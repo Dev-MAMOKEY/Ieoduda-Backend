@@ -1,4 +1,4 @@
-package com.mamoki.ieojuda.global.config;
+package com.mamoki.ieojuda.global.openai.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
