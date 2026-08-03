@@ -18,7 +18,7 @@ public class Recipient {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "assigne_id") // 오탈자 DB 그대로 유지 (올바른 표기: assignee_id)
+    @Column(name = "assignee_id") // 오탈자 DB 그대로 유지 (올바른 표기: assignee_id)
     private Long assigneeId;
 
     @ManyToOne(fetch = FetchType.LAZY)
