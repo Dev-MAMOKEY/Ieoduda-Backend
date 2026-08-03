@@ -19,6 +19,7 @@ import java.util.List;
 public class OpenAIClient {
 
     // 삶의 구역 작성 - AI 구조화 대화에서 항상 지켜야 하는 고정 정책 (대화 턴 수와 무관하게 매 요청 동일하게 포함)
+    // 응답 형식(JSON 스키마)까지 강제해서, 서비스 코드가 "되묻는 중"인지 "구조화 완료"인지 파싱으로 구분할 수 있게 함
     private static final String COMPILE_POLICY_PROMPT =
             "당신은 이어주다 서비스의 '삶의 구역 작성' 단계를 돕는 어시스턴트입니다. " +
                     "사용자가 작성한 원문을 대상·구역·행동·역할·선행조건으로 구조화하고, " +
@@ -26,7 +27,15 @@ public class OpenAIClient {
                     "담당자가 누락되었거나 표현이 모호하면 사용자에게 되물어 확인하세요. " +
                     "절대로 사망 여부 판정, 증빙 진위 판단, 상속 권리 판단을 하지 마세요. " +
                     "비밀번호·PIN·OTP 등 자격증명을 묻거나 추론하지 마세요. " +
-                    "실제 계정 작업을 대신 수행하지 말고, 사용자 승인 없이 계획을 확정하지 마세요.";
+                    "실제 계정 작업을 대신 수행하지 말고, 사용자 승인 없이 계획을 확정하지 마세요. " +
+                    "다른 설명 없이 아래 두 형식 중 하나의 JSON으로만 답하세요. " +
+                    "1) 되물어야 할 내용이 있을 때: {\"type\":\"QUESTION\",\"question\":\"되물을 내용\"} " +
+                    "2) 구조화를 끝냈을 때: {\"type\":\"RESULT\",\"items\":[{\"locationType\":\"위치 유형\"," +
+                    "\"action\":\"행동\",\"precondition\":\"선행 조건(없으면 빈 문자열)\"," +
+                    "\"disclosureScope\":\"FAMILY 또는 WORK 또는 RELATIONSHIP 중 하나\"," +
+                    "\"sourceExcerpt\":\"이 항목의 근거가 되는 원문 문장 그대로\"}]}";
+
+    private static final String JSON_RESPONSE_FORMAT_TYPE = "json_object";
 
     private final RestTemplate restTemplate;
 
@@ -72,7 +81,7 @@ public class OpenAIClient {
         messages.add(systemMessage);
         messages.addAll(history);
 
-        // step 1-3. 모델 이름과 메세지를 포함한 요청 객체 생성
-        return new OpenAIRequest(model, messages);
+        // step 1-3. 모델 이름, 메세지, 응답 형식(JSON 강제)을 포함한 요청 객체 생성
+        return new OpenAIRequest(model, messages, new OpenAIRequest.ResponseFormat(JSON_RESPONSE_FORMAT_TYPE));
     }
 }

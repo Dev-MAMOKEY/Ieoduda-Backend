@@ -44,6 +44,7 @@ public enum ErrorCode {
     // 리소스 없음 (404)
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "요청한 리소스가 존재하지 않습니다."),
     PLAN_NOT_FOUND(HttpStatus.NOT_FOUND, "PLAN_NOT_FOUND", "해당 계획이 존재하지 않습니다."),
+    LIFE_AREA_NOT_FOUND(HttpStatus.NOT_FOUND, "LIFE_AREA_NOT_FOUND", "해당 삶의 구역이 존재하지 않습니다."),
     CONFIRMER_NOT_FOUND(HttpStatus.NOT_FOUND, "CONFIRMER_NOT_FOUND", "해당 지정 확인자가 존재하지 않습니다."),
     RECIPIENT_NOT_FOUND(HttpStatus.NOT_FOUND, "RECIPIENT_NOT_FOUND", "해당 역할 담당자가 존재하지 않습니다."),
     RELEASE_CASE_NOT_FOUND(HttpStatus.NOT_FOUND, "RELEASE_CASE_NOT_FOUND", "해당 사후 인계 사건이 존재하지 않습니다."),
