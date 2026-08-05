@@ -27,6 +27,12 @@ public enum ErrorCode {
     DEATH_REPORT_MISMATCH(HttpStatus.BAD_REQUEST, "DEATH_REPORT_MISMATCH", "두 확인자의 신고 내용이 일치하지 않아 절차를 중지합니다."),
     EVIDENCE_SUBMISSION_INVALID(HttpStatus.BAD_REQUEST, "EVIDENCE_SUBMISSION_INVALID", "증빙 파일 형식이 올바르지 않거나 보안 검사에 실패했습니다."),
 
+    // 공통 이메일 발송 모듈 관련 예외 (500)
+    EMAIL_CONTENT_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EMAIL_CONTENT_GENERATION_FAILED", "이메일 본문 생성에 실패했습니다."),
+    //이메일 토큰 관련 예외 (400/500)
+    INVALID_TOKEN_FORMAT(HttpStatus.BAD_REQUEST, "INVALID_TOKEN_FORMAT", "토큰 값이 비어있거나 형식이 올바르지 않습니다."),
+    TOKEN_HASHING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TOKEN_HASHING_FAILED", "토큰 처리 중 서버 오류가 발생했습니다."),
+
     // 인증 관련 예외 처리 (401)
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다."),
     TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "TOKEN_EXPIRED", "Access Token이 만료되었습니다."),
