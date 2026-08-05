@@ -28,6 +28,9 @@ public class Item {
     @JoinColumn(name = "life_id", nullable = false)
     private LifeArea lifeArea;
 
+    @Column(name = "target_name", length = 100)
+    private String targetName;
+
     @Column(name = "location_type", length = 100)
     private String locationType;
 
@@ -52,9 +55,10 @@ public class Item {
     private LocalDateTime reviewedAt;
 
     @Builder
-    public Item(LifeArea lifeArea, String locationType, String action,
+    public Item(LifeArea lifeArea, String targetName, String locationType, String action,
                 String precondition, DisclosureScope disclosureScope, String sourceExcerpt) {
         this.lifeArea = lifeArea;
+        this.targetName = targetName;
         this.locationType = locationType;
         this.action = action;
         this.precondition = precondition;
@@ -71,6 +75,16 @@ public class Item {
     public void reject() {
         this.status = ItemStatus.REJECTED;
         this.reviewedAt = LocalDateTime.now();
+    }
+
+    // 대화창 인라인 "수정" 버튼 - AI가 만든 초안을 사용자가 직접 고침
+    public void updateContent(String targetName, String locationType, String action,
+                               String precondition, DisclosureScope disclosureScope) {
+        this.targetName = targetName;
+        this.locationType = locationType;
+        this.action = action;
+        this.precondition = precondition;
+        this.disclosureScope = disclosureScope;
     }
 
     public void assignRecipient(Recipient recipient) {

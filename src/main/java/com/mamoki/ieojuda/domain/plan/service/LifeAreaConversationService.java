@@ -8,6 +8,7 @@ import com.mamoki.ieojuda.domain.plan.dto.LifeAreaMessageResponse;
 import com.mamoki.ieojuda.domain.plan.dto.LifeAreaTurnResponse;
 import com.mamoki.ieojuda.domain.plan.entity.DisclosureScope;
 import com.mamoki.ieojuda.domain.plan.entity.Item;
+import com.mamoki.ieojuda.domain.plan.entity.ItemStatus;
 import com.mamoki.ieojuda.domain.plan.entity.LifeArea;
 import com.mamoki.ieojuda.domain.plan.entity.LifeAreaMessage;
 import com.mamoki.ieojuda.domain.plan.entity.MessageRole;
@@ -80,8 +81,8 @@ public class LifeAreaConversationService {
         }
         openAiHistory.add(new OpenAIMessageDto(toOpenAiRole(MessageRole.USER), userMessage.getContent()));
 
-        // step 4. OpenAI 호출
-        OpenAIResponse response = openAIClient.getChatCompletion(openAiHistory);
+        // step 4. OpenAI 호출 (새 계획 만들기 화면에서 넘어온 이 구역의 초기 선택값을 매번 함께 전달)
+        OpenAIResponse response = openAIClient.getChatCompletion(openAiHistory, lifeArea.getRawText());
         String rawContent = response.choices().get(0).message().content();
 
         // step 5. AI 응답 저장 (원문 그대로 저장 - 다음 턴에도 이력으로 다시 전달되어야 함)
@@ -112,6 +113,12 @@ public class LifeAreaConversationService {
     }
 
     private List<Item> createItems(LifeArea lifeArea, List<AiStructuredItemDto> items) {
+        // 화면 전환 없이 같은 대화창에서 계속 대화하는 구조라, AI가 계획을 다시 짤 때마다
+        // 이전에 만들어둔 초안(PROPOSED)은 지우고 새로 받은 항목으로 교체한다.
+        // 이미 사용자가 승인/기각한 항목(APPROVED/REJECTED)은 대화가 계속되어도 그대로 둔다.
+        List<Item> previousProposed = itemRepository.findByLifeArea_LifeIdAndStatus(lifeArea.getLifeId(), ItemStatus.PROPOSED);
+        itemRepository.deleteAll(previousProposed);
+
         List<Item> savedItems = new ArrayList<>();
         for (AiStructuredItemDto dto : items) {
             // 명세서 "AI 구조화 결과 검토" 예외 처리: 원문 근거 없는 항목은 승인 불가
@@ -128,6 +135,7 @@ public class LifeAreaConversationService {
 
             Item item = Item.builder()
                     .lifeArea(lifeArea)
+                    .targetName(dto.targetName())
                     .locationType(dto.locationType())
                     .action(dto.action())
                     .precondition(dto.precondition())

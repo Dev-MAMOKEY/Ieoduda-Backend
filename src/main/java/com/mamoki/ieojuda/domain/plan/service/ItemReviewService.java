@@ -2,7 +2,9 @@ package com.mamoki.ieojuda.domain.plan.service;
 
 import com.mamoki.ieojuda.domain.plan.dto.ItemReviewDecision;
 import com.mamoki.ieojuda.domain.plan.dto.ItemReviewRequest;
+import com.mamoki.ieojuda.domain.plan.dto.ItemUpdateRequest;
 import com.mamoki.ieojuda.domain.plan.dto.LifeAreaTurnResponse;
+import com.mamoki.ieojuda.domain.plan.entity.DisclosureScope;
 import com.mamoki.ieojuda.domain.plan.entity.Item;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
@@ -32,6 +34,24 @@ public class ItemReviewService {
         } else {
             item.reject();
         }
+
+        return LifeAreaTurnResponse.ItemResponse.from(item);
+    }
+
+    // 대화창 인라인 "수정" 버튼 - AI가 만든 초안을 사용자가 직접 고쳐서 저장 (대화 화면 전환 없이 처리)
+    @Transactional
+    public LifeAreaTurnResponse.ItemResponse update(Long planId, Long itemId, ItemUpdateRequest request) {
+        Item item = findItem(planId, itemId);
+
+        DisclosureScope disclosureScope;
+        try {
+            disclosureScope = DisclosureScope.valueOf(request.disclosureScope());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
+        item.updateContent(request.targetName(), request.locationType(), request.action(),
+                request.precondition(), disclosureScope);
 
         return LifeAreaTurnResponse.ItemResponse.from(item);
     }
