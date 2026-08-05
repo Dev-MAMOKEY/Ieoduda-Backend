@@ -1,12 +1,8 @@
 package com.mamoki.ieojuda.global.email.template;
 
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
-import com.mamoki.ieojuda.global.exception.CustomException;
-import com.mamoki.ieojuda.global.exception.ErrorCode;
-
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.Locale;
 
 public class EmailBuilder {
