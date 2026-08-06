@@ -22,7 +22,7 @@ public class ItemReviewService {
     private final ItemRepository itemRepository;
 
     @Transactional
-    public LifeAreaTurnResponse.ItemResponse review(Long planId, ItemReviewRequest request) {
+    public LifeAreaTurnResponse.ItemResponse review(Long planId,  ItemReviewRequest request) {
         Item item = findItem(planId, request.itemId());
 
         if (request.decision() == ItemReviewDecision.APPROVE) {

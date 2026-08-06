@@ -38,6 +38,24 @@ public class OpenAIClient {
                     "\"disclosureScope\":\"FAMILY 또는 WORK 또는 RELATIONSHIP 중 하나\"," +
                     "\"sourceExcerpt\":\"이 항목의 근거가 되는 원문 문장 또는 선택값 그대로\"}]}";
 
+    // 새 계획 만들기 - 입력값이 어느 칸(가족/관계정리/업무정리)에 쓰였는지가 아니라 실제 내용을 보고 분류
+    private static final String INITIAL_STRUCTURE_PROMPT =
+            "당신은 이어주다 서비스의 '새 계획 만들기' 화면에서 사용자가 입력한 내용을 처음 구조화하는 어시스턴트입니다. " +
+                    "다음 user 메세지로 계획 작성자가 입력한 값이 JSON으로 주어집니다. " +
+                    "이 값은 자유 텍스트(familyMessage)와 버튼으로 고른 값(snsAction 등)이 섞여 있는데, " +
+                    "그 값이 어느 필드에 담겨 왔는지가 아니라 실제 내용을 읽고 가족(FAMILY)/관계 정리(RELATIONSHIP)/업무 연속성(WORK) 중 어디에 해당하는지 직접 판단해서 분류하세요. " +
+                    "예를 들어 familyMessage 칸에 적힌 내용이라도 실제로는 업무 이야기면 WORK로 분류하고, 반대로 업무 관련 칸이라도 실제로는 가족 이야기면 FAMILY로 분류하세요. " +
+                    "각 항목에는 대상 이름(targetName), 위치 유형(locationType), 행동(action), 선행 조건(precondition, 없으면 빈 문자열), " +
+                    "근거(sourceExcerpt, 분류 판단의 근거가 된 원문/선택값 그대로)를 포함하세요. " +
+                    "절대로 사망 여부 판정, 증빙 진위 판단, 상속 권리 판단을 하지 마세요. " +
+                    "비밀번호·PIN·OTP 등 자격증명을 묻거나 추론하지 마세요. " +
+                    "값이 비어있거나 실질적인 내용이 없는 항목은 만들지 마세요. " +
+                    "다른 설명 없이 아래 JSON 형식으로만 답하세요. " +
+                    "{\"items\":[{\"targetName\":\"이 항목의 대상 이름\",\"locationType\":\"위치 유형\"," +
+                    "\"action\":\"행동\",\"precondition\":\"선행 조건(없으면 빈 문자열)\"," +
+                    "\"disclosureScope\":\"FAMILY 또는 WORK 또는 RELATIONSHIP 중 하나\"," +
+                    "\"sourceExcerpt\":\"분류 판단의 근거가 된 원문/선택값 그대로\"}]}";
+
     private static final String JSON_RESPONSE_FORMAT_TYPE = "json_object";
 
     private final RestTemplate restTemplate;
@@ -55,44 +73,46 @@ public class OpenAIClient {
      * 대화 이력에는 없지만 매 턴 AI가 계속 기억해야 하는 값이라 매 요청마다 다시 실어 보낸다.
      */
     public OpenAIResponse getChatCompletion(List<OpenAIMessageDto> history, String seedContext) {
-        // step 1. OpenAI 요청 구성
-        OpenAIRequest openAiRequest = getOpenAIRequest(history, seedContext);
+        List<OpenAIMessageDto> messages = new ArrayList<>();
+        messages.add(new OpenAIMessageDto("system", COMPILE_POLICY_PROMPT));
 
-        // step 2. RestTemplate을 통해 OpenAI API POST 요청 전송
+        if (seedContext != null && !seedContext.isBlank()) {
+            messages.add(new OpenAIMessageDto("system", "이 구역의 초기 선택값: " + seedContext));
+        }
+
+        messages.addAll(history);
+
+        return callOpenAI(messages);
+    }
+
+    /**
+     * 새 계획 만들기 - 입력값 전체(JSON)를 받아 AI가 내용을 보고 3개 구역으로 분류/구조화한 결과를 받아온다.
+     * 1회성 제출이라 되묻기(QUESTION) 없이 바로 항목 목록만 반환한다.
+     */
+    public OpenAIResponse getInitialStructure(String optionsJson) {
+        List<OpenAIMessageDto> messages = List.of(
+                new OpenAIMessageDto("system", INITIAL_STRUCTURE_PROMPT),
+                new OpenAIMessageDto("user", optionsJson)
+        );
+        return callOpenAI(messages);
+    }
+
+    /**
+     * OpenAI API 실제 호출 (모든 기능이 공유하는 공통 로직)
+     */
+    private OpenAIResponse callOpenAI(List<OpenAIMessageDto> messages) {
+        OpenAIRequest openAiRequest = new OpenAIRequest(model, messages, new OpenAIRequest.ResponseFormat(JSON_RESPONSE_FORMAT_TYPE));
+
         ResponseEntity<OpenAIResponse> chatResponse = restTemplate.postForEntity(
                 apiUrl,
                 openAiRequest,
                 OpenAIResponse.class
         );
 
-        // step 3. 응답 실패 처리
         if (!chatResponse.getStatusCode().is2xxSuccessful() || chatResponse.getBody() == null) {
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
 
-        // step 4. 성공 시 응답 본문 반환
         return chatResponse.getBody();
-    }
-
-    /**
-     * OpenAI 요청 구성
-     */
-    private OpenAIRequest getOpenAIRequest(List<OpenAIMessageDto> history, String seedContext) {
-        // step 1-1. system 메세지 작성 - 고정된 서비스 정책 (매 요청 동일)
-        OpenAIMessageDto systemMessage = new OpenAIMessageDto("system", COMPILE_POLICY_PROMPT);
-
-        List<OpenAIMessageDto> messages = new ArrayList<>();
-        messages.add(systemMessage);
-
-        // step 1-2. 이 구역의 초기 선택값이 있으면 정책 다음, 대화 이력 앞에 별도 system 메세지로 삽입
-        if (seedContext != null && !seedContext.isBlank()) {
-            messages.add(new OpenAIMessageDto("system", "이 구역의 초기 선택값: " + seedContext));
-        }
-
-        // step 1-3. 지금까지의 실제 대화 이력을 순서대로 이어붙임
-        messages.addAll(history);
-
-        // step 1-4. 모델 이름, 메세지, 응답 형식(JSON 강제)을 포함한 요청 객체 생성
-        return new OpenAIRequest(model, messages, new OpenAIRequest.ResponseFormat(JSON_RESPONSE_FORMAT_TYPE));
     }
 }
