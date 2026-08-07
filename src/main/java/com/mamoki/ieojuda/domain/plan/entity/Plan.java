@@ -41,5 +41,12 @@ public class Plan extends BaseCreatedAtEntity {
         this.status = PlanStatus.DRAFT; // plan 생성하면 '작성중' 적용하기 위해
     }
 
+    public void updateInfo(String name, Integer waitingDays) {
+        this.name = name;
+        this.waitingDays = waitingDays;
+    }
 
+    public void deactivate() {
+        this.status = PlanStatus.DEACTIVATED;
+    }
 }

@@ -51,6 +51,12 @@ public class LifeArea extends BaseUpdatedAtEntity {
         this.aiStructuredResult = aiStructuredResult;
     }
 
+    // 새 계획 만들기 화면의 "세부사항 대화하기" 버튼 - 구역별 초기 입력(자유 텍스트 또는 선택값 JSON)을 저장
+    // 대화 턴마다 이 값을 다시 함께 보내야 AI가 초기 선택값을 계속 기억함
+    public void applyRawText(String rawText) {
+        this.rawText = rawText;
+    }
+
     // AI 구조화 검토에서 호출되게 설정
     public void review() {
         this.reviewedAt = LocalDateTime.now();
