@@ -27,6 +27,9 @@ public enum ErrorCode {
     DEATH_REPORT_MISMATCH(HttpStatus.BAD_REQUEST, "DEATH_REPORT_MISMATCH", "두 확인자의 신고 내용이 일치하지 않아 절차를 중지합니다."),
     EVIDENCE_SUBMISSION_INVALID(HttpStatus.BAD_REQUEST, "EVIDENCE_SUBMISSION_INVALID", "증빙 파일 형식이 올바르지 않거나 보안 검사에 실패했습니다."),
 
+    // 암호화 증빙 저장소 관련 예외 (500)
+    EVIDENCE_STORAGE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EVIDENCE_STORAGE_FAILED", "증빙 저장소 처리 중 오류가 발생했습니다."),
+
     // 공통 이메일 발송 모듈 관련 예외 (500)
     EMAIL_CONTENT_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EMAIL_CONTENT_GENERATION_FAILED", "이메일 본문 생성에 실패했습니다."),
     //이메일 토큰 관련 예외 (400/500)
