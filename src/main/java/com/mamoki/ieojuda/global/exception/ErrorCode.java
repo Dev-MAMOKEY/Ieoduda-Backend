@@ -8,6 +8,9 @@ public enum ErrorCode {
     // 요청 값 검증 예외 (400) -> @Valid 검증 실패, JSON 파싱 실패, 파라미터 타입 불일치 등
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "입력값이 올바르지 않습니다."),
 
+    // 회원가입 / 로그인 관련 예외 (400)
+    PASSWORD_CONFIRMATION_MISMATCH(HttpStatus.BAD_REQUEST, "PASSWORD_CONFIRMATION_MISMATCH", "비밀번호와 비밀번호 확인이 일치하지 않습니다."),
+
     // 계획 / 삶의 구역 / AI 구조화 관련 예외 (400)
     INVALID_WAITING_PERIOD(HttpStatus.BAD_REQUEST, "INVALID_WAITING_PERIOD", "대기 기간은 7~30일 사이여야 합니다."),
     CONSENT_REQUIRED(HttpStatus.BAD_REQUEST, "CONSENT_REQUIRED", "사후 인계 조건과 안전 범위를 확인해 주세요."),
