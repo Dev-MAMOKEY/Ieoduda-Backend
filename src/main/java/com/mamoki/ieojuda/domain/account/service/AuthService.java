@@ -78,6 +78,19 @@ public class AuthService {
         return issueTokens(user);
     }
 
+    // /auth/**는 SecurityConfig에서 permitAll이라 토큰 없이도 요청 자체는 통과되므로, userId가 비어 있으면
+    // (=Authorization 헤더 없이 호출한 경우) 여기서 직접 막는다.
+    // AT는 만료 전까지 계속 유효하지만(블랙리스트 없음), 저장된 RT를 지워서 재발급은 더 이상 못 하게 막는다.
+    @Transactional
+    public void logout(Long userId) {
+        if (userId == null) {
+            throw new CustomException(ErrorCode.TOKEN_INVALID);
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        user.updateRefreshToken(null);
+    }
+
     // AT/RT 새로 발급하고 RT는 DB에 갱신 저장 (재발급마다 RT도 회전)
     private TokenResponse issueTokens(User user) {
         String accessToken = jwtTokenProvider.generateAccessToken(user.getUserId(), user.getEmail());

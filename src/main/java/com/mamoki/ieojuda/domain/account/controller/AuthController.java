@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,5 +43,12 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<RsData<TokenResponse>> refresh(@Valid @RequestBody RefreshRequest request) {
         return ResponseEntity.ok(RsData.success(authService.refresh(request)));
+    }
+
+    @Operation(summary = "로그아웃", description = "저장된 Refresh Token을 무효화해 재발급을 막습니다. 이미 발급된 Access Token은 만료 전까지 계속 유효합니다. Authorization 헤더의 Access Token으로 사용자를 식별합니다.")
+    @PostMapping("/logout")
+    public ResponseEntity<RsData<Void>> logout(@AuthenticationPrincipal Long userId) {
+        authService.logout(userId);
+        return ResponseEntity.ok(RsData.success(null));
     }
 }
