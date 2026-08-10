@@ -9,7 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "plans")
+@Table(name = "plans", uniqueConstraints = @UniqueConstraint(name = "UQ_plans_user_id", columnNames = "user_id"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Plan extends BaseCreatedAtEntity {
@@ -23,27 +23,14 @@ public class Plan extends BaseCreatedAtEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "name", length = 100)
-    private String name;
-
-    @Column(name = "waiting_days")
-    private Integer waitingDays;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 30)
     private PlanStatus status;
 
     @Builder
-    public Plan(User user, String name, Integer waitingDays) {
+    public Plan(User user) {
         this.user = user;
-        this.name = name;
-        this.waitingDays = waitingDays;
         this.status = PlanStatus.DRAFT; // plan 생성하면 '작성중' 적용하기 위해
-    }
-
-    public void updateInfo(String name, Integer waitingDays) {
-        this.name = name;
-        this.waitingDays = waitingDays;
     }
 
     public void deactivate() {
