@@ -2,8 +2,8 @@ package com.mamoki.ieojuda.domain.plan.service;
 
 import com.mamoki.ieojuda.domain.plan.dto.ItemReviewDecision;
 import com.mamoki.ieojuda.domain.plan.dto.ItemReviewRequest;
+import com.mamoki.ieojuda.domain.plan.dto.ItemResponse;
 import com.mamoki.ieojuda.domain.plan.dto.ItemUpdateRequest;
-import com.mamoki.ieojuda.domain.plan.dto.LifeAreaTurnResponse;
 import com.mamoki.ieojuda.domain.plan.entity.DisclosureScope;
 import com.mamoki.ieojuda.domain.plan.entity.Item;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
@@ -22,7 +22,7 @@ public class ItemReviewService {
     private final ItemRepository itemRepository;
 
     @Transactional
-    public LifeAreaTurnResponse.ItemResponse review(Long planId,  ItemReviewRequest request) {
+    public ItemResponse review(Long planId, ItemReviewRequest request) {
         Item item = findItem(planId, request.itemId());
 
         if (request.decision() == ItemReviewDecision.APPROVE) {
@@ -35,12 +35,12 @@ public class ItemReviewService {
             item.reject();
         }
 
-        return LifeAreaTurnResponse.ItemResponse.from(item);
+        return ItemResponse.from(item);
     }
 
     // 대화창 인라인 "수정" 버튼 - AI가 만든 초안을 사용자가 직접 고쳐서 저장 (대화 화면 전환 없이 처리)
     @Transactional
-    public LifeAreaTurnResponse.ItemResponse update(Long planId, Long itemId, ItemUpdateRequest request) {
+    public ItemResponse update(Long planId, Long itemId, ItemUpdateRequest request) {
         Item item = findItem(planId, itemId);
 
         DisclosureScope disclosureScope;
@@ -53,7 +53,7 @@ public class ItemReviewService {
         item.updateContent(request.targetName(), request.locationType(), request.action(),
                 request.precondition(), disclosureScope);
 
-        return LifeAreaTurnResponse.ItemResponse.from(item);
+        return ItemResponse.from(item);
     }
 
     private Item findItem(Long planId, Long itemId) {

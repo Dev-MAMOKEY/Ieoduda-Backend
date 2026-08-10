@@ -7,6 +7,8 @@ import com.mamoki.ieojuda.domain.account.dto.SignupResponse;
 import com.mamoki.ieojuda.domain.account.dto.TokenResponse;
 import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.account.repository.UserRepository;
+import com.mamoki.ieojuda.domain.plan.entity.Plan;
+import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.jwt.component.JwtTokenProvider;
@@ -22,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final PlanRepository planRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -39,6 +42,9 @@ public class AuthService {
                 .password(passwordEncoder.encode(request.password()))
                 .name(request.name())
                 .build());
+
+        // 1인 1계획 고정 - "계획 만들기" 화면이 없어졌으므로 회원가입과 동시에 사후 인계 케이스(Plan)를 자동 생성한다.
+        planRepository.save(Plan.builder().user(user).build());
 
         return SignupResponse.from(user);
     }

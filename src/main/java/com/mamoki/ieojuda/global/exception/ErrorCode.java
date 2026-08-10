@@ -58,6 +58,7 @@ public enum ErrorCode {
     PLAN_NOT_FOUND(HttpStatus.NOT_FOUND, "PLAN_NOT_FOUND", "해당 계획이 존재하지 않습니다."),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "해당 사용자가 존재하지 않습니다."),
     LIFE_AREA_NOT_FOUND(HttpStatus.NOT_FOUND, "LIFE_AREA_NOT_FOUND", "해당 삶의 구역이 존재하지 않습니다."),
+    CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "CONVERSATION_NOT_FOUND", "해당 대화 세션이 존재하지 않습니다."),
     ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "ITEM_NOT_FOUND", "해당 항목이 존재하지 않습니다."),
     CONFIRMER_NOT_FOUND(HttpStatus.NOT_FOUND, "CONFIRMER_NOT_FOUND", "해당 지정 확인자가 존재하지 않습니다."),
     RECIPIENT_NOT_FOUND(HttpStatus.NOT_FOUND, "RECIPIENT_NOT_FOUND", "해당 역할 담당자가 존재하지 않습니다."),
