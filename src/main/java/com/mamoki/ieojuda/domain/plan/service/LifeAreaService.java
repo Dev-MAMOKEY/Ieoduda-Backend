@@ -1,5 +1,8 @@
 package com.mamoki.ieojuda.domain.plan.service;
 
+import tools.jackson.databind.ObjectMapper;
+import com.mamoki.ieojuda.domain.plan.dto.AiTurnResult;
+import com.mamoki.ieojuda.domain.plan.dto.CompilationResponse;
 import com.mamoki.ieojuda.domain.plan.dto.LifeAreaResponse;
 import com.mamoki.ieojuda.domain.plan.entity.LifeArea;
 import com.mamoki.ieojuda.domain.plan.repository.LifeAreaRepository;
@@ -19,6 +22,7 @@ import java.util.List;
 public class LifeAreaService {
 
     private final LifeAreaRepository lifeAreaRepository;
+    private final ObjectMapper objectMapper;
 
     public List<LifeAreaResponse> getLifeAreas(Long planId) {
         return lifeAreaRepository.findByPlan_PlanIdOrderByLifeIdAsc(planId).stream()
@@ -27,11 +31,36 @@ public class LifeAreaService {
     }
 
     public LifeAreaResponse getLifeArea(Long planId, Long lifeAreaId) {
+        return LifeAreaResponse.from(findLifeArea(planId, lifeAreaId));
+    }
+
+    // 명세서 "AI 구조화 결과 검토" 화면 - 새 엔티티 없이 LifeArea.aiStructuredResult(구역별 최신 AI 구조화 원문)를 재조회
+    public CompilationResponse getCompilation(Long planId, Long lifeAreaId) {
+        LifeArea lifeArea = findLifeArea(planId, lifeAreaId);
+        String raw = lifeArea.getAiStructuredResult();
+
+        if (raw == null || raw.isBlank()) {
+            return new CompilationResponse(lifeArea.getLifeId(), lifeArea.getCategory().name(), true, List.of());
+        }
+
+        AiTurnResult result = parseAiTurnResult(raw);
+        return new CompilationResponse(lifeArea.getLifeId(), lifeArea.getCategory().name(), false, result.items());
+    }
+
+    private AiTurnResult parseAiTurnResult(String rawContent) {
+        try {
+            return objectMapper.readValue(rawContent, AiTurnResult.class);
+        } catch (Exception e) {
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private LifeArea findLifeArea(Long planId, Long lifeAreaId) {
         LifeArea lifeArea = lifeAreaRepository.findById(lifeAreaId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LIFE_AREA_NOT_FOUND));
         if (!lifeArea.getPlan().getPlanId().equals(planId)) {
             throw new CustomException(ErrorCode.LIFE_AREA_NOT_FOUND);
         }
-        return LifeAreaResponse.from(lifeArea);
+        return lifeArea;
     }
 }

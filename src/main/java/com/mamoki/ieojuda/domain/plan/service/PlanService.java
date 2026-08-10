@@ -4,6 +4,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.account.repository.UserRepository;
 import com.mamoki.ieojuda.domain.plan.dto.AiStructuredItemDto;
+import com.mamoki.ieojuda.domain.plan.dto.AiTurnResult;
 import com.mamoki.ieojuda.domain.plan.dto.InitialStructureResult;
 import com.mamoki.ieojuda.domain.plan.dto.LifeAreaResponse;
 import com.mamoki.ieojuda.domain.plan.dto.LifeAreaTurnResponse;
@@ -51,10 +52,10 @@ public class PlanService {
     private final ObjectMapper objectMapper;
 
     @Transactional
-    public PlanResponse create(PlanCreateRequest request) {
+    public PlanResponse create(Long userId, PlanCreateRequest request) {
         validateWaitingDays(request.waitingDays());
 
-        User user = userRepository.findById(request.userId())
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         Plan plan = planRepository.save(Plan.builder()
@@ -114,6 +115,7 @@ public class PlanService {
         InitialStructureResult result = parseInitialStructure(rawContent);
 
         Map<LifeAreaCategory, List<LifeAreaTurnResponse.ItemResponse>> itemsByCategory = new EnumMap<>(LifeAreaCategory.class);
+        Map<LifeAreaCategory, List<AiStructuredItemDto>> dtosByCategory = new EnumMap<>(LifeAreaCategory.class);
         for (AiStructuredItemDto dto : result.items()) {
             // 명세서 "AI 구조화 결과 검토" 예외 처리: 근거 없는 항목은 승인 불가 (여기선 생성 자체를 차단)
             if (dto.sourceExcerpt() == null || dto.sourceExcerpt().isBlank()) {
@@ -143,7 +145,17 @@ public class PlanService {
 
             itemsByCategory.computeIfAbsent(category, key -> new ArrayList<>())
                     .add(LifeAreaTurnResponse.ItemResponse.from(saved));
+            dtosByCategory.computeIfAbsent(category, key -> new ArrayList<>()).add(dto);
         }
+
+        // GET /api/plans/{planId}/compilations/{lifeAreaId}(구역별 AI 구조화 결과 재조회)에서 쓸 수 있도록
+        // 구역별로 이번에 구조화된 원문을 LifeArea.aiStructuredResult에 저장 (대화 턴에서 저장하는 것과 동일한 형태)
+        for (LifeAreaCategory category : LifeAreaCategory.values()) {
+            LifeArea lifeArea = lifeAreasByCategory.get(category);
+            List<AiStructuredItemDto> dtos = dtosByCategory.getOrDefault(category, List.of());
+            lifeArea.applyAiStructuredResult(toJson(new AiTurnResult("RESULT", null, dtos)));
+        }
+
         return itemsByCategory;
     }
 
