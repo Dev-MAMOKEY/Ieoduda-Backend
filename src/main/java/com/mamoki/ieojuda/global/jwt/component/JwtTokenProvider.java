@@ -49,6 +49,10 @@ public class JwtTokenProvider {
         return TOKEN_TYPE_REFRESH.equals(parseClaims(token).get(CLAIM_TOKEN_TYPE, String.class));
     }
 
+    public boolean isAccessToken(String token) { // AT 검증 - JwtAuthenticationFilter에서 사용
+        return TOKEN_TYPE_ACCESS.equals(parseClaims(token).get(CLAIM_TOKEN_TYPE, String.class));
+    }
+
     //토큰 열기
     private Claims parseClaims(String token) {
         return Jwts.parser()

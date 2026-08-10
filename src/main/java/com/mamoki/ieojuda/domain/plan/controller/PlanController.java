@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,10 +29,13 @@ public class PlanController {
 
     private final PlanService planService;
 
-    @Operation(summary = "계획 생성", description = "계획 이름과 대기 기간(7~30일)을 입력받아 계획을 생성합니다. 동시에 기본 삶의 구역(가족/관계 정리/업무 연속성) 3개가 자동 생성됩니다.")
+    @Operation(summary = "계획 생성", description = "계획 이름과 대기 기간(7~30일)을 입력받아 계획을 생성합니다. 동시에 기본 삶의 구역(가족/관계 정리/업무 연속성) 3개가 자동 생성됩니다. 작성자는 Authorization 헤더의 Access Token으로 식별합니다.")
     @PostMapping
-    public ResponseEntity<RsData<PlanResponse>> create(@Valid @RequestBody PlanCreateRequest request) {
-        return ResponseEntity.ok(RsData.success(planService.create(request)));
+    public ResponseEntity<RsData<PlanResponse>> create(
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody PlanCreateRequest request
+    ) {
+        return ResponseEntity.ok(RsData.success(planService.create(userId, request)));
     }
 
     @Operation(summary = "계획 조회")

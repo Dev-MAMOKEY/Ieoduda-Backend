@@ -51,10 +51,10 @@ public class PlanService {
     private final ObjectMapper objectMapper;
 
     @Transactional
-    public PlanResponse create(PlanCreateRequest request) {
+    public PlanResponse create(Long userId, PlanCreateRequest request) {
         validateWaitingDays(request.waitingDays());
 
-        User user = userRepository.findById(request.userId())
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         Plan plan = planRepository.save(Plan.builder()
