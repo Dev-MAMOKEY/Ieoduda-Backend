@@ -54,9 +54,13 @@ public class Item {
     @Column(name = "reviewed_at")
     private LocalDateTime reviewedAt;
 
+    @Column(name = "sort_order")
+    private Integer sortOrder;
+
     @Builder
     public Item(LifeArea lifeArea, String targetName, String locationType, String action,
-                String precondition, DisclosureScope disclosureScope, String sourceExcerpt) {
+                String precondition, DisclosureScope disclosureScope, String sourceExcerpt,
+                Integer sortOrder) {
         this.lifeArea = lifeArea;
         this.targetName = targetName;
         this.locationType = locationType;
@@ -64,6 +68,7 @@ public class Item {
         this.precondition = precondition;
         this.disclosureScope = disclosureScope;
         this.sourceExcerpt = sourceExcerpt;
+        this.sortOrder = sortOrder;
         this.status = ItemStatus.PROPOSED;
     }
 

@@ -19,8 +19,8 @@ public class LifeAreaMessage extends BaseCreatedAtEntity {
     private Long messageId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "life_id", nullable = false)
-    private LifeArea lifeArea;
+    @JoinColumn(name = "conversation_id", nullable = false)
+    private Conversation conversation;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", length = 20)
@@ -31,8 +31,8 @@ public class LifeAreaMessage extends BaseCreatedAtEntity {
 
     // 삶의 구역 작성 대화(말풍선) 한 턴을 저장 - 사용자 발화/AI 응답이 순서대로 쌓임
     @Builder
-    public LifeAreaMessage(LifeArea lifeArea, MessageRole role, String content) {
-        this.lifeArea = lifeArea;
+    public LifeAreaMessage(Conversation conversation, MessageRole role, String content) {
+        this.conversation = conversation;
         this.role = role;
         this.content = content;
     }
