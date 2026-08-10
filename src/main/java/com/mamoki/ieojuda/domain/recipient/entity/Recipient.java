@@ -1,6 +1,7 @@
 package com.mamoki.ieojuda.domain.recipient.entity;
 
 import com.mamoki.ieojuda.domain.plan.entity.DisclosureScope;
+import com.mamoki.ieojuda.domain.plan.entity.LifeArea;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -24,6 +25,10 @@ public class Recipient {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "plan_id", nullable = false)
     private Plan plan;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "life_id", nullable = false)
+    private LifeArea lifeArea;
 
     @Column(name = "name", length = 100)
     private String name;
@@ -68,10 +73,11 @@ public class Recipient {
 
     // 담당자 등록 시점 - 역할명, 담당자 이름, 이메일, 공개 범주, 최대 단계 대기 시간, 대체 담당자 입력
     @Builder
-    public Recipient(Plan plan, String name, String email, RoleType roleType,
+    public Recipient(Plan plan, LifeArea lifeArea, String name, String email, RoleType roleType,
                      Boolean isBackup, DisclosureScope disclosureScope,
                      Integer maxWaitHours, Recipient backupFor) {
         this.plan = plan;
+        this.lifeArea = lifeArea;
         this.name = name;
         this.email = email;
         this.roleType = roleType;
