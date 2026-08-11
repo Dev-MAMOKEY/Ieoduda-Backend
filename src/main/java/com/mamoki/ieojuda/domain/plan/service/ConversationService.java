@@ -171,7 +171,7 @@ public class ConversationService {
                     .precondition(dto.precondition())
                     .disclosureScope(disclosureScope)
                     .sourceExcerpt(dto.sourceExcerpt())
-                    .sortOrder(savedItems.size())
+                    .sortOrder(dto.sortOrder() != null ? dto.sortOrder() : 0) // AI가 지시를 안 지키고 null을 줄 경우 대비
                     .build();
             savedItems.add(itemRepository.save(item));
         }

@@ -7,6 +7,7 @@ public record AiStructuredItemDto(
         String action,
         String precondition,
         String disclosureScope, // DisclosureScope.name()과 동일한 문자열(FAMILY/WORK/RELATIONSHIP)이어야 함
-        String sourceExcerpt    // 원문 근거 또는 선택값 근거
+        String sourceExcerpt,   // 원문 근거 또는 선택값 근거
+        Integer sortOrder       // 같은 응답 안 항목들끼리의 실행 순서 (낮을수록 먼저)
 ) {
 }
