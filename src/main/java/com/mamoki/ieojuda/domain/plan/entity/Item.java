@@ -77,11 +77,6 @@ public class Item {
         this.reviewedAt = LocalDateTime.now();
     }
 
-    public void reject() {
-        this.status = ItemStatus.REJECTED;
-        this.reviewedAt = LocalDateTime.now();
-    }
-
     // 대화창 인라인 "수정" 버튼 - AI가 만든 초안을 사용자가 직접 고침
     public void updateContent(String targetName, String locationType, String action,
                                String precondition, DisclosureScope disclosureScope) {
