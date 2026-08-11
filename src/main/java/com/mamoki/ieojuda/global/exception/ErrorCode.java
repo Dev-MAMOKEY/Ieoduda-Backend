@@ -16,6 +16,7 @@ public enum ErrorCode {
     CONSENT_REQUIRED(HttpStatus.BAD_REQUEST, "CONSENT_REQUIRED", "사후 인계 조건과 안전 범위를 확인해 주세요."),
     SUSPECTED_CREDENTIAL_INPUT(HttpStatus.BAD_REQUEST, "SUSPECTED_CREDENTIAL_INPUT", "비밀번호 등 자격증명으로 의심되는 내용은 저장할 수 없습니다."),
     UNGROUNDED_ITEM_NOT_APPROVABLE(HttpStatus.BAD_REQUEST, "UNGROUNDED_ITEM_NOT_APPROVABLE", "원문 근거가 없는 항목은 승인할 수 없습니다."),
+    ITEM_NOT_APPROVED(HttpStatus.BAD_REQUEST, "ITEM_NOT_APPROVED", "승인되지 않은 항목에는 담당자를 등록할 수 없습니다."),
     PROHIBITED_ACTION_DETECTED(HttpStatus.BAD_REQUEST, "PROHIBITED_ACTION_DETECTED", "AI가 처리할 수 없는 금지 행동이 포함되어 있습니다."),
     PACKAGE_SEAL_BLOCKED(HttpStatus.BAD_REQUEST, "PACKAGE_SEAL_BLOCKED", "금지 정보나 근거 없는 항목이 있어 패키지를 봉인할 수 없습니다."),
     CIRCULAR_DEPENDENCY_DETECTED(HttpStatus.BAD_REQUEST, "CIRCULAR_DEPENDENCY_DETECTED", "발송 단계에 순환 의존 관계가 존재합니다."),
@@ -70,6 +71,7 @@ public enum ErrorCode {
     DISPUTE_RAISED(HttpStatus.CONFLICT, "DISPUTE_RAISED", "이의 제기가 접수되어 자동 발송이 중지되었습니다."),
     RELEASE_CASE_FROZEN(HttpStatus.CONFLICT, "RELEASE_CASE_FROZEN", "사건이 동결되어 있어 처리할 수 없습니다."),
     ACTIVE_RELEASE_CASE_EXISTS(HttpStatus.CONFLICT, "ACTIVE_RELEASE_CASE_EXISTS", "진행 중인 사후 인계 사건이 있어 계정을 삭제할 수 없습니다."),
+    RECIPIENT_ALREADY_ASSIGNED(HttpStatus.CONFLICT, "RECIPIENT_ALREADY_ASSIGNED", "해당 항목에는 이미 담당자가 등록되어 있습니다."),
 
     // 서버 에러 (500)
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR","서버 오류가 발생했습니다.");
