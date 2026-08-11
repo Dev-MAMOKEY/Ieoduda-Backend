@@ -12,7 +12,7 @@ public record ItemResponse(
         @Schema(description = "선행 조건 (없으면 빈 문자열)") String precondition,
         @Schema(description = "공개 범위", example = "FAMILY", allowableValues = {"FAMILY", "WORK", "RELATIONSHIP"}) String disclosureScope,
         @Schema(description = "이 항목의 근거가 되는 원문 문장") String sourceExcerpt,
-        @Schema(description = "검토 상태", example = "PROPOSED", allowableValues = {"PROPOSED", "APPROVED", "REJECTED"}) String status
+        @Schema(description = "검토 상태", example = "PROPOSED", allowableValues = {"PROPOSED", "APPROVED"}) String status
 ) {
     public static ItemResponse from(Item item) {
         return new ItemResponse(

@@ -137,7 +137,7 @@ public class ConversationService {
 
     private List<Item> createItems(Plan plan, Conversation conversation, List<AiStructuredItemDto> items) {
         // 대화가 이어지며 AI가 다시 구조화할 때마다, 아직 검토 안 된(PROPOSED) 이전 초안은 계획 전체 기준으로 지우고
-        // 새로 받은 항목으로 교체한다. 이미 사용자가 승인/기각한 항목(APPROVED/REJECTED)은 그대로 둔다.
+        // 새로 받은 항목으로 교체한다. 이미 사용자가 승인한 항목(APPROVED)은 그대로 둔다.
         List<Item> previousProposed = itemRepository.findByLifeArea_Plan_PlanIdAndStatus(plan.getPlanId(), ItemStatus.PROPOSED);
         itemRepository.deleteAll(previousProposed);
 
