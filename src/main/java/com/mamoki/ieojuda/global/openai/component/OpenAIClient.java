@@ -36,6 +36,11 @@ public class OpenAIClient {
                     "이번에 만드는 항목들 사이에 실행 순서를 지켜야 하는 관계가 있다면(예: 자료를 보존해야 하는 항목은 " +
                     "그 자료가 있는 계정을 삭제하는 항목보다 먼저 실행되어야 함, 거래처 통지는 채널 폐쇄보다 먼저, " +
                     "기록 반출은 기기 초기화보다 먼저) 그 순서에 맞게 서로 다른 sortOrder 값을 매기세요. " +
+                    "특히 어떤 항목의 precondition에 '~한 후에', '~하고 나서'처럼 다른 항목이 먼저 끝나야 한다는 내용을 적었다면, " +
+                    "그 항목의 sortOrder는 반드시 그 다른 항목의 sortOrder보다 큰 값이어야 합니다 " +
+                    "(예: '아내에게 위치를 알려준 후 계정을 삭제해줘'라면 '위치 알려주기'는 sortOrder 0, " +
+                    "precondition에 '아내에게 위치를 알려준 후'라고 적은 '계정 삭제'는 sortOrder 1처럼 반드시 더 큰 값을 매겨야 합니다). " +
+                    "precondition과 sortOrder가 서로 모순되면 안 됩니다. " +
                     "순서를 지킬 필요가 없는 항목들끼리는 모두 0을 매기세요. " +
                     "절대로 사망 여부 판정, 증빙 진위 판단, 상속 권리 판단을 하지 마세요. " +
                     "비밀번호·PIN·OTP 등 자격증명을 묻거나 추론하지 마세요. " +
@@ -50,6 +55,8 @@ public class OpenAIClient {
                     "\"sortOrder\":실행 순서를 나타내는 정수(낮을수록 먼저)}]}";
 
     private static final String JSON_RESPONSE_FORMAT_TYPE = "json_object";
+    // 창의성이 필요 없는 구조화 작업이라 낮게 고정해서 같은 입력에 최대한 일관된 결과(특히 sortOrder)가 나오게 함
+    private static final double COMPILE_TEMPERATURE = 0.0;
 
     private final RestTemplate restTemplate;
 
@@ -76,7 +83,8 @@ public class OpenAIClient {
      * OpenAI API 실제 호출
      */
     private OpenAIResponse callOpenAI(List<OpenAIMessageDto> messages) {
-        OpenAIRequest openAiRequest = new OpenAIRequest(model, messages, new OpenAIRequest.ResponseFormat(JSON_RESPONSE_FORMAT_TYPE));
+        OpenAIRequest openAiRequest = new OpenAIRequest(
+                model, messages, new OpenAIRequest.ResponseFormat(JSON_RESPONSE_FORMAT_TYPE), COMPILE_TEMPERATURE);
 
         ResponseEntity<OpenAIResponse> chatResponse = restTemplate.postForEntity(
                 apiUrl,

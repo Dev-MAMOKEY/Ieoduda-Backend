@@ -4,6 +4,7 @@ import com.mamoki.ieojuda.domain.account.dto.UserResponse;
 import com.mamoki.ieojuda.domain.account.dto.UserUpdateRequest;
 import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.account.repository.UserRepository;
+import com.mamoki.ieojuda.domain.confirmer.repository.DisputeContactRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.repository.ConversationRepository;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
@@ -30,6 +31,7 @@ public class UserService {
     private final LifeAreaMessageRepository lifeAreaMessageRepository;
     private final ItemRepository itemRepository;
     private final RecipientRepository recipientRepository;
+    private final DisputeContactRepository disputeContactRepository;
 
     @Transactional
     public UserResponse updateProfile(Long userId, UserUpdateRequest request) {
@@ -45,7 +47,7 @@ public class UserService {
     }
 
     // 계정·계획 데이터를 영구 삭제한다(되돌릴 수 없음).
-    // confirmer/evidence/releasecase 등 도메인은 아직 어떤 서비스도 행을 만들지 않아 삭제 대상이 없다 -
+    // confirmer(Confirmer)/evidence/releasecase 등은 아직 어떤 서비스도 행을 만들지 않아 삭제 대상이 없다 -
     // 나중에 그 도메인들이 실제로 wiring되면 여기에 삭제 순서를 추가해야 한다.
     @Transactional
     public void deleteAccount(Long userId) {
@@ -63,6 +65,7 @@ public class UserService {
         lifeAreaMessageRepository.deleteAll(lifeAreaMessageRepository.findByConversation_Plan_PlanId(planId));
         itemRepository.deleteAll(itemRepository.findByLifeArea_Plan_PlanIdOrderByItemIdAsc(planId));
         recipientRepository.deleteAll(recipientRepository.findByPlan_PlanId(planId));
+        disputeContactRepository.deleteAll(disputeContactRepository.findByPlan_PlanId(planId));
         lifeAreaRepository.deleteAll(lifeAreaRepository.findByPlan_PlanId(planId));
         conversationRepository.deleteAll(conversationRepository.findByPlan_PlanId(planId));
         planRepository.delete(plan);

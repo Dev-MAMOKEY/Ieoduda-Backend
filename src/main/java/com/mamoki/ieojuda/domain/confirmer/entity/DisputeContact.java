@@ -36,6 +36,12 @@ public class DisputeContact {
     @Column(name = "verified_at")
     private LocalDateTime verifiedAt;
 
+    @Column(name = "invite_token", length = 255)
+    private String inviteToken;
+
+    @Column(name = "invite_token_expires_at")
+    private LocalDateTime inviteTokenExpiresAt;
+
     @Builder
     public DisputeContact(Plan plan, String email, String name) {
         this.plan = plan;
@@ -44,9 +50,27 @@ public class DisputeContact {
         this.isVerified = false;
     }
 
+    // 검증 이메일 발송 시 토큰(해시) 저장
+    public void issueInviteToken(String inviteTokenHash, LocalDateTime expiresAt) {
+        this.inviteToken = inviteTokenHash;
+        this.inviteTokenExpiresAt = expiresAt;
+    }
+
     // 이메일 검증 완료
     public void verify() {
         this.isVerified = true;
         this.verifiedAt = LocalDateTime.now();
+    }
+
+    // "대기 이의제기 수정" 화면 - 이름/이메일 수정
+    public void updateContact(String name, String email) {
+        this.name = name;
+        this.email = email;
+    }
+
+    // 이메일이 바뀌면 이전 검증은 더 이상 유효하지 않으므로 다시 검증받아야 함
+    public void resetVerification() {
+        this.isVerified = false;
+        this.verifiedAt = null;
     }
 }
