@@ -72,6 +72,7 @@ public enum ErrorCode {
     RELEASE_CASE_FROZEN(HttpStatus.CONFLICT, "RELEASE_CASE_FROZEN", "사건이 동결되어 있어 처리할 수 없습니다."),
     ACTIVE_RELEASE_CASE_EXISTS(HttpStatus.CONFLICT, "ACTIVE_RELEASE_CASE_EXISTS", "진행 중인 사후 인계 사건이 있어 계정을 삭제할 수 없습니다."),
     RECIPIENT_ALREADY_ASSIGNED(HttpStatus.CONFLICT, "RECIPIENT_ALREADY_ASSIGNED", "해당 항목에는 이미 담당자가 등록되어 있습니다."),
+    CONFIRMER_ALREADY_REGISTERED(HttpStatus.CONFLICT, "CONFIRMER_ALREADY_REGISTERED", "이미 등록된 지정 확인자 이메일입니다."),
 
     // 서버 에러 (500)
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR","서버 오류가 발생했습니다.");

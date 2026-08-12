@@ -53,6 +53,9 @@ public class Confirmer {
     @Column(name = "invite_token", length = 255)
     private String inviteToken;
 
+    @Column(name = "invite_token_expires_at")
+    private LocalDateTime inviteTokenExpiresAt;
+
     @Builder
     public Confirmer(Plan plan, String name, Relationship relationship, String email) {
         this.plan = plan;
@@ -63,8 +66,10 @@ public class Confirmer {
         this.reportStatus = ReportStatus.NOT_REPORTED;
     }
 
-    public void issueInviteToken(String inviteToken) {
-        this.inviteToken = inviteToken;
+    // 초대 이메일 토큰 저장 (평문이 아닌 해시값만 저장, 만료 시각 함께 기록)
+    public void issueInviteToken(String inviteTokenHash, LocalDateTime expiresAt) {
+        this.inviteToken = inviteTokenHash;
+        this.inviteTokenExpiresAt = expiresAt;
     }
 
     //  수락 상태
