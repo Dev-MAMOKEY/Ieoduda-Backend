@@ -67,6 +67,9 @@ public class Recipient {
     @Column(name = "invite_token", length = 255)
     private String inviteToken;
 
+    @Column(name = "invite_token_expires_at")
+    private LocalDateTime inviteTokenExpiresAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "backup_for_id")
     private Recipient backupFor;
@@ -88,9 +91,10 @@ public class Recipient {
         this.acceptanceStatus = AcceptanceStatus.PENDING;
     }
 
-    // 초대 이메일 토큰 저장
-    public void issueInviteToken(String inviteToken) {
-        this.inviteToken = inviteToken;
+    // 초대 이메일 토큰 저장 (평문이 아닌 해시값만 저장, 만료 시각 함께 기록)
+    public void issueInviteToken(String inviteTokenHash, LocalDateTime expiresAt) {
+        this.inviteToken = inviteTokenHash;
+        this.inviteTokenExpiresAt = expiresAt;
     }
 
     // 담당자 수락
@@ -115,6 +119,7 @@ public class Recipient {
         this.acceptanceStatus = AcceptanceStatus.PENDING;
         this.acceptedAt = null;
         this.inviteToken = null;
+        this.inviteTokenExpiresAt = null;
     }
 
     // 사후 인계 단계에서 담당자에게 이메일을 보낸 시간 기록
