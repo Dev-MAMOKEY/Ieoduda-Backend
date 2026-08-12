@@ -6,6 +6,8 @@ import com.mamoki.ieojuda.domain.plan.entity.ItemStatus;
 import com.mamoki.ieojuda.domain.plan.entity.LifeArea;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
+import com.mamoki.ieojuda.domain.recipient.dto.BackupRegisterRequest;
+import com.mamoki.ieojuda.domain.recipient.dto.BackupRegisterResponse;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientBulkRegisterRequest;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientBulkRegisterResponse;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientRegisterRequest;
@@ -80,6 +82,10 @@ public class RecipientService {
             if (!ALLOWED_WAIT_HOURS.contains(request.maxWaitHours())) {
                 throw new CustomException(ErrorCode.INVALID_WAITING_PERIOD);
             }
+            // 대체 담당자가 주 담당자와 동일 이메일이면 실제 대체 전환 시 의미가 없으므로 차단
+            if (request.backup() != null && request.backup().email().equals(request.email())) {
+                throw new CustomException(ErrorCode.BACKUP_RECIPIENT_EMAIL_DUPLICATED);
+            }
 
             items.add(item);
         }
@@ -107,25 +113,58 @@ public class RecipientService {
 
         item.assignRecipient(recipient);
 
-        String plainToken = TokenProvider.generatePlainToken();
-        LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
-        recipient.issueInviteToken(TokenProvider.hashToken(plainToken), expiresAt);
+        EmailSendResult sendResult = issueInviteAndSend(recipient, toRoleName(disclosureScope));
 
-        EmailSendResult sendResult = sendAcceptanceEmail(recipient, disclosureScope, plainToken, expiresAt);
+        BackupRegisterResponse backupResponse = request.backup() == null
+                ? null
+                : registerBackup(plan, lifeArea, disclosureScope, recipient, request.backup());
 
         return RecipientRegisterResponse.of(
                 recipient,
                 item.getItemId(),
                 sendResult.success(),
+                sendResult.bounceType() == null ? null : sendResult.bounceType().name(),
+                backupResponse
+        );
+    }
+
+    // 대체 담당자 저장 + 초대 토큰 발급 + 수락 이메일 발송
+    // 항목(Item)에는 배정하지 않는다 - 박스당 활성(주) 담당자 1명 규칙은 backupFor 관계로만 표현한다
+    private BackupRegisterResponse registerBackup(Plan plan, LifeArea lifeArea, DisclosureScope disclosureScope,
+                                                   Recipient primary, BackupRegisterRequest backupRequest) {
+        Recipient backup = recipientRepository.save(Recipient.builder()
+                .plan(plan)
+                .lifeArea(lifeArea)
+                .name(backupRequest.name())
+                .email(backupRequest.email())
+                .roleType(toRoleType(disclosureScope))
+                .isBackup(true)
+                .disclosureScope(disclosureScope)
+                .maxWaitHours(null)
+                .backupFor(primary)
+                .build());
+
+        EmailSendResult sendResult = issueInviteAndSend(backup, toRoleName(disclosureScope) + " (대체 담당자)");
+
+        return BackupRegisterResponse.of(
+                backup,
+                sendResult.success(),
                 sendResult.bounceType() == null ? null : sendResult.bounceType().name()
         );
     }
 
-    private EmailSendResult sendAcceptanceEmail(Recipient recipient, DisclosureScope disclosureScope,
+    private EmailSendResult issueInviteAndSend(Recipient recipient, String roleName) {
+        String plainToken = TokenProvider.generatePlainToken();
+        LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
+        recipient.issueInviteToken(TokenProvider.hashToken(plainToken), expiresAt);
+        return sendAcceptanceEmail(recipient, roleName, plainToken, expiresAt);
+    }
+
+    private EmailSendResult sendAcceptanceEmail(Recipient recipient, String roleName,
                                                  String plainToken, LocalDateTime expiresAt) {
         String secureLink = appProperties.getBaseUrl() + "/recipient-acceptances/" + plainToken;
         EmailContent content = EmailBuilder.build(
-                toRoleName(disclosureScope),
+                roleName,
                 "역할 수락 여부를 확인해 주세요.",
                 expiresAt.atZone(ZoneId.systemDefault()),
                 secureLink,
