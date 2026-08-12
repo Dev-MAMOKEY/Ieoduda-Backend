@@ -73,6 +73,7 @@ public enum ErrorCode {
     ACTIVE_RELEASE_CASE_EXISTS(HttpStatus.CONFLICT, "ACTIVE_RELEASE_CASE_EXISTS", "진행 중인 사후 인계 사건이 있어 계정을 삭제할 수 없습니다."),
     RECIPIENT_ALREADY_ASSIGNED(HttpStatus.CONFLICT, "RECIPIENT_ALREADY_ASSIGNED", "해당 항목에는 이미 담당자가 등록되어 있습니다."),
     CONFIRMER_ALREADY_REGISTERED(HttpStatus.CONFLICT, "CONFIRMER_ALREADY_REGISTERED", "이미 등록된 지정 확인자 이메일입니다."),
+    BACKUP_RECIPIENT_EMAIL_DUPLICATED(HttpStatus.CONFLICT, "BACKUP_RECIPIENT_EMAIL_DUPLICATED", "대체 담당자 이메일은 주 담당자와 같을 수 없습니다."),
 
     // 서버 에러 (500)
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR","서버 오류가 발생했습니다.");

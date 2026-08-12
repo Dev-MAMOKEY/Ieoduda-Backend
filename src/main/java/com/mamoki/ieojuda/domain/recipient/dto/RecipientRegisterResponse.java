@@ -14,9 +14,11 @@ public record RecipientRegisterResponse(
         @Schema(description = "최대 단계 대기 시간(시간 단위)") Integer maxWaitHours,
         @Schema(description = "수락 상태", example = "PENDING", allowableValues = {"PENDING", "ACCEPTED", "DECLINED", "EXPIRED"}) String acceptanceStatus,
         @Schema(description = "역할 수락 이메일 발송 성공 여부") boolean emailSent,
-        @Schema(description = "발송 실패 시 반송 유형 (성공 시 null)", example = "TEMPORARY", allowableValues = {"NONE", "TEMPORARY", "PERMANENT"}) String bounceType
+        @Schema(description = "발송 실패 시 반송 유형 (성공 시 null)", example = "TEMPORARY", allowableValues = {"NONE", "TEMPORARY", "PERMANENT"}) String bounceType,
+        @Schema(description = "대체 담당자 등록 결과 (미등록 시 null)") BackupRegisterResponse backup
 ) {
-    public static RecipientRegisterResponse of(Recipient recipient, Long itemId, boolean emailSent, String bounceType) {
+    public static RecipientRegisterResponse of(Recipient recipient, Long itemId, boolean emailSent, String bounceType,
+                                                BackupRegisterResponse backup) {
         return new RecipientRegisterResponse(
                 recipient.getAssigneeId(),
                 itemId,
@@ -27,7 +29,8 @@ public record RecipientRegisterResponse(
                 recipient.getMaxWaitHours(),
                 recipient.getAcceptanceStatus().name(),
                 emailSent,
-                bounceType
+                bounceType,
+                backup
         );
     }
 }

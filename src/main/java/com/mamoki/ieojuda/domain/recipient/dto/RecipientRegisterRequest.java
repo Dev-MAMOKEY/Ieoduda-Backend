@@ -1,6 +1,7 @@
 package com.mamoki.ieojuda.domain.recipient.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -18,6 +19,9 @@ public record RecipientRegisterRequest(
         @Email(message = "이메일 형식이 올바르지 않습니다.") String email,
 
         @Schema(description = "최대 단계 대기 시간(시간 단위, 7/14/21일에 대응)", example = "168", allowableValues = {"168", "336", "504"})
-        @NotNull(message = "대기 기간을 선택해 주세요.") Integer maxWaitHours
+        @NotNull(message = "대기 기간을 선택해 주세요.") Integer maxWaitHours,
+
+        @Schema(description = "대체 담당자 (선택). [대체 담당자 등록하기]로 입력한 경우에만 전달")
+        @Valid BackupRegisterRequest backup
 ) {
 }
