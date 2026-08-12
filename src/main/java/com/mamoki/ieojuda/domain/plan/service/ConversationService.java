@@ -168,6 +168,8 @@ public class ConversationService {
                     .targetName(dto.targetName())
                     .locationType(dto.locationType())
                     .action(dto.action())
+                    .title(dto.title())
+                    .content(dto.content())
                     .precondition(dto.precondition())
                     .disclosureScope(disclosureScope)
                     .sourceExcerpt(dto.sourceExcerpt())

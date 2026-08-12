@@ -37,6 +37,12 @@ public class Item {
     @Column(name = "action", columnDefinition = "TEXT")
     private String action;
 
+    @Column(name = "title", length = 100)
+    private String title;
+
+    @Column(name = "content", columnDefinition = "TEXT")
+    private String content;
+
     @Column(name = "precondition", columnDefinition = "TEXT")
     private String precondition;
 
@@ -58,13 +64,15 @@ public class Item {
     private Integer sortOrder;
 
     @Builder
-    public Item(LifeArea lifeArea, String targetName, String locationType, String action,
+    public Item(LifeArea lifeArea, String targetName, String locationType, String action, String title, String content,
                 String precondition, DisclosureScope disclosureScope, String sourceExcerpt,
                 Integer sortOrder) {
         this.lifeArea = lifeArea;
         this.targetName = targetName;
         this.locationType = locationType;
         this.action = action;
+        this.title = title;
+        this.content = content;
         this.precondition = precondition;
         this.disclosureScope = disclosureScope;
         this.sourceExcerpt = sourceExcerpt;
@@ -78,11 +86,13 @@ public class Item {
     }
 
     // 대화창 인라인 "수정" 버튼 - AI가 만든 초안을 사용자가 직접 고침
-    public void updateContent(String targetName, String locationType, String action,
+    public void updateContent(String targetName, String locationType, String action, String title, String content,
                                String precondition, DisclosureScope disclosureScope) {
         this.targetName = targetName;
         this.locationType = locationType;
         this.action = action;
+        this.title = title;
+        this.content = content;
         this.precondition = precondition;
         this.disclosureScope = disclosureScope;
     }

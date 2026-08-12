@@ -20,6 +20,11 @@ public class ItemReviewService {
 
     private final ItemRepository itemRepository;
 
+    // 항목 단건 조회
+    public ItemResponse getItem(Long planId, Long itemId) {
+        return ItemResponse.from(findItem(planId, itemId));
+    }
+
     @Transactional
     public ItemResponse approve(Long planId, ItemReviewRequest request) {
         Item item = findItem(planId, request.itemId());
@@ -52,7 +57,7 @@ public class ItemReviewService {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
 
-        item.updateContent(request.targetName(), request.locationType(), request.action(),
+        item.updateContent(request.targetName(), request.locationType(), request.action(), request.title(), request.content(),
                 request.precondition(), disclosureScope);
 
         return ItemResponse.from(item);
