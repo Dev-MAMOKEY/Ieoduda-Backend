@@ -40,4 +40,10 @@ public class User extends BaseCreatedAtEntity {
     public void updateRefreshToken(String refreshToken) {
         this.refreshToken = refreshToken;
     }
+
+    // 마이페이지 - 이메일/이름 변경
+    public void updateProfile(String email, String name) {
+        this.email = email;
+        this.name = name;
+    }
 }
