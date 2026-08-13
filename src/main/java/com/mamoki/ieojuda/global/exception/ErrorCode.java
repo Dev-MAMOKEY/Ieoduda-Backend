@@ -12,7 +12,7 @@ public enum ErrorCode {
     PASSWORD_CONFIRMATION_MISMATCH(HttpStatus.BAD_REQUEST, "PASSWORD_CONFIRMATION_MISMATCH", "비밀번호와 비밀번호 확인이 일치하지 않습니다."),
 
     // 계획 / 삶의 구역 / AI 구조화 관련 예외 (400)
-    INVALID_WAITING_PERIOD(HttpStatus.BAD_REQUEST, "INVALID_WAITING_PERIOD", "대기 기간은 7~30일 사이여야 합니다."),
+    INVALID_WAITING_PERIOD(HttpStatus.BAD_REQUEST, "INVALID_WAITING_PERIOD", "대기 기간은 7일, 14일, 21일 중 하나여야 합니다."),
     CONSENT_REQUIRED(HttpStatus.BAD_REQUEST, "CONSENT_REQUIRED", "사후 인계 조건과 안전 범위를 확인해 주세요."),
     SUSPECTED_CREDENTIAL_INPUT(HttpStatus.BAD_REQUEST, "SUSPECTED_CREDENTIAL_INPUT", "비밀번호 등 자격증명으로 의심되는 내용은 저장할 수 없습니다."),
     UNGROUNDED_ITEM_NOT_APPROVABLE(HttpStatus.BAD_REQUEST, "UNGROUNDED_ITEM_NOT_APPROVABLE", "원문 근거가 없는 항목은 승인할 수 없습니다."),
@@ -65,6 +65,7 @@ public enum ErrorCode {
     RECIPIENT_NOT_FOUND(HttpStatus.NOT_FOUND, "RECIPIENT_NOT_FOUND", "해당 역할 담당자가 존재하지 않습니다."),
     RELEASE_CASE_NOT_FOUND(HttpStatus.NOT_FOUND, "RELEASE_CASE_NOT_FOUND", "해당 사후 인계 사건이 존재하지 않습니다."),
     EVIDENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "EVIDENCE_NOT_FOUND", "해당 증빙이 존재하지 않습니다."),
+    DISPUTE_CONTACT_NOT_FOUND(HttpStatus.NOT_FOUND, "DISPUTE_CONTACT_NOT_FOUND", "해당 이의 제기 연락처가 존재하지 않습니다."),
 
     // 상태 충돌 (409)
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "DUPLICATE_EMAIL", "이미 사용 중인 이메일입니다."),

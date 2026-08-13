@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.global.config;
 
+import com.mamoki.ieojuda.domain.account.repository.UserRepository;
+import com.mamoki.ieojuda.global.consent.filter.ConsentCheckFilter;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.jwt.component.JwtTokenProvider;
 import com.mamoki.ieojuda.global.jwt.filter.JwtAuthenticationFilter;
@@ -28,10 +30,14 @@ public class SecurityConfig {
             "/auth/**",
             "/swagger-ui/**",
             "/v3/api-docs/**",
-            "/swagger-ui.html"
+            "/swagger-ui.html",
+            // 이메일 링크를 클릭해서 접근하는 검증 엔드포인트 - 로그인 상태가 아니므로 인증 요구하지 않음
+            "/api/self-warning-email/**",
+            "/api/dispute-contacts/*/verify"
     };
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserRepository userRepository;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -75,7 +81,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(authenticationEntryPoint()))
-                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new ConsentCheckFilter(userRepository), JwtAuthenticationFilter.class);
 
         return http.build();
     }

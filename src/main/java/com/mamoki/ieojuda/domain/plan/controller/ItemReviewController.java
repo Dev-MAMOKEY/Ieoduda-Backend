@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -19,14 +20,23 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-// 명세서 "AI 구조화 결과 검토" 화면 - 항목 승인/수정/삭제
-@Tag(name = "Item Review", description = "AI 구조화 결과 검토 - 항목 승인/수정/삭제")
+// 명세서 "AI 구조화 결과 검토" 화면 - 항목 조회/승인/수정/삭제
+@Tag(name = "Item Review", description = "AI 구조화 결과 검토 - 항목 조회/승인/수정/삭제")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/plans/{planId}/items")
 public class ItemReviewController {
 
     private final ItemReviewService itemReviewService;
+
+    @Operation(summary = "항목 단건 조회")
+    @GetMapping("/{itemId}")
+    public ResponseEntity<RsData<ItemResponse>> getItem(
+            @Parameter(description = "계획 ID") @PathVariable Long planId,
+            @Parameter(description = "항목 ID") @PathVariable Long itemId
+    ) {
+        return ResponseEntity.ok(RsData.success(itemReviewService.getItem(planId, itemId)));
+    }
 
     @Operation(summary = "항목 승인", description = "AI가 만든 항목을 승인합니다. 원문 근거가 없는 항목은 승인할 수 없습니다.")
     @PostMapping("/review")

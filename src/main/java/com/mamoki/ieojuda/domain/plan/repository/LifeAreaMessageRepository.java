@@ -14,4 +14,7 @@ public interface LifeAreaMessageRepository extends JpaRepository<LifeAreaMessage
 
     // 대화 작성 화면용 - 최신 턴부터 페이지 단위로 조회 (무한 스크롤)
     Slice<LifeAreaMessage> findByConversation_ConversationIdOrderByMessageIdDesc(Long conversationId, Pageable pageable);
+
+    // 계정 삭제 시 이 계획에 속한 모든 대화 세션의 메세지를 한 번에 지우기 위한 조회
+    List<LifeAreaMessage> findByConversation_Plan_PlanId(Long planId);
 }
