@@ -1,17 +1,25 @@
 package com.mamoki.ieojuda.domain.recipient.service;
 
+import com.mamoki.ieojuda.domain.plan.dto.ItemResponse;
 import com.mamoki.ieojuda.domain.plan.entity.DisclosureScope;
 import com.mamoki.ieojuda.domain.plan.entity.Item;
 import com.mamoki.ieojuda.domain.plan.entity.ItemStatus;
 import com.mamoki.ieojuda.domain.plan.entity.LifeArea;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
+import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.domain.recipient.dto.BackupRegisterRequest;
 import com.mamoki.ieojuda.domain.recipient.dto.BackupRegisterResponse;
+import com.mamoki.ieojuda.domain.recipient.dto.RecipientAcceptanceEmailResponse;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientBulkRegisterRequest;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientBulkRegisterResponse;
+import com.mamoki.ieojuda.domain.recipient.dto.RecipientDetailResponse;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientRegisterRequest;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientRegisterResponse;
+import com.mamoki.ieojuda.domain.recipient.dto.RecipientSummaryResponse;
+import com.mamoki.ieojuda.domain.recipient.dto.RecipientUpdateRequest;
+import com.mamoki.ieojuda.domain.recipient.dto.RecipientUpdateResponse;
+import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.entity.RoleType;
 import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
@@ -33,6 +41,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 // "역할 담당자 등록" 화면 - 승인된 항목(박스) 하나당 담당자 한 명을 배정하고, 등록과 동시에 역할 수락 이메일을 발송
 @Service
@@ -44,6 +53,7 @@ public class RecipientService {
 
     private final ItemRepository itemRepository;
     private final RecipientRepository recipientRepository;
+    private final PlanRepository planRepository;
     private final EmailSender emailSender;
     private final AppProperties appProperties;
 
@@ -196,5 +206,86 @@ public class RecipientService {
             throw new CustomException(ErrorCode.ITEM_NOT_FOUND);
         }
         return item;
+    }
+
+    // "역할 점검" 화면 상단 이름 목록 - row 단위 그대로, 대체 담당자는 제외
+    public List<RecipientSummaryResponse> getRecipients(Long userId, Long planId) {
+        findOwnedPlan(userId, planId);
+        return recipientRepository.findByPlan_PlanIdAndIsBackupFalseOrderByAssigneeIdAsc(planId).stream()
+                .map(RecipientSummaryResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    // "역할 점검" 화면 상세 - 이름 클릭 시 해당 담당자에게 배정된 항목 전체
+    public RecipientDetailResponse getRecipient(Long userId, Long planId, Long assigneeId) {
+        findOwnedPlan(userId, planId);
+        Recipient recipient = findOwnedRecipient(planId, assigneeId);
+
+        List<ItemResponse> items = itemRepository.findByRecipient_AssigneeIdOrderByItemIdAsc(assigneeId).stream()
+                .map(ItemResponse::from)
+                .collect(Collectors.toList());
+
+        return RecipientDetailResponse.of(recipient, items);
+    }
+
+    // "수락 요청 다시 보내기" - 이미 수락/거절한 담당자에게는 재전송하지 않는다
+    @Transactional
+    public RecipientAcceptanceEmailResponse resendAcceptanceEmail(Long userId, Long recipientId) {
+        Recipient recipient = recipientRepository.findById(recipientId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RECIPIENT_NOT_FOUND));
+        if (!recipient.getPlan().getUser().getUserId().equals(userId)) {
+            throw new CustomException(ErrorCode.RECIPIENT_NOT_FOUND);
+        }
+        if (recipient.getAcceptanceStatus() != AcceptanceStatus.PENDING
+                && recipient.getAcceptanceStatus() != AcceptanceStatus.EXPIRED) {
+            throw new CustomException(ErrorCode.RECIPIENT_RESEND_NOT_ALLOWED);
+        }
+
+        recipient.resetAcceptance();
+        EmailSendResult sendResult = issueInviteAndSend(recipient, toRoleName(recipient.getDisclosureScope()));
+
+        return RecipientAcceptanceEmailResponse.of(
+                recipient,
+                sendResult.success(),
+                sendResult.bounceType() == null ? null : sendResult.bounceType().name()
+        );
+    }
+
+    // "담당자 수정하기" - 이름/이메일 수정. 이메일이 바뀌면 재검증이 필요하므로 수락 이메일을 다시 보낸다
+    @Transactional
+    public RecipientUpdateResponse updateRecipient(Long userId, Long planId, Long assigneeId, RecipientUpdateRequest request) {
+        findOwnedPlan(userId, planId);
+        Recipient recipient = findOwnedRecipient(planId, assigneeId);
+
+        boolean emailChanged = recipient.updateContact(request.name(), request.email());
+
+        EmailSendResult sendResult = emailChanged
+                ? issueInviteAndSend(recipient, toRoleName(recipient.getDisclosureScope()))
+                : null;
+
+        return RecipientUpdateResponse.of(
+                recipient,
+                sendResult != null && sendResult.success(),
+                sendResult == null || sendResult.bounceType() == null ? null : sendResult.bounceType().name()
+        );
+    }
+
+    // 로그인한 사용자가 자신의 계획만 조회할 수 있도록 검증 (불일치 시 존재 노출 방지를 위해 NOT_FOUND로 응답)
+    private Plan findOwnedPlan(Long userId, Long planId) {
+        Plan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PLAN_NOT_FOUND));
+        if (!plan.getUser().getUserId().equals(userId)) {
+            throw new CustomException(ErrorCode.PLAN_NOT_FOUND);
+        }
+        return plan;
+    }
+
+    private Recipient findOwnedRecipient(Long planId, Long assigneeId) {
+        Recipient recipient = recipientRepository.findById(assigneeId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RECIPIENT_NOT_FOUND));
+        if (!recipient.getPlan().getPlanId().equals(planId)) {
+            throw new CustomException(ErrorCode.RECIPIENT_NOT_FOUND);
+        }
+        return recipient;
     }
 }
