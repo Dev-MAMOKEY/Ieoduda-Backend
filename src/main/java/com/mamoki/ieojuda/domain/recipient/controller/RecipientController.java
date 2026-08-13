@@ -3,7 +3,6 @@ package com.mamoki.ieojuda.domain.recipient.controller;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientBulkRegisterRequest;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientBulkRegisterResponse;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientDetailResponse;
-import com.mamoki.ieojuda.domain.recipient.dto.RecipientSummaryResponse;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientUpdateRequest;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientUpdateResponse;
 import com.mamoki.ieojuda.domain.recipient.service.RecipientService;
@@ -23,8 +22,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 // 명세서 "역할 담당자 등록" 화면 - 승인된 항목(박스)마다 담당자를 배정하고 수락 이메일을 발송
 @Tag(name = "Recipient", description = "역할 담당자 등록 / 수락 이메일 발송")
 @RestController
@@ -41,17 +38,6 @@ public class RecipientController {
             @Valid @RequestBody RecipientBulkRegisterRequest request
     ) {
         RecipientBulkRegisterResponse result = recipientService.registerAll(planId, request);
-        return ResponseEntity.ok(RsData.success(result));
-    }
-
-    // 명세서 "역할 점검" 화면 - 상단 이름 목록 (row 단위, 같은 사람이 여러 항목을 맡으면 이름이 중복될 수 있음)
-    @Operation(summary = "역할 담당자 이름 목록 조회", description = "역할 점검 화면 상단에 표시할 담당자 이름 목록을 조회합니다. 대체 담당자는 포함하지 않습니다.")
-    @GetMapping
-    public ResponseEntity<RsData<List<RecipientSummaryResponse>>> getRecipients(
-            @AuthenticationPrincipal Long userId, // 현재 로그인한 사용자 ID 식별
-            @Parameter(description = "계획 ID") @PathVariable Long planId
-    ) {
-        List<RecipientSummaryResponse> result = recipientService.getRecipients(userId, planId);
         return ResponseEntity.ok(RsData.success(result));
     }
 

@@ -16,7 +16,6 @@ import com.mamoki.ieojuda.domain.recipient.dto.RecipientBulkRegisterResponse;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientDetailResponse;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientRegisterRequest;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientRegisterResponse;
-import com.mamoki.ieojuda.domain.recipient.dto.RecipientSummaryResponse;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientUpdateRequest;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientUpdateResponse;
 import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
@@ -206,14 +205,6 @@ public class RecipientService {
             throw new CustomException(ErrorCode.ITEM_NOT_FOUND);
         }
         return item;
-    }
-
-    // "역할 점검" 화면 상단 이름 목록 - row 단위 그대로, 대체 담당자는 제외
-    public List<RecipientSummaryResponse> getRecipients(Long userId, Long planId) {
-        findOwnedPlan(userId, planId);
-        return recipientRepository.findByPlan_PlanIdAndIsBackupFalseOrderByAssigneeIdAsc(planId).stream()
-                .map(RecipientSummaryResponse::from)
-                .collect(Collectors.toList());
     }
 
     // "역할 점검" 화면 상세 - 이름 클릭 시 해당 담당자에게 배정된 항목 전체
