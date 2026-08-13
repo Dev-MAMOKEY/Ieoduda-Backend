@@ -86,6 +86,11 @@ public class Evidence {
 
 
 
+    // 이 증빙을 검토할 파트너 검토자 배정 (검토 결과 제출 시 함께 기록)
+    public void assignReviewer(PartnerReviewer reviewer) {
+        this.reviewer = reviewer;
+    }
+
     // 승인. 검토 완료일 기준 30일 이내 삭제 규정에 따라 삭제 예정일 자동 계산 - 명세서상 30일로 임의 지정
     public void approve() {
         this.reviewStatus = EvidenceReviewStatus.APPROVED;
@@ -107,5 +112,11 @@ public class Evidence {
 
     public void markDeleted() {
         this.deletedAt = LocalDateTime.now();
+        this.failureReason = null;
+    }
+
+    // "증빙 삭제 감사" 화면 - 자동 삭제 실패 시 사유 기록 (재처리 요청 대상)
+    public void markDeleteFailed(String failureReason) {
+        this.failureReason = failureReason;
     }
 }

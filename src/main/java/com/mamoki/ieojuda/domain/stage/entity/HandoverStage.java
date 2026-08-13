@@ -82,8 +82,9 @@ public class HandoverStage {
         this.status = HandoverStageStatus.BOUNCED;
     }
 
-    // 대체 담당자 전환됨
-    public void fallback() {
+    // 대체 담당자 전환됨 - 이 단계의 담당자를 대체 담당자로 교체하고 다시 발송 준비 상태로 되돌림
+    public void fallbackTo(Recipient backupRecipient) {
+        this.recipient = backupRecipient;
         this.status = HandoverStageStatus.FALLBACK;
     }
 

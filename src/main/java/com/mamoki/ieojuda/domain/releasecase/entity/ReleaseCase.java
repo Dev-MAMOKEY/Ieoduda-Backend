@@ -59,5 +59,12 @@ public class ReleaseCase {
         this.frozen = false;
     }
 
+    // "이메일 발송 감사" 화면 - 운영자가 발송 절차 전체를 동결
+    public void freeze() {
+        this.frozen = true;
+    }
 
+    public void unfreeze() {
+        this.frozen = false;
+    }
 }
