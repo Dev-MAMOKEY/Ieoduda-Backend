@@ -34,7 +34,8 @@ public class SecurityConfig {
             "/swagger-ui.html",
             // 이메일 링크를 클릭해서 접근하는 검증 엔드포인트 - 로그인 상태가 아니므로 인증 요구하지 않음
             "/api/self-warning-email/**",
-            "/api/dispute-contacts/*/verify"
+            "/api/dispute-contacts/*/verify",
+            "/api/recipient-acceptances/**"
     };
 
     // 운영관리자 전용 - 이메일 발송 감사/재시도/사건 동결/단계 조회·대체담당자 전환
