@@ -126,4 +126,24 @@ public class Recipient {
     public void startWait() {
         this.waitAt = LocalDateTime.now();
     }
+
+    // 수락 요청 재전송 - 새 토큰이 발급되므로 만료 상태를 수락 대기로 되돌린다
+    public void resetAcceptance() {
+        this.acceptanceStatus = AcceptanceStatus.PENDING;
+        this.acceptedAt = null;
+    }
+
+    // "담당자 수정하기" - 이름/이메일 수정. 이메일이 바뀌면 기존 수락 상태와 초대 토큰을 무효화한다
+    public boolean updateContact(String name, String email) {
+        this.name = name;
+        boolean emailChanged = !this.email.equals(email);
+        if (emailChanged) {
+            this.email = email;
+            this.acceptanceStatus = AcceptanceStatus.PENDING;
+            this.acceptedAt = null;
+            this.inviteToken = null;
+            this.inviteTokenExpiresAt = null;
+        }
+        return emailChanged;
+    }
 }
