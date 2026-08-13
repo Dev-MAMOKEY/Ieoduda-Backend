@@ -32,17 +32,22 @@ public class JwtTokenProvider {
         this.key = Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateAccessToken(Long userId, String email) {
-        return generateToken(userId, email, TOKEN_TYPE_ACCESS, jwtProperties.getAccessTokenExpirationMs());
+    public String generateAccessToken(Long userId, String email, String role) {
+        return generateToken(userId, email, role, TOKEN_TYPE_ACCESS, jwtProperties.getAccessTokenExpirationMs());
     }
 
     public String generateRefreshToken(Long userId) {
-        return generateToken(userId, null, TOKEN_TYPE_REFRESH, jwtProperties.getRefreshTokenExpirationMs());
+        return generateToken(userId, null, null, TOKEN_TYPE_REFRESH, jwtProperties.getRefreshTokenExpirationMs());
     }
 
     //토큰 -> 사용자 ID 추출
     public Long getUserId(String token) {
         return Long.valueOf(parseClaims(token).getSubject());
+    }
+
+    // 토큰 -> 권한(USER/ADMIN/EXTERNAL) 추출 - JwtAuthenticationFilter가 SecurityContext 권한을 채울 때 사용
+    public String getRole(String token) {
+        return parseClaims(token).get("role", String.class);
     }
 
     public boolean isRefreshToken(String token) { // RT 검증
@@ -63,7 +68,7 @@ public class JwtTokenProvider {
     }
 
     //토큰 생성
-    private String generateToken(Long userId, String email, String tokenType, long expirationMs) {
+    private String generateToken(Long userId, String email, String role, String tokenType, long expirationMs) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMs);
 
@@ -75,6 +80,9 @@ public class JwtTokenProvider {
 
         if (email != null) {
             builder.claim("email", email);
+        }
+        if (role != null) {
+            builder.claim("role", role);
         }
 
         return builder.signWith(key).compact();

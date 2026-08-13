@@ -37,11 +37,17 @@ public class User extends BaseCreatedAtEntity {
     @Column(name = "consent_agreed_at")
     private LocalDateTime consentAgreedAt;
 
+    // 공개 회원가입(POST /auth/signup)으로는 항상 USER로만 생성됨 - ADMIN/EXTERNAL은 DB에서 role만 승격해서 부여한다.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", length = 20, nullable = false)
+    private UserRole role;
+
     @Builder
     public User(String email, String password, String name) {
         this.email = email;
         this.password = password;
         this.name = name;
+        this.role = UserRole.USER;
     }
 
     public void updateRefreshToken(String refreshToken) {

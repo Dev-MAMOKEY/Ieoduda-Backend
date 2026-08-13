@@ -15,6 +15,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -36,6 +37,18 @@ public class SecurityConfig {
             "/api/dispute-contacts/*/verify"
     };
 
+    // 운영관리자 전용 - 이메일 발송 감사/재시도/사건 동결/단계 조회·대체담당자 전환
+    private static final String[] ADMIN_ONLY_PATHS = {
+            "/api/admin/**",
+            "/api/release-cases/**"
+    };
+
+    // 운영관리자 + 외부 파트너 공용 - 증빙 삭제 감사, 파트너 증빙 검토
+    private static final String[] ADMIN_OR_EXTERNAL_PATHS = {
+            "/api/evidence/**",
+            "/api/partner/**"
+    };
+
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
 
@@ -50,6 +63,13 @@ public class SecurityConfig {
     public AuthenticationEntryPoint authenticationEntryPoint() {
         return (request, response, authException) ->
                 SecurityErrorResponseWriter.write(response, ErrorCode.TOKEN_INVALID);
+    }
+
+    // 인증은 됐지만 역할(role)이 안 맞는 경우(예: EXTERNAL이 /api/admin/** 호출) - 위 entry point와 달리 403으로 응답
+    @Bean
+    public AccessDeniedHandler accessDeniedHandler() {
+        return (request, response, accessDeniedException) ->
+                SecurityErrorResponseWriter.write(response, ErrorCode.FORBIDDEN);
     }
 
     // 프론트엔드가 아직 정해진 도메인 없이 여러 환경(로컬/배포)에서 접근하는 개발 단계라 전체 origin을 허용.
@@ -78,9 +98,13 @@ public class SecurityConfig {
                 .formLogin(formLogin -> formLogin.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PERMIT_ALL_PATHS).permitAll()
+                        .requestMatchers(ADMIN_ONLY_PATHS).hasRole("ADMIN")
+                        .requestMatchers(ADMIN_OR_EXTERNAL_PATHS).hasAnyRole("ADMIN", "EXTERNAL")
                         .anyRequest().authenticated()
                 )
-                .exceptionHandling(exception -> exception.authenticationEntryPoint(authenticationEntryPoint()))
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(authenticationEntryPoint())
+                        .accessDeniedHandler(accessDeniedHandler()))
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(new ConsentCheckFilter(userRepository), JwtAuthenticationFilter.class);
 

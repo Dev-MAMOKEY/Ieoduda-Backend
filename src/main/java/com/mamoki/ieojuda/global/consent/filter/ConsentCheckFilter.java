@@ -1,6 +1,7 @@
 package com.mamoki.ieojuda.global.consent.filter;
 
 import com.mamoki.ieojuda.domain.account.entity.User;
+import com.mamoki.ieojuda.domain.account.entity.UserRole;
 import com.mamoki.ieojuda.domain.account.repository.UserRepository;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.jwt.filter.SecurityErrorResponseWriter;
@@ -55,7 +56,13 @@ public class ConsentCheckFilter extends OncePerRequestFilter {
         }
 
         User user = userRepository.findById(userId).orElse(null);
-        if (user == null || user.getConsentAgreedAt() == null) {
+        if (user == null) {
+            SecurityErrorResponseWriter.write(response, ErrorCode.CONSENT_REQUIRED);
+            return;
+        }
+
+        // "사후 인계 안내" 동의는 계획 작성자(USER)에게만 의미 있는 절차 - 운영관리자/외부 파트너는 대상이 아님
+        if (user.getRole() == UserRole.USER && user.getConsentAgreedAt() == null) {
             SecurityErrorResponseWriter.write(response, ErrorCode.CONSENT_REQUIRED);
             return;
         }

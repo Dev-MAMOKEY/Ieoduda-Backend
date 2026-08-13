@@ -1,5 +1,6 @@
 package com.mamoki.ieojuda.domain.partner.entity;
 
+import com.mamoki.ieojuda.domain.account.entity.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -21,6 +22,11 @@ public class PartnerReviewer {
     @JoinColumn(name = "partner_id", nullable = false)
     private ExternalPartner partner;
 
+    // 이 검토자로 로그인하는 계정(role=EXTERNAL). DB에서 role을 승격시킬 때 같이 연결해줘야 한다.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
     @Column(name = "name", length = 100)
     private String name;
 
@@ -31,8 +37,9 @@ public class PartnerReviewer {
     private Boolean isActive;
 
     @Builder
-    public PartnerReviewer(ExternalPartner partner, String name, String email) {
+    public PartnerReviewer(ExternalPartner partner, User user, String name, String email) {
         this.partner = partner;
+        this.user = user;
         this.name = name;
         this.email = email;
         this.isActive = true;

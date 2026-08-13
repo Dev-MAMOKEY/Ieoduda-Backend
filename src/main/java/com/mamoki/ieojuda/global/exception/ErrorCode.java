@@ -66,6 +66,8 @@ public enum ErrorCode {
     RELEASE_CASE_NOT_FOUND(HttpStatus.NOT_FOUND, "RELEASE_CASE_NOT_FOUND", "해당 사후 인계 사건이 존재하지 않습니다."),
     EVIDENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "EVIDENCE_NOT_FOUND", "해당 증빙이 존재하지 않습니다."),
     DISPUTE_CONTACT_NOT_FOUND(HttpStatus.NOT_FOUND, "DISPUTE_CONTACT_NOT_FOUND", "해당 이의 제기 연락처가 존재하지 않습니다."),
+    HANDOVER_STAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "HANDOVER_STAGE_NOT_FOUND", "해당 인계 단계가 존재하지 않습니다."),
+    PARTNER_REVIEWER_NOT_FOUND(HttpStatus.NOT_FOUND, "PARTNER_REVIEWER_NOT_FOUND", "해당 파트너 검토자가 존재하지 않습니다."),
 
     // 상태 충돌 (409)
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "DUPLICATE_EMAIL", "이미 사용 중인 이메일입니다."),

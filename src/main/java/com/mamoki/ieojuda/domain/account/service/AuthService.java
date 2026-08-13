@@ -99,7 +99,7 @@ public class AuthService {
 
     // AT/RT 새로 발급하고 RT는 DB에 갱신 저장 (재발급마다 RT도 회전)
     private TokenResponse issueTokens(User user) {
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getUserId(), user.getEmail());
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getUserId(), user.getEmail(), user.getRole().name());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getUserId());
         user.updateRefreshToken(refreshToken);
         return new TokenResponse(accessToken, refreshToken);

@@ -66,6 +66,23 @@ public class EmailLog {
         this.sentAt = LocalDateTime.now();
     }
 
+    public void markOpened() {
+        this.openedAt = LocalDateTime.now();
+    }
 
+    public void markBounced() {
+        this.bouncedAt = LocalDateTime.now();
+    }
 
+    public void markCanceled() {
+        this.canceledAt = LocalDateTime.now();
+    }
+
+    // "이메일 발송 감사" 화면 "재시도 정책 실행하기" - 반송/실패 건 재발송 시 호출
+    public void markRetried(String newMessageId) {
+        this.retryCount = this.retryCount + 1;
+        this.messageId = newMessageId;
+        this.sentAt = LocalDateTime.now();
+        this.bouncedAt = null;
+    }
 }
