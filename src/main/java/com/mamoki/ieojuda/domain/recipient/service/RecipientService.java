@@ -57,7 +57,8 @@ public class RecipientService {
     private final AppProperties appProperties;
 
     @Transactional
-    public RecipientBulkRegisterResponse registerAll(Long planId, RecipientBulkRegisterRequest request) {
+    public RecipientBulkRegisterResponse registerAll(Long userId, Long planId, RecipientBulkRegisterRequest request) {
+        findOwnedPlan(userId, planId);
         List<Item> items = validateAll(planId, request.recipients());
 
         List<RecipientRegisterResponse> responses = new ArrayList<>();
