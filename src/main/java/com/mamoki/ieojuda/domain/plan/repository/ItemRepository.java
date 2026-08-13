@@ -14,4 +14,7 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
 
     // 대화 턴이 새로 끝날 때마다 아직 검토 안 된(PROPOSED) 이전 초안을 지우기 위한 조회
     List<Item> findByLifeArea_Plan_PlanIdAndStatus(Long planId, ItemStatus status);
+
+    // 역할 점검 상세 - 해당 담당자에게 배정된 항목
+    List<Item> findByRecipient_AssigneeIdOrderByItemIdAsc(Long assigneeId);
 }
