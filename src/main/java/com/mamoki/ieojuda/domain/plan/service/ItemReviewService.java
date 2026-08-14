@@ -5,6 +5,7 @@ import com.mamoki.ieojuda.domain.plan.dto.ItemResponse;
 import com.mamoki.ieojuda.domain.plan.dto.ItemUpdateRequest;
 import com.mamoki.ieojuda.domain.plan.entity.DisclosureScope;
 import com.mamoki.ieojuda.domain.plan.entity.Item;
+import com.mamoki.ieojuda.domain.plan.entity.ItemActionType;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
@@ -57,8 +58,15 @@ public class ItemReviewService {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
 
+        ItemActionType actionType;
+        try {
+            actionType = request.actionType() == null ? ItemActionType.OTHER : ItemActionType.valueOf(request.actionType());
+        } catch (IllegalArgumentException e) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
         item.updateContent(request.targetName(), request.locationType(), request.action(), request.title(), request.content(),
-                request.precondition(), disclosureScope);
+                request.precondition(), disclosureScope, actionType);
 
         return ItemResponse.from(item);
     }
