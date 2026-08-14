@@ -46,6 +46,10 @@ public class Plan extends BaseCreatedAtEntity {
     @Column(name = "self_warning_verify_token_expires_at")
     private LocalDateTime selfWarningVerifyTokenExpiresAt;
 
+    // "실행 순서 점검" 화면 - 충돌 없이 순서를 확정한 시각. 순서가 다시 바뀌면 null로 되돌아가 재확정이 필요하다
+    @Column(name = "order_confirmed_at")
+    private LocalDateTime orderConfirmedAt;
+
     @Builder
     public Plan(User user) {
         this.user = user;
@@ -71,5 +75,15 @@ public class Plan extends BaseCreatedAtEntity {
 
     public void verifySelfWarningEmail() {
         this.selfWarningEmailVerified = true;
+    }
+
+    // 순서 충돌이 없을 때만 서비스에서 호출 - 실행 순서를 확정
+    public void confirmOrder() {
+        this.orderConfirmedAt = LocalDateTime.now();
+    }
+
+    // 확정 후 순서가 다시 바뀌면 재확정이 필요하므로 되돌린다
+    public void resetOrderConfirmation() {
+        this.orderConfirmedAt = null;
     }
 }

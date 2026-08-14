@@ -77,6 +77,7 @@ public enum ErrorCode {
     BACKUP_RECIPIENT_EMAIL_DUPLICATED(HttpStatus.CONFLICT, "BACKUP_RECIPIENT_EMAIL_DUPLICATED", "대체 담당자 이메일은 주 담당자와 같을 수 없습니다."),
     RECIPIENT_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "RECIPIENT_RESEND_NOT_ALLOWED", "현재 수락 상태에서는 수락 요청을 다시 보낼 수 없습니다."),
     CONFIRMER_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "CONFIRMER_RESEND_NOT_ALLOWED", "현재 수락 상태에서는 수락 요청을 다시 보낼 수 없습니다."),
+    ITEM_ORDER_CONFLICT(HttpStatus.CONFLICT, "ITEM_ORDER_CONFLICT", "순서 충돌이 있어 확정할 수 없습니다."),
 
     // 서버 에러 (500)
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR","서버 오류가 발생했습니다.");
