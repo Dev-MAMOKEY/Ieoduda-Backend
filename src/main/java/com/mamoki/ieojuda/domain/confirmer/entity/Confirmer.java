@@ -56,6 +56,10 @@ public class Confirmer {
     @Column(name = "invite_token_expires_at")
     private LocalDateTime inviteTokenExpiresAt;
 
+    // "지정확인자 수락 이메일" 화면 - 확인자가 수락/거절 시 남기는 문의 사항 (선택 입력)
+    @Column(name = "inquiry", columnDefinition = "TEXT")
+    private String inquiry;
+
     @Builder
     public Confirmer(Plan plan, String name, Relationship relationship, String email) {
         this.plan = plan;
@@ -93,13 +97,15 @@ public class Confirmer {
     }
 
     //  수락 상태
-    public void accept() {
+    public void accept(String inquiry) {
         this.acceptanceStatus = AcceptanceStatus.ACCEPTED;
         this.acceptedAt = LocalDateTime.now();
+        this.inquiry = inquiry;
     }
     // 거절 상태
-    public void decline() {
+    public void decline(String inquiry) {
         this.acceptanceStatus = AcceptanceStatus.DECLINED;
+        this.inquiry = inquiry;
     }
     // 만료 상태
     public void expire() {
