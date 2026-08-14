@@ -10,6 +10,7 @@ public record ItemUpdateRequest(
         @NotBlank(message = "제목을 입력해 주세요.") String title,
         @NotBlank(message = "내용을 입력해 주세요.") String content,
         String precondition,
-        @NotBlank(message = "공개 범위를 선택해 주세요.") String disclosureScope
+        @NotBlank(message = "공개 범위를 선택해 주세요.") String disclosureScope,
+        String actionType
 ) {
 }

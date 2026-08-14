@@ -10,9 +10,10 @@ import java.time.LocalDateTime;
 public record PlanResponse(
         @Schema(description = "계획 ID") Long planId,
         @Schema(description = "계획 상태", example = "DRAFT", allowableValues = {"DRAFT", "SEALED", "DEACTIVATED"}) String status,
-        @Schema(description = "생성 시각") LocalDateTime createdAt
+        @Schema(description = "생성 시각") LocalDateTime createdAt,
+        @Schema(description = "실행 순서 확정 시각 (미확정이면 null)") LocalDateTime orderConfirmedAt
 ) {
     public static PlanResponse from(Plan plan) {
-        return new PlanResponse(plan.getPlanId(), plan.getStatus().name(), plan.getCreatedAt());
+        return new PlanResponse(plan.getPlanId(), plan.getStatus().name(), plan.getCreatedAt(), plan.getOrderConfirmedAt());
     }
 }

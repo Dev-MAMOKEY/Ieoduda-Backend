@@ -17,4 +17,7 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
 
     // 역할 점검 상세 - 해당 담당자에게 배정된 항목
     List<Item> findByRecipient_AssigneeIdOrderByItemIdAsc(Long assigneeId);
+
+    // "실행 순서 점검" 화면 - 담당자가 배정된(=발송 대상이 확정된) 항목만 순서 점검 대상
+    List<Item> findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(Long planId);
 }

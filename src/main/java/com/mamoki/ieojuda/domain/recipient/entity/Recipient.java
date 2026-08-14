@@ -74,6 +74,10 @@ public class Recipient {
     @JoinColumn(name = "backup_for_id")
     private Recipient backupFor;
 
+    // "역할 수락 이메일" 화면 - 담당자가 수락/거절 시 남기는 문의 사항 (선택 입력)
+    @Column(name = "inquiry", columnDefinition = "TEXT")
+    private String inquiry;
+
     // 담당자 등록 시점 - 역할명, 담당자 이름, 이메일, 공개 범주, 최대 단계 대기 시간, 대체 담당자 입력
     @Builder
     public Recipient(Plan plan, LifeArea lifeArea, String name, String email, RoleType roleType,
@@ -98,14 +102,16 @@ public class Recipient {
     }
 
     // 담당자 수락
-    public void accept() {
+    public void accept(String inquiry) {
         this.acceptanceStatus = AcceptanceStatus.ACCEPTED;
         this.acceptedAt = LocalDateTime.now();
+        this.inquiry = inquiry;
     }
 
     // 담당자 거절
-    public void decline() {
+    public void decline(String inquiry) {
         this.acceptanceStatus = AcceptanceStatus.DECLINED;
+        this.inquiry = inquiry;
     }
 
     // 초대 링크 만료

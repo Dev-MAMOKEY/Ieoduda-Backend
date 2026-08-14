@@ -63,10 +63,15 @@ public class Item {
     @Column(name = "sort_order")
     private Integer sortOrder;
 
+    // "실행 순서 점검" 화면 - 삭제형 항목이 인계형 항목보다 먼저 오면 순서 충돌로 판정하기 위한 분류
+    @Enumerated(EnumType.STRING)
+    @Column(name = "action_type", length = 30)
+    private ItemActionType actionType;
+
     @Builder
     public Item(LifeArea lifeArea, String targetName, String locationType, String action, String title, String content,
                 String precondition, DisclosureScope disclosureScope, String sourceExcerpt,
-                Integer sortOrder) {
+                Integer sortOrder, ItemActionType actionType) {
         this.lifeArea = lifeArea;
         this.targetName = targetName;
         this.locationType = locationType;
@@ -77,6 +82,7 @@ public class Item {
         this.disclosureScope = disclosureScope;
         this.sourceExcerpt = sourceExcerpt;
         this.sortOrder = sortOrder;
+        this.actionType = actionType != null ? actionType : ItemActionType.OTHER;
         this.status = ItemStatus.PROPOSED;
     }
 
@@ -87,7 +93,7 @@ public class Item {
 
     // 대화창 인라인 "수정" 버튼 - AI가 만든 초안을 사용자가 직접 고침
     public void updateContent(String targetName, String locationType, String action, String title, String content,
-                               String precondition, DisclosureScope disclosureScope) {
+                               String precondition, DisclosureScope disclosureScope, ItemActionType actionType) {
         this.targetName = targetName;
         this.locationType = locationType;
         this.action = action;
@@ -95,6 +101,12 @@ public class Item {
         this.content = content;
         this.precondition = precondition;
         this.disclosureScope = disclosureScope;
+        this.actionType = actionType != null ? actionType : ItemActionType.OTHER;
+    }
+
+    // 드래그로 실행 순서 변경
+    public void updateSortOrder(int sortOrder) {
+        this.sortOrder = sortOrder;
     }
 
     public void assignRecipient(Recipient recipient) {

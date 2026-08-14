@@ -35,6 +35,8 @@ public class SecurityConfig {
             // 이메일 링크를 클릭해서 접근하는 검증 엔드포인트 - 로그인 상태가 아니므로 인증 요구하지 않음
             "/api/self-warning-email/**",
             "/api/dispute-contacts/*/verify",
+            "/api/recipient-acceptances/**",// 역할 담당자 수락
+            "/api/dispute-contacts/*/verify",
             "/api/confirmer-acceptances/**" // 지정확인자 수락
     };
 
