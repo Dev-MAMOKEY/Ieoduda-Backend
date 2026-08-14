@@ -36,7 +36,6 @@ public class SecurityConfig {
             "/api/self-warning-email/**",
             "/api/dispute-contacts/*/verify",
             "/api/recipient-acceptances/**",// 역할 담당자 수락
-            "/api/dispute-contacts/*/verify",
             "/api/confirmer-acceptances/**" // 지정확인자 수락
     };
 
