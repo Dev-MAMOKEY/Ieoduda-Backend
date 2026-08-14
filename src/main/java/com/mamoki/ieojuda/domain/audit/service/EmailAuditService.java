@@ -85,6 +85,12 @@ public class EmailAuditService {
         findCase(caseId).freeze();
     }
 
+    // 동결 해제 - 관리자가 오판단으로 동결한 사건을 되돌릴 때 사용
+    @Transactional
+    public void unfreeze(Long caseId) {
+        findCase(caseId).unfreeze();
+    }
+
     private ReleaseCase findCase(Long caseId) {
         return releaseCaseRepository.findById(caseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RELEASE_CASE_NOT_FOUND));

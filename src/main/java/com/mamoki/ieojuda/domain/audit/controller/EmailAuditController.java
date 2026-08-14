@@ -50,4 +50,13 @@ public class EmailAuditController {
         emailAuditService.freeze(caseId);
         return ResponseEntity.ok(RsData.success(null));
     }
+
+    @Operation(summary = "사건 동결 해제하기", description = "동결된 사건을 다시 정상 상태로 되돌립니다.")
+    @PostMapping("/unfreeze")
+    public ResponseEntity<RsData<Void>> unfreeze(
+            @Parameter(description = "사건 ID") @PathVariable Long caseId
+    ) {
+        emailAuditService.unfreeze(caseId);
+        return ResponseEntity.ok(RsData.success(null));
+    }
 }
