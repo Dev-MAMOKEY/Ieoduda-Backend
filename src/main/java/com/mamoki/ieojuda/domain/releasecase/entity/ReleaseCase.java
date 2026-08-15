@@ -85,10 +85,11 @@ public class ReleaseCase {
     }
 
     // 외부 파트너가 증빙을 승인하면, 계획의 대기 기간만큼 실행을 미루는 대기 상태로 전이
+    // 작성자가 대기·이의제기 설정을 아직 안 했을 수 있어 waitingDays가 null이면 기본값 7일을 적용한다
     public void approveEvidenceAndStartWaiting(Integer waitingDays) {
         this.evidenceApprovedAt = LocalDateTime.now();
         this.status = ReleaseCaseStatus.WAITING;
-        this.waitingEndsAt = this.evidenceApprovedAt.plusDays(waitingDays);
+        this.waitingEndsAt = this.evidenceApprovedAt.plusDays(waitingDays != null ? waitingDays : 7);
     }
 
     // 외부 파트너가 증빙을 반려
