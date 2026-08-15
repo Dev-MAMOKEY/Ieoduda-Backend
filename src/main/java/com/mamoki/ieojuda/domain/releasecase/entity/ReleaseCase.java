@@ -67,4 +67,49 @@ public class ReleaseCase {
     public void unfreeze() {
         this.frozen = false;
     }
+
+    // 두 확인자의 신고 내용이 일치해 사건이 생성된 직후 - 신고 확인됨 상태로 전이
+    public void confirmReport() {
+        this.confirmedAt = LocalDateTime.now();
+        this.status = ReleaseCaseStatus.REPORT_CONFIRMED;
+    }
+
+    // 신고 확인 직후 - 증빙 제출 대기 상태로 전이
+    public void awaitEvidence() {
+        this.status = ReleaseCaseStatus.EVIDENCE_PENDING;
+    }
+
+    // 증빙이 처음 제출되면 검토 중 상태로 전이
+    public void startEvidenceReview() {
+        this.status = ReleaseCaseStatus.EVIDENCE_REVIEWING;
+    }
+
+    // 외부 파트너가 증빙을 승인하면, 계획의 대기 기간만큼 실행을 미루는 대기 상태로 전이
+    // 작성자가 대기·이의제기 설정을 아직 안 했을 수 있어 waitingDays가 null이면 기본값 7일을 적용한다
+    public void approveEvidenceAndStartWaiting(Integer waitingDays) {
+        this.evidenceApprovedAt = LocalDateTime.now();
+        this.status = ReleaseCaseStatus.WAITING;
+        this.waitingEndsAt = this.evidenceApprovedAt.plusDays(waitingDays != null ? waitingDays : 7);
+    }
+
+    // 외부 파트너가 증빙을 반려
+    public void rejectEvidence() {
+        this.status = ReleaseCaseStatus.EVIDENCE_REJECTED;
+    }
+
+    // 작성자 본인이 "본인 확인 후 취소하기"를 눌렀을 때 - 절차 전체를 즉시 취소
+    public void cancel() {
+        this.status = ReleaseCaseStatus.CANCELED;
+        this.canceledAt = LocalDateTime.now();
+    }
+
+    // 이의 제기가 접수되면 확인될 때까지 자동으로 절차를 멈춤
+    public void raiseDispute() {
+        this.status = ReleaseCaseStatus.DISPUTED;
+    }
+
+    // 대기 기간이 지나 스케줄러가 자동으로 발송 단계에 진입
+    public void startReleasing() {
+        this.status = ReleaseCaseStatus.RELEASING;
+    }
 }

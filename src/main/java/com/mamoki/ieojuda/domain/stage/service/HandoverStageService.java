@@ -24,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 
 // 명세서 "단계 완료 / 대체 담당자" 화면 - 역할 담당자·서비스 운영자 공용
 @Service
@@ -67,6 +69,28 @@ public class HandoverStageService {
         sendHandoffInvite(stage, backup);
 
         return HandoverStageResponse.from(stage);
+    }
+
+    // 스케줄러 - 대기 기간 만료 시, 확정된 실행 순서대로 담당자 한 명당 단계 하나씩 만들고 1단계 담당자에게만 발송한다
+    // (다음 담당자는 1단계가 완료·반송·문제신고로 넘어갈 때 뒤이어 발송된다 - 이 메서드는 최초 진입만 담당)
+    @Transactional
+    public void createStagesAndDispatchFirst(ReleaseCase releaseCase, List<Recipient> orderedRecipients) {
+        List<HandoverStage> stages = new ArrayList<>();
+        int stageOrder = 0;
+        for (Recipient recipient : orderedRecipients) {
+            HandoverStage stage = handoverStageRepository.save(HandoverStage.builder()
+                    .plan(releaseCase.getPlan())
+                    .recipient(recipient)
+                    .stageOrder(stageOrder++)
+                    .build());
+            stage.assignToCase(releaseCase);
+            stages.add(stage);
+        }
+
+        if (!stages.isEmpty()) {
+            HandoverStage firstStage = stages.get(0);
+            sendHandoffInvite(firstStage, firstStage.getRecipient());
+        }
     }
 
     private void sendHandoffInvite(HandoverStage stage, Recipient recipient) {

@@ -46,12 +46,17 @@ public class PartnerReviewService {
         evidence.assignReviewer(reviewer);
 
         switch (request.decision()) {
-            case APPROVE -> evidence.approve();
+            // 승인되면 계획에 설정된 대기 기간만큼 발송을 미루는 대기 상태로 사건을 전이시킨다
+            case APPROVE -> {
+                evidence.approve();
+                evidence.getReleaseCase().approveEvidenceAndStartWaiting(evidence.getPlan().getWaitingDays());
+            }
             case REJECT -> {
                 if (request.failureReason() == null || request.failureReason().isBlank()) {
                     throw new CustomException(ErrorCode.INVALID_INPUT);
                 }
                 evidence.reject(request.failureReason());
+                evidence.getReleaseCase().rejectEvidence();
             }
             case ADDITIONAL_INFO_REQUESTED -> evidence.reAdditionalInfo();
         }
