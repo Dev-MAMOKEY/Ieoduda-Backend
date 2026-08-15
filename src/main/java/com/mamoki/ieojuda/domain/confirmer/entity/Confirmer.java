@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -49,6 +50,10 @@ public class Confirmer {
 
     @Column(name = "reported_at")
     private LocalDateTime reportedAt;
+
+    // "사망 신고 이메일" 화면 - 확인자가 입력한 사망일 (모르는 경우 null)
+    @Column(name = "reported_death_date")
+    private LocalDate reportedDeathDate;
 
     @Column(name = "invite_token", length = 255)
     private String inviteToken;
@@ -112,10 +117,11 @@ public class Confirmer {
         this.acceptanceStatus = AcceptanceStatus.EXPIRED;
     }
 
-    // 사망 신고 접수 ( 각 확인자 독립 신고)
-    public void report() {
+    // 사망 신고 접수 (각 확인자 독립 신고, 사망일은 모를 경우 null)
+    public void report(LocalDate reportedDeathDate) {
         this.reportStatus = ReportStatus.REPORTED;
         this.reportedAt = LocalDateTime.now();
+        this.reportedDeathDate = reportedDeathDate;
     }
 
     // 다른 확인자 신고와 대상·사건이 일치한다고 판정
