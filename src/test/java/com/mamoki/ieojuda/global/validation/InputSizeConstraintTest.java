@@ -22,6 +22,8 @@ import com.mamoki.ieojuda.domain.recipient.dto.RecipientUpdateRequest;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.releasecase.dto.ObjectionRequest;
 import com.mamoki.ieojuda.domain.releasecase.entity.Objection;
+import com.mamoki.ieojuda.global.exception.CustomException;
+import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.exception.GlobalExceptionHandler;
 import jakarta.persistence.Column;
 import jakarta.validation.Validation;
@@ -29,6 +31,8 @@ import jakarta.validation.Validator;
 import jakarta.validation.constraints.Size;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.io.IOException;
@@ -38,6 +42,8 @@ import java.util.Map;
 import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class InputSizeConstraintTest {
 
@@ -143,6 +149,7 @@ class InputSizeConstraintTest {
 
         assertThat(properties.getProperty("spring.servlet.multipart.max-file-size")).isEqualTo("25MB");
         assertThat(properties.getProperty("spring.servlet.multipart.max-request-size")).isEqualTo("30MB");
+        assertThat(properties.getProperty("server.tomcat.max-swallow-size")).isEqualTo("35MB");
     }
 
     @Test
@@ -151,6 +158,22 @@ class InputSizeConstraintTest {
         maxFileSize.setAccessible(true);
 
         assertThat(maxFileSize.getLong(null)).isEqualTo(25L * 1024 * 1024);
+    }
+
+    @Test
+    void evidenceFilenameMatchesTheDatabaseColumnLimit() {
+        EvidenceSubmitService service = new EvidenceSubmitService(null, null, null, null);
+        MockMultipartFile valid = new MockMultipartFile(
+                "file", "x".repeat(255), "application/pdf", new byte[]{1});
+        MockMultipartFile oversized = new MockMultipartFile(
+                "file", "x".repeat(256), "application/pdf", new byte[]{1});
+
+        assertThatCode(() -> ReflectionTestUtils.invokeMethod(service, "validateFile", valid))
+                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "validateFile", oversized))
+                .isInstanceOfSatisfying(CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.EVIDENCE_SUBMISSION_INVALID));
     }
 
     @Test

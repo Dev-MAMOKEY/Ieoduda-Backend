@@ -79,6 +79,10 @@ public class EvidenceSubmitService {
         if (file == null || file.isEmpty()) {
             throw new CustomException(ErrorCode.EVIDENCE_SUBMISSION_INVALID);
         }
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank() || originalFilename.length() > 255) {
+            throw new CustomException(ErrorCode.EVIDENCE_SUBMISSION_INVALID);
+        }
         if (!ALLOWED_MIME_TYPES.contains(file.getContentType())) {
             throw new CustomException(ErrorCode.EVIDENCE_SUBMISSION_INVALID);
         }
