@@ -25,8 +25,10 @@ import java.util.stream.Collectors;
 public class LifeAreaService {
 
     private final ItemRepository itemRepository;
+    private final PlanOwnershipReader planOwnershipReader;
 
-    public List<LifeAreaResponse> getLifeAreas(Long planId) {
+    public List<LifeAreaResponse> getLifeAreas(Long userId, Long planId) {
+        planOwnershipReader.findOwnedPlan(userId, planId);
         List<Item> items = itemRepository.findByLifeArea_Plan_PlanIdOrderByItemIdAsc(planId);
 
         Map<LifeAreaCategory, List<Item>> itemsByCategory = items.stream()
