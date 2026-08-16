@@ -26,7 +26,7 @@ public class User extends BaseCreatedAtEntity {
     @Column(name = "password", length = 255, nullable = false)
     private String password;
 
-    @Column(name = "name", length = 50)
+    @Column(name = "name", length = 100)
     private String name;
 
     @Column(name = "refresh_token", length = 255)
