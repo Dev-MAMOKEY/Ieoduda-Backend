@@ -62,7 +62,7 @@ public class Confirmer {
     private LocalDateTime inviteTokenExpiresAt;
 
     // "지정확인자 수락 이메일" 화면 - 확인자가 수락/거절 시 남기는 문의 사항 (선택 입력)
-    @Column(name = "inquiry", columnDefinition = "TEXT")
+    @Column(name = "inquiry", length = 1000)
     private String inquiry;
 
     @Builder
@@ -79,6 +79,13 @@ public class Confirmer {
     public void issueInviteToken(String inviteTokenHash, LocalDateTime expiresAt) {
         this.inviteToken = inviteTokenHash;
         this.inviteTokenExpiresAt = expiresAt;
+    }
+
+    // 계정 이메일 변경 등 계정 탈취 대응 - 기존 초대 토큰으로는 더 이상 아무것도 할 수 없게 만든다
+    // (수락 완료 후에는 만료 검사를 건너뛰는 개인 접근키로 쓰이므로, 만료가 아니라 값 자체를 지워야 진짜로 막힌다)
+    public void invalidateInviteToken() {
+        this.inviteToken = null;
+        this.inviteTokenExpiresAt = null;
     }
 
     // 수락 요청 재전송 - 새 토큰이 발급되므로 만료 상태를 수락 대기로 되돌린다

@@ -14,6 +14,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @Slf4j
 @RestControllerAdvice // 컨트롤러에 대해 전역적으로 예외 처리하기 위해 사용하는 어노테이션
@@ -47,6 +48,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(ErrorCode.INVALID_INPUT.getHttpStatus())
                 .body(RsData.fail(ErrorCode.INVALID_INPUT, "요청 파라미터 '" + exception.getName() + "' 값이 올바르지 않습니다."));
+    }
+
+    // multipart 파일 또는 요청 전체 크기 초과 (413)
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<RsData<Void>> handle(MaxUploadSizeExceededException exception) {
+        return ResponseEntity
+                .status(ErrorCode.PAYLOAD_TOO_LARGE.getHttpStatus())
+                .body(RsData.fail(ErrorCode.PAYLOAD_TOO_LARGE));
     }
 
     // 인증 관련 예외 처리 (401)

@@ -25,7 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Set;
 
 // 계획(Plan)은 더 이상 사용자가 "만드는" 대상이 아니다 - 회원가입 시 자동으로 1개 생성되고(AuthService),
 // 사망확인/증빙검토/발송 파이프라인(death_confirmers, release_cases 등)이 매달리는 앵커 역할만 한다.
@@ -35,7 +34,8 @@ import java.util.Set;
 @Transactional(readOnly = true)
 public class PlanService {
 
-    private static final Set<Integer> ALLOWED_WAITING_DAYS = Set.of(7, 14, 21);
+    private static final int MIN_WAITING_DAYS = 7;
+    private static final int MAX_WAITING_DAYS = 30;
 
     private final PlanRepository planRepository;
     private final DisputeContactRepository disputeContactRepository;
@@ -70,7 +70,9 @@ public class PlanService {
     // "대기 이의제기 설정" 화면 - 대기 기간 저장
     @Transactional
     public ReleasePolicyResponse updateReleasePolicy(Long planId, ReleasePolicyRequest request) {
-        if (!ALLOWED_WAITING_DAYS.contains(request.waitingDays())) {
+        if (request.waitingDays() == null
+                || request.waitingDays() < MIN_WAITING_DAYS
+                || request.waitingDays() > MAX_WAITING_DAYS) {
             throw new CustomException(ErrorCode.INVALID_WAITING_PERIOD);
         }
         Plan plan = findPlan(planId);
