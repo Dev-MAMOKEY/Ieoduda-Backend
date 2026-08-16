@@ -7,6 +7,7 @@ public enum ErrorCode {
 
     // 요청 값 검증 예외 (400) -> @Valid 검증 실패, JSON 파싱 실패, 파라미터 타입 불일치 등
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "입력값이 올바르지 않습니다."),
+    PAYLOAD_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "PAYLOAD_TOO_LARGE", "업로드 파일 또는 요청 크기가 허용 범위를 초과했습니다."),
 
     // 회원가입 / 로그인 관련 예외 (400)
     PASSWORD_CONFIRMATION_MISMATCH(HttpStatus.BAD_REQUEST, "PASSWORD_CONFIRMATION_MISMATCH", "비밀번호와 비밀번호 확인이 일치하지 않습니다."),

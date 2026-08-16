@@ -7,10 +7,12 @@ import jakarta.validation.constraints.NotBlank;
 // "담당자 수정" 화면 - 이름/이메일 수정
 public record RecipientUpdateRequest(
         @Schema(description = "담당자 이름", example = "김민수")
-        @NotBlank(message = "담당자 이름을 입력해 주세요.") String name,
+        @NotBlank(message = "담당자 이름을 입력해 주세요.")
+        @jakarta.validation.constraints.Size(max = 100, message = "담당자 이름은 100자 이하여야 합니다.") String name,
 
         @Schema(description = "담당자 이메일", example = "recipient@example.com")
         @NotBlank(message = "담당자 이메일을 입력해 주세요.")
-        @Email(message = "이메일 형식이 올바르지 않습니다.") String email
+        @Email(message = "이메일 형식이 올바르지 않습니다.")
+        @jakarta.validation.constraints.Size(max = 255, message = "담당자 이메일은 255자 이하여야 합니다.") String email
 ) {
 }
