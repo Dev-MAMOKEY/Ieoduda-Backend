@@ -58,7 +58,7 @@ public class Evidence {
     @Column(name = "integrity_hash", length = 255)
     private String integrityHash;
 
-    @Column(name = "failure_reason", columnDefinition = "TEXT")
+    @Column(name = "failure_reason", length = 1000)
     private String failureReason;
 
     @Column(name = "storage_key", length = 500, nullable = false)

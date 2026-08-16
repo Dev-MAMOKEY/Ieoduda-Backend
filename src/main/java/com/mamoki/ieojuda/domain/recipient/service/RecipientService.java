@@ -7,7 +7,7 @@ import com.mamoki.ieojuda.domain.plan.entity.ItemStatus;
 import com.mamoki.ieojuda.domain.plan.entity.LifeArea;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
-import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
+import com.mamoki.ieojuda.domain.plan.service.PlanOwnershipReader;
 import com.mamoki.ieojuda.domain.recipient.dto.BackupRegisterRequest;
 import com.mamoki.ieojuda.domain.recipient.dto.BackupRegisterResponse;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientAcceptanceEmailResponse;
@@ -52,13 +52,13 @@ public class RecipientService {
 
     private final ItemRepository itemRepository;
     private final RecipientRepository recipientRepository;
-    private final PlanRepository planRepository;
+    private final PlanOwnershipReader planOwnershipReader;
     private final EmailSender emailSender;
     private final AppProperties appProperties;
 
     @Transactional
     public RecipientBulkRegisterResponse registerAll(Long userId, Long planId, RecipientBulkRegisterRequest request) {
-        findOwnedPlan(userId, planId);
+        planOwnershipReader.findOwnedPlan(userId, planId);
         List<Item> items = validateAll(planId, request.recipients());
 
         List<RecipientRegisterResponse> responses = new ArrayList<>();
@@ -210,7 +210,7 @@ public class RecipientService {
 
     // "역할 점검" 화면 상세 - 이름 클릭 시 해당 담당자에게 배정된 항목 전체
     public RecipientDetailResponse getRecipient(Long userId, Long planId, Long assigneeId) {
-        findOwnedPlan(userId, planId);
+        planOwnershipReader.findOwnedPlan(userId, planId);
         Recipient recipient = findOwnedRecipient(planId, assigneeId);
 
         List<ItemResponse> items = itemRepository.findByRecipient_AssigneeIdOrderByItemIdAsc(assigneeId).stream()
@@ -246,7 +246,7 @@ public class RecipientService {
     // "담당자 수정하기" - 이름/이메일 수정. 이메일이 바뀌면 재검증이 필요하므로 수락 이메일을 다시 보낸다
     @Transactional
     public RecipientUpdateResponse updateRecipient(Long userId, Long planId, Long assigneeId, RecipientUpdateRequest request) {
-        findOwnedPlan(userId, planId);
+        planOwnershipReader.findOwnedPlan(userId, planId);
         Recipient recipient = findOwnedRecipient(planId, assigneeId);
 
         boolean emailChanged = recipient.updateContact(request.name(), request.email());
@@ -260,16 +260,6 @@ public class RecipientService {
                 sendResult != null && sendResult.success(),
                 sendResult == null || sendResult.bounceType() == null ? null : sendResult.bounceType().name()
         );
-    }
-
-    // 로그인한 사용자가 자신의 계획만 조회할 수 있도록 검증 (불일치 시 존재 노출 방지를 위해 NOT_FOUND로 응답)
-    private Plan findOwnedPlan(Long userId, Long planId) {
-        Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new CustomException(ErrorCode.PLAN_NOT_FOUND));
-        if (!plan.getUser().getUserId().equals(userId)) {
-            throw new CustomException(ErrorCode.PLAN_NOT_FOUND);
-        }
-        return plan;
     }
 
     private Recipient findOwnedRecipient(Long planId, Long assigneeId) {

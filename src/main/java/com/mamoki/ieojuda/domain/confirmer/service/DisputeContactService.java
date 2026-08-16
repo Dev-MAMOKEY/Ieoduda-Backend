@@ -5,7 +5,7 @@ import com.mamoki.ieojuda.domain.confirmer.dto.DisputeContactResponse;
 import com.mamoki.ieojuda.domain.confirmer.entity.DisputeContact;
 import com.mamoki.ieojuda.domain.confirmer.repository.DisputeContactRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
-import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
+import com.mamoki.ieojuda.domain.plan.service.PlanOwnershipReader;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
 import com.mamoki.ieojuda.global.email.contract.EmailSendResult;
@@ -31,7 +31,7 @@ import java.time.ZoneId;
 @Transactional(readOnly = true)
 public class DisputeContactService {
 
-    private final PlanRepository planRepository;
+    private final PlanOwnershipReader planOwnershipReader;
     private final DisputeContactRepository disputeContactRepository;
     private final EmailSender emailSender;
     private final AppProperties appProperties;
@@ -39,9 +39,8 @@ public class DisputeContactService {
     private final PublicLinkAuditor publicLinkAuditor;
 
     @Transactional
-    public DisputeContactResponse register(Long planId, DisputeContactRegisterRequest request) {
-        Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new CustomException(ErrorCode.PLAN_NOT_FOUND));
+    public DisputeContactResponse register(Long userId, Long planId, DisputeContactRegisterRequest request) {
+        Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
 
         DisputeContact contact = disputeContactRepository.save(DisputeContact.builder()
                 .plan(plan)
@@ -55,7 +54,8 @@ public class DisputeContactService {
 
     // "대기 이의제기 수정" 화면 - 이미 등록된 연락처의 이름/이메일 수정. 이메일이 바뀌면 검증을 다시 받아야 하므로 재발송한다.
     @Transactional
-    public DisputeContactResponse update(Long planId, Long contactId, DisputeContactRegisterRequest request) {
+    public DisputeContactResponse update(Long userId, Long planId, Long contactId, DisputeContactRegisterRequest request) {
+        planOwnershipReader.findOwnedPlan(userId, planId);
         DisputeContact contact = findContact(planId, contactId);
         boolean emailChanged = !contact.getEmail().equals(request.email());
 

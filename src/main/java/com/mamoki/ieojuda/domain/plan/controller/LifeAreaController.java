@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,8 +30,9 @@ public class LifeAreaController {
     @Operation(summary = "삶의 구역별 항목 조회", description = "가족/관계 정리/업무 연속성 3개 구역 각각에 지금까지 쌓인 항목 전체를 조회합니다.")
     @GetMapping
     public ResponseEntity<RsData<List<LifeAreaResponse>>> getLifeAreas(
+            @AuthenticationPrincipal Long userId,
             @Parameter(description = "계획 ID") @PathVariable Long planId
     ) {
-        return ResponseEntity.ok(RsData.success(lifeAreaService.getLifeAreas(planId)));
+        return ResponseEntity.ok(RsData.success(lifeAreaService.getLifeAreas(userId, planId)));
     }
 }

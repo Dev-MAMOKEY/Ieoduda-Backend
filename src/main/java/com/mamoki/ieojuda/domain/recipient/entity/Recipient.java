@@ -75,7 +75,7 @@ public class Recipient {
     private Recipient backupFor;
 
     // "역할 수락 이메일" 화면 - 담당자가 수락/거절 시 남기는 문의 사항 (선택 입력)
-    @Column(name = "inquiry", columnDefinition = "TEXT")
+    @Column(name = "inquiry", length = 1000)
     private String inquiry;
 
     // 담당자 등록 시점 - 역할명, 담당자 이름, 이메일, 공개 범주, 최대 단계 대기 시간, 대체 담당자 입력
@@ -99,6 +99,12 @@ public class Recipient {
     public void issueInviteToken(String inviteTokenHash, LocalDateTime expiresAt) {
         this.inviteToken = inviteTokenHash;
         this.inviteTokenExpiresAt = expiresAt;
+    }
+
+    // 계정 이메일 변경 등 계정 탈취 대응 - 기존 초대 토큰으로는 더 이상 아무것도 할 수 없게 만든다
+    public void invalidateInviteToken() {
+        this.inviteToken = null;
+        this.inviteTokenExpiresAt = null;
     }
 
     // 담당자 수락

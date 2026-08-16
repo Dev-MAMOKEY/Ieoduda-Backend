@@ -33,7 +33,7 @@ import java.util.Set;
 public class EvidenceSubmitService {
 
     private static final Set<String> ALLOWED_MIME_TYPES = Set.of("application/pdf", "image/jpeg", "image/png");
-    private static final long MAX_FILE_SIZE = 10L * 1024 * 1024; // 10MB
+    private static final long MAX_FILE_SIZE = 25L * 1024 * 1024; // 25MB
     private static final long MAX_FILE_COUNT = 3;
 
     private final ConfirmerRepository confirmerRepository;
@@ -84,11 +84,15 @@ public class EvidenceSubmitService {
         if (file == null || file.isEmpty()) {
             throw new CustomException(ErrorCode.EVIDENCE_SUBMISSION_INVALID);
         }
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank() || originalFilename.length() > 255) {
+            throw new CustomException(ErrorCode.EVIDENCE_SUBMISSION_INVALID);
+        }
         if (!ALLOWED_MIME_TYPES.contains(file.getContentType())) {
             throw new CustomException(ErrorCode.EVIDENCE_SUBMISSION_INVALID);
         }
         if (file.getSize() > MAX_FILE_SIZE) {
-            throw new CustomException(ErrorCode.EVIDENCE_SUBMISSION_INVALID);
+            throw new CustomException(ErrorCode.PAYLOAD_TOO_LARGE);
         }
     }
 

@@ -56,6 +56,12 @@ public class DisputeContact {
         this.inviteTokenExpiresAt = expiresAt;
     }
 
+    // 계정 이메일 변경 등 계정 탈취 대응 - 기존 초대 토큰으로는 더 이상 아무것도 할 수 없게 만든다
+    public void invalidateInviteToken() {
+        this.inviteToken = null;
+        this.inviteTokenExpiresAt = null;
+    }
+
     // 이메일 검증 완료
     public void verify() {
         this.isVerified = true;

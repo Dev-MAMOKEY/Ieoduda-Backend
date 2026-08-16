@@ -29,6 +29,9 @@ import static org.mockito.Mockito.when;
 
 class PlanServiceTest {
 
+    private static final Long USER_ID = 1L;
+    private static final Long PLAN_ID = 1L;
+
     private PlanRepository planRepository;
     private Plan plan;
     private PlanService planService;
@@ -40,6 +43,7 @@ class PlanServiceTest {
         plan = mock(Plan.class);
         planService = new PlanService(
                 planRepository,
+                new PlanOwnershipReader(planRepository),
                 mock(DisputeContactRepository.class),
                 mock(EmailSender.class),
                 mock(AppProperties.class)
@@ -50,9 +54,9 @@ class PlanServiceTest {
     @ParameterizedTest
     @MethodSource("validWaitingDays")
     void updateReleasePolicyAcceptsEveryDayWithinRange(int waitingDays) {
-        when(planRepository.findById(1L)).thenReturn(Optional.of(plan));
+        when(planRepository.findByPlanIdAndUser_UserId(PLAN_ID, USER_ID)).thenReturn(Optional.of(plan));
 
-        planService.updateReleasePolicy(1L, new ReleasePolicyRequest(waitingDays));
+        planService.updateReleasePolicy(USER_ID, PLAN_ID, new ReleasePolicyRequest(waitingDays));
 
         verify(plan).updateWaitingDays(waitingDays);
     }
@@ -73,10 +77,12 @@ class PlanServiceTest {
     }
 
     private void assertInvalidWaitingDays(Integer waitingDays) {
-        assertThatThrownBy(() -> planService.updateReleasePolicy(1L, new ReleasePolicyRequest(waitingDays)))
+        when(planRepository.findByPlanIdAndUser_UserId(PLAN_ID, USER_ID)).thenReturn(Optional.of(plan));
+
+        assertThatThrownBy(() -> planService.updateReleasePolicy(USER_ID, PLAN_ID, new ReleasePolicyRequest(waitingDays)))
                 .isInstanceOfSatisfying(CustomException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_WAITING_PERIOD));
-        verifyNoInteractions(planRepository);
+        verify(plan, org.mockito.Mockito.never()).updateWaitingDays(org.mockito.ArgumentMatchers.any());
     }
 
     @Test

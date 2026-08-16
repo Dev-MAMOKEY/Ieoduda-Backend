@@ -8,7 +8,6 @@ import com.mamoki.ieojuda.domain.plan.entity.Item;
 import com.mamoki.ieojuda.domain.plan.entity.ItemActionType;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
-import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
@@ -30,11 +29,11 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class ItemOrderService {
 
-    private final PlanRepository planRepository;
+    private final PlanOwnershipReader planOwnershipReader;
     private final ItemRepository itemRepository;
 
     public OrderCheckResponse getOrderCheck(Long userId, Long planId) {
-        findOwnedPlan(userId, planId);
+        planOwnershipReader.findOwnedPlan(userId, planId);
         List<Item> items = itemRepository.findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(planId);
         return OrderCheckResponse.of(buildItemResponses(items));
     }
@@ -42,7 +41,7 @@ public class ItemOrderService {
     // 드래그로 바뀐 순서를 저장 - 순서가 바뀌었으므로 기존 확정 상태는 초기화한다
     @Transactional
     public OrderCheckResponse reorder(Long userId, Long planId, ItemReorderRequest request) {
-        Plan plan = findOwnedPlan(userId, planId);
+        Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
         List<Item> items = itemRepository.findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(planId);
 
         Map<Long, Item> itemsById = items.stream().collect(Collectors.toMap(Item::getItemId, item -> item));
@@ -64,7 +63,7 @@ public class ItemOrderService {
     // "순서 확정하기" - 충돌이 하나라도 남아있으면 확정할 수 없다
     @Transactional
     public OrderConfirmResponse confirm(Long userId, Long planId) {
-        Plan plan = findOwnedPlan(userId, planId);
+        Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
         List<Item> items = itemRepository.findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(planId);
 
         boolean hasConflict = buildItemResponses(items).stream().anyMatch(OrderCheckItemResponse::conflict);
@@ -123,15 +122,5 @@ public class ItemOrderService {
 
     private int sortOrderOf(Item item) {
         return item.getSortOrder() == null ? 0 : item.getSortOrder();
-    }
-
-    // 로그인한 사용자가 자신의 계획만 조회할 수 있도록 검증 (불일치 시 존재 노출 방지를 위해 NOT_FOUND로 응답)
-    private Plan findOwnedPlan(Long userId, Long planId) {
-        Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new CustomException(ErrorCode.PLAN_NOT_FOUND));
-        if (!plan.getUser().getUserId().equals(userId)) {
-            throw new CustomException(ErrorCode.PLAN_NOT_FOUND);
-        }
-        return plan;
     }
 }

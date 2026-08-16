@@ -24,7 +24,7 @@ public class EvidenceSubmitController {
 
     private final EvidenceSubmitService evidenceSubmitService;
 
-    @Operation(summary = "증빙 자료 제출", description = "PDF/JPG/PNG, 최대 10MB, 사건당 최대 3개까지 제출할 수 있습니다.")
+    @Operation(summary = "증빙 자료 제출", description = "PDF/JPG/PNG, 파일당 최대 25MB, 요청 전체 최대 30MB, 사건당 최대 3개까지 제출할 수 있습니다.")
     @PostMapping(value = "/evidences", consumes = "multipart/form-data")
     public ResponseEntity<RsData<EvidenceSubmitResponse>> submit(
             @Parameter(description = "초대 토큰") @PathVariable String token,

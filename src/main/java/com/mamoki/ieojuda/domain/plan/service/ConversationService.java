@@ -22,7 +22,6 @@ import com.mamoki.ieojuda.domain.plan.repository.ConversationRepository;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
 import com.mamoki.ieojuda.domain.plan.repository.LifeAreaMessageRepository;
 import com.mamoki.ieojuda.domain.plan.repository.LifeAreaRepository;
-import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.openai.component.OpenAIClient;
@@ -49,7 +48,7 @@ import java.util.Map;
 @Transactional(readOnly = true)
 public class ConversationService {
 
-    private final PlanRepository planRepository;
+    private final PlanOwnershipReader planOwnershipReader;
     private final ConversationRepository conversationRepository;
     private final LifeAreaMessageRepository lifeAreaMessageRepository;
     private final LifeAreaRepository lifeAreaRepository;
@@ -59,15 +58,15 @@ public class ConversationService {
 
     // 새 대화 세션 시작 - 처음 채팅을 시작할 때, 또는 나중에 수정하러 다시 들어올 때마다 호출
     @Transactional
-    public ConversationResponse startConversation(Long planId) {
-        Plan plan = findPlan(planId);
+    public ConversationResponse startConversation(Long userId, Long planId) {
+        Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
         Conversation conversation = conversationRepository.save(Conversation.builder().plan(plan).build());
         return ConversationResponse.from(conversation);
     }
 
     // 대화 작성 화면 - 최신 턴부터 페이지 단위로 조회(무한 스크롤), 화면엔 오래된 순으로 뒤집어서 반환
-    public LifeAreaMessageHistoryResponse getHistory(Long planId, Long conversationId, Pageable pageable) {
-        Conversation conversation = findConversation(planId, conversationId);
+    public LifeAreaMessageHistoryResponse getHistory(Long userId, Long planId, Long conversationId, Pageable pageable) {
+        Conversation conversation = findConversation(userId, planId, conversationId);
 
         Slice<LifeAreaMessage> slice = lifeAreaMessageRepository
                 .findByConversation_ConversationIdOrderByMessageIdDesc(conversation.getConversationId(), pageable);
@@ -82,8 +81,8 @@ public class ConversationService {
 
     // 대화 작성 화면 - 사용자 발화 전송 -> AI의 다음 턴(질문 또는 구조화 결과) 반환
     @Transactional
-    public LifeAreaTurnResponse sendMessage(Long planId, Long conversationId, String userContent) {
-        Conversation conversation = findConversation(planId, conversationId);
+    public LifeAreaTurnResponse sendMessage(Long userId, Long planId, Long conversationId, String userContent) {
+        Conversation conversation = findConversation(userId, planId, conversationId);
         Plan plan = conversation.getPlan();
 
         // step 1. 이 세션 안에서 지금까지의 대화 이력 로드
@@ -210,12 +209,8 @@ public class ConversationService {
         return role == MessageRole.ASSISTANT ? "assistant" : "user";
     }
 
-    private Plan findPlan(Long planId) {
-        return planRepository.findById(planId)
-                .orElseThrow(() -> new CustomException(ErrorCode.PLAN_NOT_FOUND));
-    }
-
-    private Conversation findConversation(Long planId, Long conversationId) {
+    private Conversation findConversation(Long userId, Long planId, Long conversationId) {
+        planOwnershipReader.findOwnedPlan(userId, planId);
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CONVERSATION_NOT_FOUND));
         if (!conversation.getPlan().getPlanId().equals(planId)) {

@@ -34,23 +34,23 @@ public class Item {
     @Column(name = "location_type", length = 100)
     private String locationType;
 
-    @Column(name = "action", columnDefinition = "TEXT")
+    @Column(name = "action", length = 2000)
     private String action;
 
-    @Column(name = "title", length = 100)
+    @Column(name = "title", length = 200)
     private String title;
 
-    @Column(name = "content", columnDefinition = "TEXT")
+    @Column(name = "content", length = 2000)
     private String content;
 
-    @Column(name = "precondition", columnDefinition = "TEXT")
+    @Column(name = "precondition", length = 2000)
     private String precondition;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "disclosure_scope", length = 30)
     private DisclosureScope disclosureScope;
 
-    @Column(name = "source_excerpt", columnDefinition = "TEXT")
+    @Column(name = "source_excerpt", length = 2000)
     private String sourceExcerpt;
 
     @Enumerated(EnumType.STRING)
