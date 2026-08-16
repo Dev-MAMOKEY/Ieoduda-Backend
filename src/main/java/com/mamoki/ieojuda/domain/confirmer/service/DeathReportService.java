@@ -5,9 +5,11 @@ import com.mamoki.ieojuda.domain.confirmer.dto.DeathReportResponse;
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
 import com.mamoki.ieojuda.domain.confirmer.entity.ReportStatus;
 import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
+import com.mamoki.ieojuda.domain.plan.dto.PlanSnapshotDto;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.entity.PlanVersion;
 import com.mamoki.ieojuda.domain.plan.repository.PlanVersionRepository;
+import com.mamoki.ieojuda.domain.plan.service.PlanSnapshotService;
 import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
@@ -33,6 +35,7 @@ public class DeathReportService {
     private final ConfirmerRepository confirmerRepository;
     private final ReleaseCaseRepository releaseCaseRepository;
     private final PlanVersionRepository planVersionRepository;
+    private final PlanSnapshotService planSnapshotService;
 
     @Transactional
     public DeathReportResponse report(String plainToken, DeathReportRequest request) {
@@ -80,8 +83,14 @@ public class DeathReportService {
             throw new CustomException(ErrorCode.ACTIVE_RELEASE_CASE_EXISTS);
         }
 
+        int nextVersionNum = (int) planVersionRepository.countByPlan_PlanId(plan.getPlanId()) + 1;
+        PlanSnapshotDto snapshot = planSnapshotService.buildSnapshot(plan);
+        String snapshotJson = planSnapshotService.serialize(snapshot);
+        String snapshotHash = planSnapshotService.hash(snapshotJson);
+
         PlanVersion planVersion = planVersionRepository.save(
-                PlanVersion.builder().plan(plan).versionNum(1).snapshotData(null).build());
+                PlanVersion.builder().plan(plan).versionNum(nextVersionNum).snapshotData(snapshotJson).build());
+        planVersion.seal(snapshotHash);
 
         ReleaseCase releaseCase = releaseCaseRepository.save(
                 ReleaseCase.builder().plan(plan).planVersion(planVersion).build());
