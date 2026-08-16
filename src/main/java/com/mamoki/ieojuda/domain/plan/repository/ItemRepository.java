@@ -20,4 +20,7 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
 
     // "실행 순서 점검" 화면 - 담당자가 배정된(=발송 대상이 확정된) 항목만 순서 점검 대상
     List<Item> findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(Long planId);
+
+    // "역할별 사후 패키지" 화면 - 진행률과 "진행 중" 판정이 실행 순서를 따르므로 sortOrder 기준으로 정렬한다
+    List<Item> findByRecipient_AssigneeIdOrderBySortOrderAscItemIdAsc(Long assigneeId);
 }

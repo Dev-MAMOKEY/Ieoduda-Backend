@@ -27,4 +27,8 @@ public class AppProperties {
 
     @Value("${app.otp-max-attempts}")
     private int otpMaxAttempts;
+
+    // OTP 확인 후 "역할별 사후 패키지" 화면을 열어둘 수 있는 시간. 링크(used=true)와 달리 세션은 여러 번 조회해야 해서 별도 TTL을 둔다
+    @Value("${app.posthumous-session-ttl-minutes}")
+    private long posthumousSessionTtlMinutes;
 }

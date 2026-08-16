@@ -38,7 +38,8 @@ public class SecurityConfig {
             "/api/dispute-contacts/*/objections", // 이의 제기 접수
             "/api/recipient-acceptances/**",// 역할 담당자 수락
             "/api/confirmer-acceptances/**", // 지정확인자 수락 / 사망 신고 / 증빙 제출
-            "/api/posthumous-access/**" // 사후 인계 - 링크 검증 / OTP 발송·확인
+            "/api/posthumous-access/**", // 사후 인계 - 링크 검증 / OTP 발송·확인
+            "/api/posthumous-packages/**" // 역할별 사후 패키지 - 조회 / 행동 완료 / 문제 신고
     };
 
     // 운영관리자 전용 - 이메일 발송 감사/재시도/사건 동결/단계 조회·대체담당자 전환

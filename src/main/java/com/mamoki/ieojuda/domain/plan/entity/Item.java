@@ -68,6 +68,11 @@ public class Item {
     @Column(name = "action_type", length = 30)
     private ItemActionType actionType;
 
+    // "역할별 사후 패키지" 화면에서 담당자가 이 행동을 완료 처리한 시각.
+    // status(PROPOSED/APPROVED)는 생전 검토용이라 사후 진행 상태를 담을 수 없어 별도 컬럼으로 둔다.
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
     @Builder
     public Item(LifeArea lifeArea, String targetName, String locationType, String action, String title, String content,
                 String precondition, DisclosureScope disclosureScope, String sourceExcerpt,
@@ -111,5 +116,12 @@ public class Item {
 
     public void assignRecipient(Recipient recipient) {
         this.recipient = recipient;
+    }
+
+    // "역할별 사후 패키지" 화면 - 담당자가 "완료하기"를 누른 시점. 이미 완료된 항목은 최초 완료 시각을 유지한다
+    public void completeAction() {
+        if (this.completedAt == null) {
+            this.completedAt = LocalDateTime.now();
+        }
     }
 }
