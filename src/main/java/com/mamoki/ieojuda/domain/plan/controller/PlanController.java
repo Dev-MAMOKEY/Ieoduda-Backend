@@ -55,7 +55,7 @@ public class PlanController {
         return ResponseEntity.ok(RsData.success(planService.getReleaseSettings(planId)));
     }
 
-    @Operation(summary = "대기 기간 설정", description = "증빙 승인 후 실제 발송까지 기다리는 대기 기간(7/14/21일)을 저장합니다.")
+    @Operation(summary = "대기 기간 설정", description = "증빙 승인 후 실제 발송까지 기다리는 대기 기간(7~30일)을 저장합니다.")
     @PutMapping("/{planId}/release-policy")
     public ResponseEntity<RsData<ReleasePolicyResponse>> updateReleasePolicy(
             @Parameter(description = "계획 ID") @PathVariable Long planId,
