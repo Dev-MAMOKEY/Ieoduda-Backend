@@ -42,43 +42,48 @@ public class PlanController {
     @Operation(summary = "계획 조회")
     @GetMapping("/{planId}")
     public ResponseEntity<RsData<PlanResponse>> getPlan(
+            @AuthenticationPrincipal Long userId,
             @Parameter(description = "계획 ID") @PathVariable Long planId
     ) {
-        return ResponseEntity.ok(RsData.success(planService.getPlan(planId)));
+        return ResponseEntity.ok(RsData.success(planService.getPlan(userId, planId)));
     }
 
     @Operation(summary = "대기·이의제기 설정 조회", description = "저장된 대기 기간, 본인 경고 이메일, 이의 제기 연락처를 한 번에 조회합니다. 아직 등록 안 한 항목은 null로 옵니다.")
     @GetMapping("/{planId}/release-policy")
     public ResponseEntity<RsData<ReleaseSettingsResponse>> getReleaseSettings(
+            @AuthenticationPrincipal Long userId,
             @Parameter(description = "계획 ID") @PathVariable Long planId
     ) {
-        return ResponseEntity.ok(RsData.success(planService.getReleaseSettings(planId)));
+        return ResponseEntity.ok(RsData.success(planService.getReleaseSettings(userId, planId)));
     }
 
     @Operation(summary = "대기 기간 설정", description = "증빙 승인 후 실제 발송까지 기다리는 대기 기간(7~30일)을 저장합니다.")
     @PutMapping("/{planId}/release-policy")
     public ResponseEntity<RsData<ReleasePolicyResponse>> updateReleasePolicy(
+            @AuthenticationPrincipal Long userId,
             @Parameter(description = "계획 ID") @PathVariable Long planId,
             @Valid @RequestBody ReleasePolicyRequest request
     ) {
-        return ResponseEntity.ok(RsData.success(planService.updateReleasePolicy(planId, request)));
+        return ResponseEntity.ok(RsData.success(planService.updateReleasePolicy(userId, planId, request)));
     }
 
     @Operation(summary = "본인 경고 이메일 등록", description = "실행 신고가 오면 가장 먼저 경고 메일을 받을 본인 주소를 등록하고, 그 주소로 검증 메일을 발송합니다.")
     @PostMapping("/{planId}/self-warning-email")
     public ResponseEntity<RsData<SelfWarningEmailResponse>> requestSelfWarningEmailVerification(
+            @AuthenticationPrincipal Long userId,
             @Parameter(description = "계획 ID") @PathVariable Long planId,
             @Valid @RequestBody SelfWarningEmailRequest request
     ) {
-        return ResponseEntity.ok(RsData.success(planService.requestSelfWarningEmailVerification(planId, request)));
+        return ResponseEntity.ok(RsData.success(planService.requestSelfWarningEmailVerification(userId, planId, request)));
     }
 
     // 명세서 "마이페이지" API 호출: 계획 비활성화 POST /api/plans/{planId}/deactivate
     @Operation(summary = "계획 비활성화", description = "마이페이지에서 계획을 비활성화 상태로 전환합니다.")
     @PostMapping("/{planId}/deactivate")
     public ResponseEntity<RsData<PlanResponse>> deactivate(
+            @AuthenticationPrincipal Long userId,
             @Parameter(description = "계획 ID") @PathVariable Long planId
     ) {
-        return ResponseEntity.ok(RsData.success(planService.deactivate(planId)));
+        return ResponseEntity.ok(RsData.success(planService.deactivate(userId, planId)));
     }
 }

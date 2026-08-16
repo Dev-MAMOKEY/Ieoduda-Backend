@@ -38,12 +38,13 @@ public class PlanService {
     private static final int MAX_WAITING_DAYS = 30;
 
     private final PlanRepository planRepository;
+    private final PlanOwnershipReader planOwnershipReader;
     private final DisputeContactRepository disputeContactRepository;
     private final EmailSender emailSender;
     private final AppProperties appProperties;
 
-    public PlanResponse getPlan(Long planId) {
-        return PlanResponse.from(findPlan(planId));
+    public PlanResponse getPlan(Long userId, Long planId) {
+        return PlanResponse.from(planOwnershipReader.findOwnedPlan(userId, planId));
     }
 
     // 로그인한 사용자가 자기 planId를 모를 때(로그인 직후 등) 조회
@@ -54,36 +55,37 @@ public class PlanService {
     }
 
     @Transactional
-    public PlanResponse deactivate(Long planId) {
-        Plan plan = findPlan(planId);
+    public PlanResponse deactivate(Long userId, Long planId) {
+        Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
         plan.deactivate();
         return PlanResponse.from(plan);
     }
 
     // "대기 이의제기 수정" 화면 - 저장된 대기기간/본인경고이메일/이의제기연락처를 한 번에 조회
-    public ReleaseSettingsResponse getReleaseSettings(Long planId) {
-        Plan plan = findPlan(planId);
+    public ReleaseSettingsResponse getReleaseSettings(Long userId, Long planId) {
+        Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
         var disputeContact = disputeContactRepository.findFirstByPlan_PlanIdOrderByContactIdDesc(planId).orElse(null);
         return ReleaseSettingsResponse.of(plan, disputeContact);
     }
 
     // "대기 이의제기 설정" 화면 - 대기 기간 저장
+    // 소유권 검증을 범위 검증보다 먼저 수행한다 - 순서가 반대면 "타인 planId + 잘못된 값" 조합이 400을 돌려줘 존재를 흘린다
     @Transactional
-    public ReleasePolicyResponse updateReleasePolicy(Long planId, ReleasePolicyRequest request) {
+    public ReleasePolicyResponse updateReleasePolicy(Long userId, Long planId, ReleasePolicyRequest request) {
+        Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
         if (request.waitingDays() == null
                 || request.waitingDays() < MIN_WAITING_DAYS
                 || request.waitingDays() > MAX_WAITING_DAYS) {
             throw new CustomException(ErrorCode.INVALID_WAITING_PERIOD);
         }
-        Plan plan = findPlan(planId);
         plan.updateWaitingDays(request.waitingDays());
         return ReleasePolicyResponse.from(plan);
     }
 
     // "대기 이의제기 설정" 화면 - 본인 경고 이메일 등록 + 검증 메일 발송
     @Transactional
-    public SelfWarningEmailResponse requestSelfWarningEmailVerification(Long planId, SelfWarningEmailRequest request) {
-        Plan plan = findPlan(planId);
+    public SelfWarningEmailResponse requestSelfWarningEmailVerification(Long userId, Long planId, SelfWarningEmailRequest request) {
+        Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
 
         String plainToken = TokenProvider.generatePlainToken();
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
@@ -118,10 +120,5 @@ public class PlanService {
         }
 
         plan.verifySelfWarningEmail();
-    }
-
-    private Plan findPlan(Long planId) {
-        return planRepository.findById(planId)
-                .orElseThrow(() -> new CustomException(ErrorCode.PLAN_NOT_FOUND));
     }
 }

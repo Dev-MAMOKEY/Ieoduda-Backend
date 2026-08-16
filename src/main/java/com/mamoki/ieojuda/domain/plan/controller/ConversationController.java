@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -34,33 +35,36 @@ public class ConversationController {
     @Operation(summary = "대화 세션 시작", description = "새 대화 세션을 시작합니다. 처음 채팅을 시작할 때, 또는 나중에 수정하러 다시 들어올 때마다 호출합니다.")
     @PostMapping
     public ResponseEntity<RsData<ConversationResponse>> start(
+            @AuthenticationPrincipal Long userId,
             @Parameter(description = "계획 ID") @PathVariable Long planId
     ) {
-        return ResponseEntity.ok(RsData.success(conversationService.startConversation(planId)));
+        return ResponseEntity.ok(RsData.success(conversationService.startConversation(userId, planId)));
     }
 
     // page=0이 최신 턴, size만큼 과거로 내려가며 조회 (무한 스크롤)
     @Operation(summary = "대화 이력 조회", description = "page=0이 최신 턴이며, size만큼 과거로 내려가며 조회합니다(무한 스크롤). 응답의 messages는 항상 오래된 순으로 정렬됩니다.")
     @GetMapping("/{conversationId}/messages")
     public ResponseEntity<RsData<LifeAreaMessageHistoryResponse>> getHistory(
+            @AuthenticationPrincipal Long userId,
             @Parameter(description = "계획 ID") @PathVariable Long planId,
             @Parameter(description = "대화 세션 ID") @PathVariable Long conversationId,
             @Parameter(description = "페이지 번호 (0부터 시작, 최신 턴)") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기") @RequestParam(defaultValue = "20") int size
     ) {
         LifeAreaMessageHistoryResponse history = conversationService
-                .getHistory(planId, conversationId, PageRequest.of(page, size));
+                .getHistory(userId, planId, conversationId, PageRequest.of(page, size));
         return ResponseEntity.ok(RsData.success(history));
     }
 
     @Operation(summary = "사용자 발화 전송", description = "사용자 발화를 OpenAI에 전달해 다음 턴을 받습니다. AI가 되묻는 중이면 QUESTION, 구조화를 끝냈으면 RESULT(항목 목록)를 반환합니다. 한 발화에 여러 사람·주제가 섞여 있으면 항목이 여러 카테고리로 나뉘어 반환될 수 있습니다.")
     @PostMapping("/{conversationId}/messages")
     public ResponseEntity<RsData<LifeAreaTurnResponse>> sendMessage(
+            @AuthenticationPrincipal Long userId,
             @Parameter(description = "계획 ID") @PathVariable Long planId,
             @Parameter(description = "대화 세션 ID") @PathVariable Long conversationId,
             @Valid @RequestBody LifeAreaMessageRequest request
     ) {
-        LifeAreaTurnResponse result = conversationService.sendMessage(planId, conversationId, request.content());
+        LifeAreaTurnResponse result = conversationService.sendMessage(userId, planId, conversationId, request.content());
         return ResponseEntity.ok(RsData.success(result));
     }
 }
