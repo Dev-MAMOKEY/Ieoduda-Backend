@@ -20,7 +20,7 @@ public class User extends BaseCreatedAtEntity {
     @Column(name = "user_id")
     private Long userId;
 
-    @Column(name = "email", length = 255, nullable = false)
+    @Column(name = "email", length = 255, nullable = false, unique = true)
     private String email;
 
     @Column(name = "password", length = 255, nullable = false)

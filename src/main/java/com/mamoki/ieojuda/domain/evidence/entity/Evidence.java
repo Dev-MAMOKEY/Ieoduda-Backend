@@ -70,6 +70,11 @@ public class Evidence {
     @Column(name = "mime_type", length = 100)
     private String mimeType;
 
+    // 파트너 검토 결정이 동시에 두 번 들어오는 경우를 막기 위한 낙관적 잠금
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     @Builder
     public Evidence(Confirmer confirmer, Plan plan, ReleaseCase releaseCase,
                     String storageKey, String fileName, String mimeType, String integrityHash) {

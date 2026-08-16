@@ -81,6 +81,8 @@ public enum ErrorCode {
     RECIPIENT_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "RECIPIENT_RESEND_NOT_ALLOWED", "현재 수락 상태에서는 수락 요청을 다시 보낼 수 없습니다."),
     CONFIRMER_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "CONFIRMER_RESEND_NOT_ALLOWED", "현재 수락 상태에서는 수락 요청을 다시 보낼 수 없습니다."),
     ITEM_ORDER_CONFLICT(HttpStatus.CONFLICT, "ITEM_ORDER_CONFLICT", "순서 충돌이 있어 확정할 수 없습니다."),
+    DUPLICATE_REQUEST(HttpStatus.CONFLICT, "DUPLICATE_REQUEST", "이미 처리 중이거나 처리된 요청입니다."),
+    CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, "CONCURRENT_MODIFICATION", "다른 요청이 먼저 처리되어 현재 상태와 충돌합니다. 다시 시도해 주세요."),
 
     // 서버 에러 (500)
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR","서버 오류가 발생했습니다.");

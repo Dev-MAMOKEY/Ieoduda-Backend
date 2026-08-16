@@ -8,6 +8,7 @@ import com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer;
 import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
+import com.mamoki.ieojuda.global.idempotency.service.IdempotencyGuard;
 import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ public class PartnerReviewService {
     private final EvidenceRepository evidenceRepository;
     private final PartnerReviewerRepository partnerReviewerRepository;
     private final EvidenceStorageClient evidenceStorageClient;
+    private final IdempotencyGuard idempotencyGuard;
 
     public PartnerReviewResponse getReview(Long reviewId) {
         return PartnerReviewResponse.from(findEvidence(reviewId));
@@ -34,7 +36,7 @@ public class PartnerReviewService {
     }
 
     @Transactional
-    public PartnerReviewResponse decide(Long reviewId, Long userId, PartnerReviewDecisionRequest request) {
+    public PartnerReviewResponse decide(Long reviewId, Long userId, PartnerReviewDecisionRequest request, String idempotencyKey) {
         Evidence evidence = findEvidence(reviewId);
         PartnerReviewer reviewer = findReviewerByUser(userId);
 
@@ -42,6 +44,7 @@ public class PartnerReviewService {
         if (!Boolean.TRUE.equals(reviewer.getIsActive())) {
             throw new CustomException(ErrorCode.REVIEWER_CONFLICT_OF_INTEREST);
         }
+        idempotencyGuard.claim("partner-review-decision", idempotencyKey);
 
         evidence.assignReviewer(reviewer);
 

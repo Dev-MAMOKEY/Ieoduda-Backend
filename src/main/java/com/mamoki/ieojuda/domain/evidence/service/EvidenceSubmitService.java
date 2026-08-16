@@ -13,6 +13,7 @@ import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
+import com.mamoki.ieojuda.global.idempotency.service.IdempotencyGuard;
 import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
 import com.mamoki.ieojuda.global.storage.contract.EvidenceUpload;
 import com.mamoki.ieojuda.global.storage.contract.StoredEvidence;
@@ -38,16 +39,23 @@ public class EvidenceSubmitService {
     private final ReleaseCaseRepository releaseCaseRepository;
     private final EvidenceRepository evidenceRepository;
     private final EvidenceStorageClient evidenceStorageClient;
+    private final IdempotencyGuard idempotencyGuard;
 
     @Transactional
-    public EvidenceSubmitResponse submit(String plainToken, MultipartFile file) {
+    public EvidenceSubmitResponse submit(String plainToken, MultipartFile file, String idempotencyKey) {
         Confirmer confirmer = findByToken(plainToken);
         if (confirmer.getAcceptanceStatus() != AcceptanceStatus.ACCEPTED) {
             throw new CustomException(ErrorCode.FORBIDDEN);
         }
+        idempotencyGuard.claim("evidence-submit", idempotencyKey);
 
         Plan plan = confirmer.getPlan();
         ReleaseCase releaseCase = releaseCaseRepository.findFirstByPlan_PlanIdOrderByCaseIdDesc(plan.getPlanId())
+                .orElseThrow(() -> new CustomException(ErrorCode.RELEASE_CASE_NOT_FOUND));
+
+        // "개수 확인 후 저장" 사이에 다른 요청이 끼어들지 못하도록, 이 트랜잭션이 끝날 때까지
+        // 같은 사건에 대한 다른 증빙 제출을 사건 행 잠금으로 직렬화한다.
+        releaseCase = releaseCaseRepository.findByIdForUpdate(releaseCase.getCaseId())
                 .orElseThrow(() -> new CustomException(ErrorCode.RELEASE_CASE_NOT_FOUND));
 
         validateFile(file);

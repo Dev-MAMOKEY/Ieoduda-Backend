@@ -13,6 +13,7 @@ import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.jwt.component.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,11 +38,18 @@ public class AuthService {
             throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
         }
 
-        User user = userRepository.save(User.builder()
-                .email(request.email())
-                .password(passwordEncoder.encode(request.password()))
-                .name(request.name())
-                .build());
+        // 동시에 같은 이메일로 가입 요청이 들어오면 위 존재 여부 검사만으로는 막을 수 없으므로,
+        // DB 유니크 제약이 최종 방어선이다 - 여기서 즉시 flush해서 위반 시 여기서 바로 잡는다.
+        User user;
+        try {
+            user = userRepository.saveAndFlush(User.builder()
+                    .email(request.email())
+                    .password(passwordEncoder.encode(request.password()))
+                    .name(request.name())
+                    .build());
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
+        }
 
         // 1인 1계획 고정 - "계획 만들기" 화면이 없어졌으므로 회원가입과 동시에 사후 인계 케이스(Plan)를 자동 생성한다.
         planRepository.save(Plan.builder().user(user).build());

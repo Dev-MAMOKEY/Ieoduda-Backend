@@ -16,7 +16,9 @@ import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
+import com.mamoki.ieojuda.global.idempotency.service.IdempotencyGuard;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,9 +38,10 @@ public class DeathReportService {
     private final ReleaseCaseRepository releaseCaseRepository;
     private final PlanVersionRepository planVersionRepository;
     private final PlanSnapshotService planSnapshotService;
+    private final IdempotencyGuard idempotencyGuard;
 
     @Transactional
-    public DeathReportResponse report(String plainToken, DeathReportRequest request) {
+    public DeathReportResponse report(String plainToken, DeathReportRequest request, String idempotencyKey) {
         Confirmer confirmer = findByToken(plainToken);
 
         if (confirmer.getAcceptanceStatus() != AcceptanceStatus.ACCEPTED) {
@@ -47,6 +50,7 @@ public class DeathReportService {
         if (confirmer.getReportStatus() != ReportStatus.NOT_REPORTED) {
             throw new CustomException(ErrorCode.ACCESS_LINK_ALREADY_USED);
         }
+        idempotencyGuard.claim("death-report", idempotencyKey);
 
         confirmer.report(request == null ? null : request.deathDate());
 
@@ -92,8 +96,15 @@ public class DeathReportService {
                 PlanVersion.builder().plan(plan).versionNum(nextVersionNum).snapshotData(snapshotJson).build());
         planVersion.seal(snapshotHash);
 
-        ReleaseCase releaseCase = releaseCaseRepository.save(
-                ReleaseCase.builder().plan(plan).planVersion(planVersion).build());
+        // 위 존재 여부 검사만으로는 두 확인자의 신고가 정확히 동시에 매칭되는 경쟁 조건을 막을 수 없으므로,
+        // DB의 부분 유니크 인덱스(활성 사건은 계획당 1개)가 최종 방어선이다 - 즉시 flush해서 위반 시 여기서 잡는다.
+        ReleaseCase releaseCase;
+        try {
+            releaseCase = releaseCaseRepository.saveAndFlush(
+                    ReleaseCase.builder().plan(plan).planVersion(planVersion).build());
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ErrorCode.ACTIVE_RELEASE_CASE_EXISTS);
+        }
         releaseCase.confirmReport();
         releaseCase.awaitEvidence();
     }

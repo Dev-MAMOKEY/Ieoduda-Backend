@@ -33,6 +33,7 @@ import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,6 +75,16 @@ public class UserService {
         }
 
         user.updateProfile(request.email(), request.name());
+
+        // 위 존재 여부 검사와 실제 반영 사이의 경쟁 조건은 DB 유니크 제약이 최종 방어선이다 -
+        // 즉시 flush해서 위반 시 여기서 바로 DUPLICATE_EMAIL로 변환한다.
+        if (emailChanged) {
+            try {
+                userRepository.saveAndFlush(user);
+            } catch (DataIntegrityViolationException e) {
+                throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
+            }
+        }
 
         // 로그인 이메일이 실제로 바뀌면(계정 탈취 대응) 이 계획에 걸린 담당자/확인자/이의연락처의
         // 기존 초대 토큰을 전부 무효화한다 - 새 이메일로 재초대해야 다시 접근할 수 있다.

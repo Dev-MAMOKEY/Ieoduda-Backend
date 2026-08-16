@@ -12,6 +12,7 @@ import com.mamoki.ieojuda.domain.plan.repository.PlanVersionRepository;
 import com.mamoki.ieojuda.domain.plan.service.PlanSnapshotService;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
+import com.mamoki.ieojuda.global.idempotency.service.IdempotencyGuard;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -34,6 +35,7 @@ class DeathReportServiceTest {
     private ReleaseCaseRepository releaseCaseRepository;
     private PlanVersionRepository planVersionRepository;
     private PlanSnapshotService planSnapshotService;
+    private IdempotencyGuard idempotencyGuard;
     private DeathReportService deathReportService;
 
     @BeforeEach
@@ -42,8 +44,9 @@ class DeathReportServiceTest {
         releaseCaseRepository = mock(ReleaseCaseRepository.class);
         planVersionRepository = mock(PlanVersionRepository.class);
         planSnapshotService = mock(PlanSnapshotService.class);
+        idempotencyGuard = mock(IdempotencyGuard.class);
         deathReportService = new DeathReportService(
-                confirmerRepository, releaseCaseRepository, planVersionRepository, planSnapshotService);
+                confirmerRepository, releaseCaseRepository, planVersionRepository, planSnapshotService, idempotencyGuard);
     }
 
     @Test
@@ -71,9 +74,9 @@ class DeathReportServiceTest {
         when(planSnapshotService.hash("{\"planId\":1}")).thenReturn("deadbeef");
 
         when(planVersionRepository.save(any(PlanVersion.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(releaseCaseRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(releaseCaseRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        deathReportService.report("token-a", new DeathReportRequest(LocalDate.of(2026, 8, 15)));
+        deathReportService.report("token-a", new DeathReportRequest(LocalDate.of(2026, 8, 15)), null);
 
         ArgumentCaptor<PlanVersion> versionCaptor = ArgumentCaptor.forClass(PlanVersion.class);
         verify(planVersionRepository).save(versionCaptor.capture());
