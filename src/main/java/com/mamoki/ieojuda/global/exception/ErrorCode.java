@@ -10,6 +10,7 @@ public enum ErrorCode {
 
     // 회원가입 / 로그인 관련 예외 (400)
     PASSWORD_CONFIRMATION_MISMATCH(HttpStatus.BAD_REQUEST, "PASSWORD_CONFIRMATION_MISMATCH", "비밀번호와 비밀번호 확인이 일치하지 않습니다."),
+    BREACHED_PASSWORD(HttpStatus.BAD_REQUEST, "BREACHED_PASSWORD", "이미 유출된 적이 있는 비밀번호입니다. 다른 비밀번호를 사용해 주세요."),
 
     // 계획 / 삶의 구역 / AI 구조화 관련 예외 (400)
     INVALID_WAITING_PERIOD(HttpStatus.BAD_REQUEST, "INVALID_WAITING_PERIOD", "대기 기간은 7일 이상 30일 이하여야 합니다."),
@@ -48,6 +49,9 @@ public enum ErrorCode {
     ACCESS_LINK_EXPIRED(HttpStatus.UNAUTHORIZED, "ACCESS_LINK_EXPIRED", "링크가 만료되었습니다."),
     ACCESS_LINK_ALREADY_USED(HttpStatus.UNAUTHORIZED, "ACCESS_LINK_ALREADY_USED", "이미 사용되었거나 재사용할 수 없는 링크입니다."),
     OTP_VERIFICATION_FAILED(HttpStatus.UNAUTHORIZED, "OTP_VERIFICATION_FAILED", "OTP 인증에 실패했습니다."),
+    ACCOUNT_TEMPORARILY_LOCKED(HttpStatus.TOO_MANY_REQUESTS, "ACCOUNT_TEMPORARILY_LOCKED", "로그인 실패 횟수가 많아 잠시 후 다시 시도해 주세요."),
+    TOKEN_TEMPORARILY_LOCKED(HttpStatus.TOO_MANY_REQUESTS, "TOKEN_TEMPORARILY_LOCKED", "이 링크로 실패 횟수가 많아 잠시 후 다시 시도해 주세요."),
+    TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS", "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."),
 
     // 권한 에러 (403)
     FORBIDDEN(HttpStatus.FORBIDDEN, "FORBIDDEN", "해당 리소스에 대한 권한이 없습니다."),

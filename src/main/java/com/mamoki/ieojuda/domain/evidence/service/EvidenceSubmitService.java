@@ -13,6 +13,8 @@ import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
+import com.mamoki.ieojuda.global.ratelimit.PublicLinkAuditor;
+import com.mamoki.ieojuda.global.ratelimit.TokenLookupGuard;
 import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
 import com.mamoki.ieojuda.global.storage.contract.EvidenceUpload;
 import com.mamoki.ieojuda.global.storage.contract.StoredEvidence;
@@ -38,11 +40,14 @@ public class EvidenceSubmitService {
     private final ReleaseCaseRepository releaseCaseRepository;
     private final EvidenceRepository evidenceRepository;
     private final EvidenceStorageClient evidenceStorageClient;
+    private final TokenLookupGuard tokenLookupGuard;
+    private final PublicLinkAuditor publicLinkAuditor;
 
     @Transactional
     public EvidenceSubmitResponse submit(String plainToken, MultipartFile file) {
         Confirmer confirmer = findByToken(plainToken);
         if (confirmer.getAcceptanceStatus() != AcceptanceStatus.ACCEPTED) {
+            publicLinkAuditor.recordStateFailure(ErrorCode.FORBIDDEN);
             throw new CustomException(ErrorCode.FORBIDDEN);
         }
 
@@ -96,7 +101,7 @@ public class EvidenceSubmitService {
     }
 
     private Confirmer findByToken(String plainToken) {
-        return confirmerRepository.findByInviteToken(TokenProvider.hashToken(plainToken))
-                .orElseThrow(() -> new CustomException(ErrorCode.TOKEN_INVALID));
+        return tokenLookupGuard.resolve(plainToken,
+                () -> confirmerRepository.findByInviteToken(TokenProvider.hashToken(plainToken)));
     }
 }
