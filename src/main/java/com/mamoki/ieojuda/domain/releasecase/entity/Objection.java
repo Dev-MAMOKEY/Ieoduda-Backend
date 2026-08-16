@@ -36,7 +36,7 @@ public class Objection {
     @Column(name = "raised_at")
     private LocalDateTime raisedAt;
 
-    @Column(name = "reason", columnDefinition = "TEXT")
+    @Column(name = "reason", length = 1000)
     private String reason;
 
     @Enumerated(EnumType.STRING)

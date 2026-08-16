@@ -12,11 +12,13 @@ public record RecipientRegisterRequest(
         @NotNull(message = "항목을 선택해 주세요.") Long itemId,
 
         @Schema(description = "담당자 이름", example = "김민수")
-        @NotBlank(message = "담당자 이름을 입력해 주세요.") String name,
+        @NotBlank(message = "담당자 이름을 입력해 주세요.")
+        @jakarta.validation.constraints.Size(max = 100, message = "담당자 이름은 100자 이하여야 합니다.") String name,
 
         @Schema(description = "담당자 이메일", example = "recipient@example.com")
         @NotBlank(message = "담당자 이메일을 입력해 주세요.")
-        @Email(message = "이메일 형식이 올바르지 않습니다.") String email,
+        @Email(message = "이메일 형식이 올바르지 않습니다.")
+        @jakarta.validation.constraints.Size(max = 255, message = "담당자 이메일은 255자 이하여야 합니다.") String email,
 
         @Schema(description = "최대 단계 대기 시간(시간 단위, 7/14/21일에 대응)", example = "168", allowableValues = {"168", "336", "504"})
         @NotNull(message = "대기 기간을 선택해 주세요.") Integer maxWaitHours,

@@ -62,7 +62,7 @@ public class Confirmer {
     private LocalDateTime inviteTokenExpiresAt;
 
     // "지정확인자 수락 이메일" 화면 - 확인자가 수락/거절 시 남기는 문의 사항 (선택 입력)
-    @Column(name = "inquiry", columnDefinition = "TEXT")
+    @Column(name = "inquiry", length = 1000)
     private String inquiry;
 
     @Builder
