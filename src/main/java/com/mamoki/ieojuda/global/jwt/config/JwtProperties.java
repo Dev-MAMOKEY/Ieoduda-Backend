@@ -18,4 +18,11 @@ public class JwtProperties {
 
     @Value("${jwt.refresh-token-expiration-ms}")
     private long refreshTokenExpirationMs;
+
+    // issue #56 - 토큰이 이 서비스가 발급한 게 맞는지(iss), 이 서비스를 대상으로 한 게 맞는지(aud) 검증하기 위한 값
+    @Value("${jwt.issuer}")
+    private String issuer;
+
+    @Value("${jwt.audience}")
+    private String audience;
 }

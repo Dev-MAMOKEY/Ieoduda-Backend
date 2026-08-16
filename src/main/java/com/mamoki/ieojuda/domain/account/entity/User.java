@@ -29,9 +29,6 @@ public class User extends BaseCreatedAtEntity {
     @Column(name = "name", length = 100)
     private String name;
 
-    @Column(name = "refresh_token", length = 255)
-    private String refreshToken;
-
     // "사후 인계 안내" 화면 - 필수 동의 완료 시각(null이면 아직 미동의). 항목이 전부 한 버튼("확인하기")으로
     // 묶여있고 동의 종류가 하나뿐이라 별도 테이블 없이 컬럼 하나로 관리한다.
     @Column(name = "consent_agreed_at")
@@ -42,16 +39,25 @@ public class User extends BaseCreatedAtEntity {
     @Column(name = "role", length = 20, nullable = false)
     private UserRole role;
 
+    // issue #56 - 정지된 계정은 Access Token이 아직 안 만료됐어도 필터에서 즉시 거부한다
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20, nullable = false)
+    private UserStatus status;
+
+    // issue #56 - Access Token에 발급 당시 버전을 함께 실어두고, 필터에서 이 값과 대조한다.
+    // 이메일 변경/정지 등 권한에 영향을 주는 이벤트가 생기면 이 값을 올려서, 만료 전까지 유효한
+    // 기존 Access Token 전부를 한 번에 무효화한다(개별 토큰 블랙리스트 없이도 즉시 폐기 가능).
+    @Column(name = "token_version", nullable = false)
+    private Integer tokenVersion;
+
     @Builder
     public User(String email, String password, String name) {
         this.email = email;
         this.password = password;
         this.name = name;
         this.role = UserRole.USER;
-    }
-
-    public void updateRefreshToken(String refreshToken) {
-        this.refreshToken = refreshToken;
+        this.status = UserStatus.ACTIVE;
+        this.tokenVersion = 0;
     }
 
     // 마이페이지 - 이메일/이름 변경
@@ -65,5 +71,17 @@ public class User extends BaseCreatedAtEntity {
         if (this.consentAgreedAt == null) {
             this.consentAgreedAt = LocalDateTime.now();
         }
+    }
+
+    public void incrementTokenVersion() {
+        this.tokenVersion = this.tokenVersion + 1;
+    }
+
+    public void suspend() {
+        this.status = UserStatus.SUSPENDED;
+    }
+
+    public void reactivate() {
+        this.status = UserStatus.ACTIVE;
     }
 }

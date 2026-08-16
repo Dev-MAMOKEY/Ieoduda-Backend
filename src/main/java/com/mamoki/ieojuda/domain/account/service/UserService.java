@@ -63,6 +63,7 @@ public class UserService {
     private final DependencyRepository dependencyRepository;
     private final EvidenceStorageClient evidenceStorageClient;
     private final ReleaseCaseGuardService releaseCaseGuardService;
+    private final SessionRevocationService sessionRevocationService;
 
     @Transactional
     public UserResponse updateProfile(Long userId, UserUpdateRequest request) {
@@ -76,9 +77,11 @@ public class UserService {
         user.updateProfile(request.email(), request.name());
 
         // 로그인 이메일이 실제로 바뀌면(계정 탈취 대응) 이 계획에 걸린 담당자/확인자/이의연락처의
-        // 기존 초대 토큰을 전부 무효화한다 - 새 이메일로 재초대해야 다시 접근할 수 있다.
+        // 기존 초대 토큰을 전부 무효화하고(#48), 이 계정 자신의 세션도 전부 폐기한다(#56) -
+        // 공격자가 이미 로그인해 있던 상태였다면 이메일 변경 직후 그 세션도 끊어내기 위함.
         if (emailChanged) {
             planRepository.findByUser_UserId(userId).ifPresent(plan -> invalidatePlanInviteTokens(plan.getPlanId()));
+            sessionRevocationService.revokeAllSessions(user);
         }
 
         return UserResponse.from(user);

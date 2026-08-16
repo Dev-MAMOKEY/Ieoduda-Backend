@@ -6,6 +6,6 @@ import jakarta.validation.constraints.NotBlank;
 public record RefreshRequest(
         @Schema(description = "로그인 시 발급받은 Refresh Token")
         @NotBlank(message = "Refresh Token이 필요합니다.")
-        @jakarta.validation.constraints.Size(max = 255, message = "Refresh Token은 255자 이하여야 합니다.") String refreshToken
+        @jakarta.validation.constraints.Size(max = 2000, message = "Refresh Token 형식이 올바르지 않습니다.") String refreshToken
 ) {
 }

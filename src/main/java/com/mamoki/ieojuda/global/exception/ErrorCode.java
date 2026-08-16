@@ -46,6 +46,8 @@ public enum ErrorCode {
     TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "TOKEN_EXPIRED", "Access Token이 만료되었습니다."),
     TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "TOKEN_INVALID", "토큰 형식이 잘못되었거나 서명이 유효하지 않습니다."),
     REFRESH_TOKEN_REVOKED(HttpStatus.UNAUTHORIZED, "REFRESH_TOKEN_REVOKED", "이미 무효화된 Refresh Token입니다."),
+    REFRESH_TOKEN_REUSE_DETECTED(HttpStatus.UNAUTHORIZED, "REFRESH_TOKEN_REUSE_DETECTED", "이미 사용된 Refresh Token이 재사용되어 관련 세션을 모두 차단했습니다. 다시 로그인해 주세요."),
+    SESSION_REVOKED(HttpStatus.UNAUTHORIZED, "SESSION_REVOKED", "세션이 만료되었습니다. 다시 로그인해 주세요."),
     ACCESS_LINK_EXPIRED(HttpStatus.UNAUTHORIZED, "ACCESS_LINK_EXPIRED", "링크가 만료되었습니다."),
     ACCESS_LINK_ALREADY_USED(HttpStatus.UNAUTHORIZED, "ACCESS_LINK_ALREADY_USED", "이미 사용되었거나 재사용할 수 없는 링크입니다."),
     OTP_VERIFICATION_FAILED(HttpStatus.UNAUTHORIZED, "OTP_VERIFICATION_FAILED", "OTP 인증에 실패했습니다."),
@@ -54,6 +56,7 @@ public enum ErrorCode {
     FORBIDDEN(HttpStatus.FORBIDDEN, "FORBIDDEN", "해당 리소스에 대한 권한이 없습니다."),
     ROLE_PACKAGE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "ROLE_PACKAGE_ACCESS_DENIED", "본인의 역할 패키지가 아니거나 권한이 없는 요청입니다."),
     REVIEWER_CONFLICT_OF_INTEREST(HttpStatus.FORBIDDEN, "REVIEWER_CONFLICT_OF_INTEREST", "이해충돌 또는 권한 만료로 다른 검토자에게 재배정이 필요합니다."),
+    ACCOUNT_SUSPENDED(HttpStatus.FORBIDDEN, "ACCOUNT_SUSPENDED", "정지된 계정입니다."),
 
     // 리소스 없음 (404)
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "요청한 리소스가 존재하지 않습니다."),

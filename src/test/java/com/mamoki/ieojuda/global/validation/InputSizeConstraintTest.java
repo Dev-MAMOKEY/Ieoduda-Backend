@@ -49,7 +49,8 @@ class InputSizeConstraintTest {
 
     private static final Map<Class<?>, Map<String, Integer>> EXPECTED_MAX_LENGTHS = Map.ofEntries(
             Map.entry(LoginRequest.class, Map.of("email", 255, "password", 128)),
-            Map.entry(RefreshRequest.class, Map.of("refreshToken", 255)),
+            // issue #56 - Refresh Token에 jti/iss/aud 클레임이 추가되면서 기존 255자로는 부족해져 2000자로 늘림
+            Map.entry(RefreshRequest.class, Map.of("refreshToken", 2000)),
             Map.entry(SignupRequest.class, Map.of("email", 255, "password", 128, "passwordConfirm", 128, "name", 100)),
             Map.entry(UserUpdateRequest.class, Map.of("email", 255, "name", 100)),
             Map.entry(ConfirmerRegisterRequest.class, Map.of("name", 100, "email", 255)),
