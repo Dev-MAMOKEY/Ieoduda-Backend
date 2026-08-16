@@ -8,6 +8,8 @@ import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.sender.EmailSender;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
+import com.mamoki.ieojuda.global.ratelimit.PublicLinkAuditor;
+import com.mamoki.ieojuda.global.ratelimit.TokenLookupGuard;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -42,7 +44,9 @@ class DisputeContactServiceBolaTest {
                 new PlanOwnershipReader(planRepository),
                 disputeContactRepository,
                 emailSender,
-                mock(AppProperties.class)
+                mock(AppProperties.class),
+                mock(TokenLookupGuard.class),
+                mock(PublicLinkAuditor.class)
         );
         when(planRepository.findByPlanIdAndUser_UserId(PLAN_ID, ATTACKER_ID)).thenReturn(Optional.empty());
     }

@@ -5,12 +5,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
 
-// "외부 파트너 증빙 검토" 화면 - 역할별 패키지(계획 내용)는 절대 포함하지 않는다
-// TODO: 사망 확인 대상자(계획 작성자 본인)의 이름·생년월일을 저장할 곳이 아직 없어서, 지금은 신고한 확인자 정보로 대체함
+// "외부 파트너 증빙 검토" 화면 - 역할별 패키지(계획 내용)는 절대 포함하지 않는다.
+// issue #62 - 대상자 이름은 신고한 확인자가 아니라 사망 확인 대상자(계획 작성자) 본인의 것이어야 하므로
+// Plan.user에서 가져온다. "신고자와의 관계"는 대상자 본인에게는 의미가 없는 필드라 제거했다.
 public record PartnerReviewResponse(
         @Schema(description = "검토 ID (증빙 ID와 동일)") Long reviewId,
-        @Schema(description = "신고한 확인자 이름") String reporterName,
-        @Schema(description = "신고한 확인자와의 관계") String reporterRelationship,
+        @Schema(description = "사망 확인 대상자(계획 작성자) 이름") String targetName,
         @Schema(description = "증빙 파일명") String fileName,
         @Schema(description = "증빙 MIME 타입") String mimeType,
         @Schema(description = "제출 시각") LocalDateTime submittedAt,
@@ -22,8 +22,7 @@ public record PartnerReviewResponse(
     public static PartnerReviewResponse from(Evidence evidence) {
         return new PartnerReviewResponse(
                 evidence.getEvidenceId(),
-                evidence.getConfirmer().getName(),
-                evidence.getConfirmer().getRelationship() == null ? null : evidence.getConfirmer().getRelationship().name(),
+                evidence.getPlan().getUser().getName(),
                 evidence.getFileName(),
                 evidence.getMimeType(),
                 evidence.getSubmittedAt(),

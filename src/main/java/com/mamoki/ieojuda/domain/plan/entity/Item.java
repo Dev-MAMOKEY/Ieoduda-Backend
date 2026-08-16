@@ -21,7 +21,7 @@ public class Item {
     private Long itemId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "assigne_id", nullable = true)
+    @JoinColumn(name = "assignee_id", nullable = true) // issue #62 - role_assigness.assigne_id 오탈자 정리
     private Recipient recipient;
 
     @ManyToOne(fetch = FetchType.LAZY)
