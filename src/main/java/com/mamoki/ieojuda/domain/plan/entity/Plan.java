@@ -29,7 +29,7 @@ public class Plan extends BaseCreatedAtEntity {
     @Column(name = "status", length = 30)
     private PlanStatus status;
 
-    // 명세서 "대기·이의 제기 설정" 화면 - 증빙 승인 후 실제 발송까지 기다리는 기간(7/14/21일)
+    // 명세서 "대기·이의 제기 설정" 화면 - 증빙 승인 후 실제 발송까지 기다리는 기간(7~30일)
     @Column(name = "waiting_days")
     private Integer waitingDays;
 
