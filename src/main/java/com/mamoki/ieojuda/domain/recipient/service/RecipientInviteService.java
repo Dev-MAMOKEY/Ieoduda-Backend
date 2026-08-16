@@ -13,6 +13,8 @@ import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.email.token.TokenValidator;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
+import com.mamoki.ieojuda.global.ratelimit.PublicLinkAuditor;
+import com.mamoki.ieojuda.global.ratelimit.TokenLookupGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +32,8 @@ public class RecipientInviteService {
     private final RecipientRepository recipientRepository;
     private final ItemRepository itemRepository;
     private final AppProperties appProperties;
+    private final TokenLookupGuard tokenLookupGuard;
+    private final PublicLinkAuditor publicLinkAuditor;
 
     // 초대 조회 - 만료된 링크는 상태를 EXPIRED로 반영하고 차단, 이미 수락/거절한 경우는 현재 상태를 그대로 보여준다
     @Transactional
@@ -76,8 +80,8 @@ public class RecipientInviteService {
     }
 
     private Recipient findByToken(String plainToken) {
-        return recipientRepository.findByInviteToken(TokenProvider.hashToken(plainToken))
-                .orElseThrow(() -> new CustomException(ErrorCode.TOKEN_INVALID));
+        return tokenLookupGuard.resolve(plainToken,
+                () -> recipientRepository.findByInviteToken(TokenProvider.hashToken(plainToken)));
     }
 
     private void checkNotExpired(Recipient recipient) {
@@ -86,6 +90,7 @@ public class RecipientInviteService {
                 : recipient.getInviteTokenExpiresAt().atZone(ZoneId.systemDefault()).toInstant();
         if (TokenValidator.isExpired(expiresAt, Instant.now())) {
             recipient.expire();
+            publicLinkAuditor.recordStateFailure(ErrorCode.ACCESS_LINK_EXPIRED);
             throw new CustomException(ErrorCode.ACCESS_LINK_EXPIRED);
         }
     }
@@ -93,6 +98,7 @@ public class RecipientInviteService {
     // 수락/거절은 대기 중(PENDING) 상태에서만 가능 - 이미 처리된 링크의 재사용을 차단
     private void checkPending(Recipient recipient) {
         if (recipient.getAcceptanceStatus() != AcceptanceStatus.PENDING) {
+            publicLinkAuditor.recordStateFailure(ErrorCode.ACCESS_LINK_ALREADY_USED);
             throw new CustomException(ErrorCode.ACCESS_LINK_ALREADY_USED);
         }
     }

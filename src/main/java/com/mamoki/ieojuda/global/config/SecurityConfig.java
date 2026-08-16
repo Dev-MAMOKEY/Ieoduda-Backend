@@ -1,11 +1,15 @@
 package com.mamoki.ieojuda.global.config;
 
 import com.mamoki.ieojuda.domain.account.repository.UserRepository;
+import com.mamoki.ieojuda.domain.audit.service.AuthAuditService;
 import com.mamoki.ieojuda.global.consent.filter.ConsentCheckFilter;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.jwt.component.JwtTokenProvider;
 import com.mamoki.ieojuda.global.jwt.filter.JwtAuthenticationFilter;
 import com.mamoki.ieojuda.global.jwt.filter.SecurityErrorResponseWriter;
+import com.mamoki.ieojuda.global.ratelimit.RateLimitFilter;
+import com.mamoki.ieojuda.global.ratelimit.RateLimitRule;
+import com.mamoki.ieojuda.global.ratelimit.RateLimiter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,6 +25,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.time.Duration;
 import java.util.List;
 
 @Configuration
@@ -54,10 +59,28 @@ public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
+    private final RateLimiter rateLimiter;
+    private final AuthAuditService authAuditService;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    // issue #55 - 경로별 rate limit 정책. 더 구체적인(민감한) 규칙을 넓은 catch-all 규칙보다 앞에 둔다.
+    private List<RateLimitRule> rateLimitRules() {
+        return List.of(
+                new RateLimitRule("signup", "/auth/signup", "POST", 5, Duration.ofHours(1)),
+                new RateLimitRule("login", "/auth/login", "POST", 10, Duration.ofMinutes(15)),
+                new RateLimitRule("refresh", "/auth/refresh", "POST", 20, Duration.ofMinutes(15)),
+                new RateLimitRule("death-report", "/api/confirmer-acceptances/*/death-report", "POST", 10, Duration.ofHours(1)),
+                new RateLimitRule("evidence-submit", "/api/confirmer-acceptances/*/evidences", "POST", 10, Duration.ofHours(1)),
+                new RateLimitRule("objection", "/api/dispute-contacts/*/objections", "POST", 10, Duration.ofHours(1)),
+                new RateLimitRule("dispute-verify", "/api/dispute-contacts/*/verify", null, 20, Duration.ofHours(1)),
+                new RateLimitRule("self-warning-email", "/api/self-warning-email/**", null, 20, Duration.ofHours(1)),
+                new RateLimitRule("confirmer-link", "/api/confirmer-acceptances/**", null, 30, Duration.ofHours(1)),
+                new RateLimitRule("recipient-link", "/api/recipient-acceptances/**", null, 30, Duration.ofHours(1))
+        );
     }
 
     // 토큰이 아예 없거나(익명) SecurityContext에 인증이 안 채워진 채로 보호된 API에 접근한 경우.
@@ -109,6 +132,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint())
                         .accessDeniedHandler(accessDeniedHandler()))
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new RateLimitFilter(rateLimiter, rateLimitRules(), authAuditService), JwtAuthenticationFilter.class)
                 .addFilterAfter(new ConsentCheckFilter(userRepository), JwtAuthenticationFilter.class);
 
         return http.build();

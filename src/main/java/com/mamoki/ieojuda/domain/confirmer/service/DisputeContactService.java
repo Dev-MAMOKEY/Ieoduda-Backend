@@ -15,6 +15,8 @@ import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.email.token.TokenValidator;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
+import com.mamoki.ieojuda.global.ratelimit.PublicLinkAuditor;
+import com.mamoki.ieojuda.global.ratelimit.TokenLookupGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +35,8 @@ public class DisputeContactService {
     private final DisputeContactRepository disputeContactRepository;
     private final EmailSender emailSender;
     private final AppProperties appProperties;
+    private final TokenLookupGuard tokenLookupGuard;
+    private final PublicLinkAuditor publicLinkAuditor;
 
     @Transactional
     public DisputeContactResponse register(Long userId, Long planId, DisputeContactRegisterRequest request) {
@@ -94,8 +98,8 @@ public class DisputeContactService {
     // 검증 링크 클릭 - 로그인 불필요(토큰 자체가 증명)
     @Transactional
     public void verify(String plainToken) {
-        DisputeContact contact = disputeContactRepository.findByInviteToken(TokenProvider.hashToken(plainToken))
-                .orElseThrow(() -> new CustomException(ErrorCode.TOKEN_INVALID));
+        DisputeContact contact = tokenLookupGuard.resolve(plainToken,
+                () -> disputeContactRepository.findByInviteToken(TokenProvider.hashToken(plainToken)));
 
         if (Boolean.TRUE.equals(contact.getIsVerified())) {
             return; // 이미 검증됨 - 링크 재클릭은 그냥 성공 처리
@@ -103,6 +107,7 @@ public class DisputeContactService {
 
         Instant expiresAt = contact.getInviteTokenExpiresAt().atZone(ZoneId.systemDefault()).toInstant();
         if (TokenValidator.isExpired(expiresAt, Instant.now())) {
+            publicLinkAuditor.recordStateFailure(ErrorCode.ACCESS_LINK_EXPIRED);
             throw new CustomException(ErrorCode.ACCESS_LINK_EXPIRED);
         }
 

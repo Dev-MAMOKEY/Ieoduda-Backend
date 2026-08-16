@@ -7,11 +7,15 @@ import com.mamoki.ieojuda.domain.account.dto.SignupResponse;
 import com.mamoki.ieojuda.domain.account.dto.TokenResponse;
 import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.account.repository.UserRepository;
+import com.mamoki.ieojuda.domain.audit.entity.AuthAuditEventType;
+import com.mamoki.ieojuda.domain.audit.service.AuthAuditService;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.jwt.component.JwtTokenProvider;
+import com.mamoki.ieojuda.global.util.ClientIpResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,6 +31,10 @@ public class AuthService {
     private final PlanRepository planRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final PasswordBreachChecker passwordBreachChecker;
+    private final LoginAttemptService loginAttemptService;
+    private final AuthAuditService authAuditService;
+    private final HttpServletRequest httpServletRequest;
 
     @Transactional
     public SignupResponse signup(SignupRequest request) {
@@ -35,6 +43,10 @@ public class AuthService {
         }
         if (userRepository.existsByEmail(request.email())) {
             throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
+        }
+        // "유출 비밀번호 검사"(issue #55) - 평문은 절대 밖으로 나가지 않고 해시 앞 5자리로만 조회한다
+        if (passwordBreachChecker.isBreached(request.password())) {
+            throw new CustomException(ErrorCode.BREACHED_PASSWORD);
         }
 
         User user = userRepository.save(User.builder()
@@ -51,14 +63,24 @@ public class AuthService {
 
     @Transactional
     public TokenResponse login(LoginRequest request) {
-        // 계정 존재 여부가 드러나지 않도록 이메일 불일치/비밀번호 불일치 둘 다 같은 에러코드로 응답
-        User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_CREDENTIALS));
+        String normalizedEmail = request.email().trim().toLowerCase();
+        String ip = ClientIpResolver.resolve(httpServletRequest);
 
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+        if (loginAttemptService.isLocked(normalizedEmail)) {
+            authAuditService.record(normalizedEmail, ip, AuthAuditEventType.LOGIN_LOCKED_ATTEMPT, null);
+            throw new CustomException(ErrorCode.ACCOUNT_TEMPORARILY_LOCKED);
+        }
+
+        // 계정 존재 여부가 드러나지 않도록 이메일 불일치/비밀번호 불일치 둘 다 같은 에러코드로 응답
+        User user = userRepository.findByEmail(request.email()).orElse(null);
+        if (user == null || !passwordEncoder.matches(request.password(), user.getPassword())) {
+            boolean nowLocked = loginAttemptService.recordFailure(normalizedEmail);
+            authAuditService.record(normalizedEmail, ip,
+                    nowLocked ? AuthAuditEventType.LOGIN_LOCKED : AuthAuditEventType.LOGIN_FAILURE, null);
             throw new CustomException(ErrorCode.INVALID_CREDENTIALS);
         }
 
+        loginAttemptService.recordSuccess(normalizedEmail);
         return issueTokens(user);
     }
 

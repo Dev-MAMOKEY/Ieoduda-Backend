@@ -16,6 +16,8 @@ import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
+import com.mamoki.ieojuda.global.ratelimit.PublicLinkAuditor;
+import com.mamoki.ieojuda.global.ratelimit.TokenLookupGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,16 +37,20 @@ public class DeathReportService {
     private final ConfirmerRepository confirmerRepository;
     private final ReleaseCaseRepository releaseCaseRepository;
     private final PlanVersionRepository planVersionRepository;
+    private final TokenLookupGuard tokenLookupGuard;
+    private final PublicLinkAuditor publicLinkAuditor;
     private final PlanSnapshotService planSnapshotService;
-
+  
     @Transactional
     public DeathReportResponse report(String plainToken, DeathReportRequest request) {
         Confirmer confirmer = findByToken(plainToken);
 
         if (confirmer.getAcceptanceStatus() != AcceptanceStatus.ACCEPTED) {
+            publicLinkAuditor.recordStateFailure(ErrorCode.FORBIDDEN);
             throw new CustomException(ErrorCode.FORBIDDEN);
         }
         if (confirmer.getReportStatus() != ReportStatus.NOT_REPORTED) {
+            publicLinkAuditor.recordStateFailure(ErrorCode.ACCESS_LINK_ALREADY_USED);
             throw new CustomException(ErrorCode.ACCESS_LINK_ALREADY_USED);
         }
 
@@ -99,7 +105,7 @@ public class DeathReportService {
     }
 
     private Confirmer findByToken(String plainToken) {
-        return confirmerRepository.findByInviteToken(TokenProvider.hashToken(plainToken))
-                .orElseThrow(() -> new CustomException(ErrorCode.TOKEN_INVALID));
+        return tokenLookupGuard.resolve(plainToken,
+                () -> confirmerRepository.findByInviteToken(TokenProvider.hashToken(plainToken)));
     }
 }
