@@ -15,4 +15,7 @@ public interface ReleaseCaseRepository extends JpaRepository<ReleaseCase, Long> 
 
     // 스케줄러 - 대기 기간이 끝났고 동결되지 않은 사건을 찾기 위한 조회
     List<ReleaseCase> findByStatusAndFrozenFalseAndWaitingEndsAtLessThanEqual(ReleaseCaseStatus status, LocalDateTime now);
+
+    // 계정 삭제 시 이 계획에 쌓인 사건(취소/완료된 과거 이력 포함)을 전부 지우기 위한 조회
+    List<ReleaseCase> findByPlan_PlanId(Long planId);
 }

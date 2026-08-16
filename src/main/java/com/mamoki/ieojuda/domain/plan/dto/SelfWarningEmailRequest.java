@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotBlank;
 public record SelfWarningEmailRequest(
         @Schema(description = "실행 신고가 오면 가장 먼저 경고 메일을 받을 본인 주소", example = "namu_k@gmail.com")
         @NotBlank(message = "이메일을 입력해 주세요.")
-        @Email(message = "이메일 형식이 올바르지 않습니다.") String email
+        @Email(message = "이메일 형식이 올바르지 않습니다.")
+        @jakarta.validation.constraints.Size(max = 255, message = "이메일은 255자 이하여야 합니다.") String email
 ) {
 }
