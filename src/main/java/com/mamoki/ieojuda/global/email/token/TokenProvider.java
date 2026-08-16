@@ -26,6 +26,12 @@ public class TokenProvider {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes); // URL에서 문제가 발생하지 않도록 UTF-Safe Base 64 문자열로 인코딩
     }
 
+    // OTP 4자리 코드 생성. 경우의 수가 적어(0000~9999) hashToken(SHA-256)이 아닌 PasswordEncoder로 별도 해싱한다 - 호출부 책임
+    public static String generateOtpCode() {
+        int code = SECURE_RANDOM.nextInt(10_000);
+        return String.format("%04d", code);
+    }
+
     /*
      * 평문 토큰을 SHA-256 hex 문자열로 해싱.
      * 이 값만 DB(invite_token 컬럼)에 저장, 대조한다.

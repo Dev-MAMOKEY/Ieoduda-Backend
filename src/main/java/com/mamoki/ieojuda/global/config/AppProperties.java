@@ -18,4 +18,13 @@ public class AppProperties {
 
     @Value("${app.invite-token-ttl-hours}")
     private long inviteTokenTtlHours;
+
+    @Value("${app.posthumous-link-ttl-hours}")
+    private long posthumousLinkTtlHours;
+
+    @Value("${app.otp-ttl-minutes}")
+    private long otpTtlMinutes;
+
+    @Value("${app.otp-max-attempts}")
+    private int otpMaxAttempts;
 }

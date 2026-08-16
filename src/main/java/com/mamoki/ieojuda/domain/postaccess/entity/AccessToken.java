@@ -54,5 +54,21 @@ public class AccessToken {
         this.used = false;
     }
 
+    // OTP 발송/재발송 - 인코딩된 해시만 저장, 시도 횟수는 재발송마다 초기화(와이어프레임 "코드 재발송")
+    public void issueOtp(String otpCodeHash) {
+        this.otpCodeHash = otpCodeHash;
+        this.otpSentAt = LocalDateTime.now();
+        this.attemptCount = 0;
+    }
 
+    // OTP 검증 시도 1회 증가
+    public void increaseAttempt() {
+        this.attemptCount = this.attemptCount + 1;
+    }
+
+    // OTP 검증 성공 - 링크를 소진 처리해 재사용을 막는다
+    public void verify() {
+        this.verifiedAt = LocalDateTime.now();
+        this.used = true;
+    }
 }

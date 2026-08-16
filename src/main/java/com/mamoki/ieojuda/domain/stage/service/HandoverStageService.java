@@ -3,6 +3,8 @@ package com.mamoki.ieojuda.domain.stage.service;
 import com.mamoki.ieojuda.domain.audit.entity.EmailLog;
 import com.mamoki.ieojuda.domain.audit.entity.EmailType;
 import com.mamoki.ieojuda.domain.audit.repository.EmailLogRepository;
+import com.mamoki.ieojuda.domain.postaccess.entity.AccessToken;
+import com.mamoki.ieojuda.domain.postaccess.repository.AccessTokenRepository;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
@@ -37,6 +39,7 @@ public class HandoverStageService {
     private final HandoverStageRepository handoverStageRepository;
     private final RecipientRepository recipientRepository;
     private final EmailLogRepository emailLogRepository;
+    private final AccessTokenRepository accessTokenRepository;
     private final EmailSender emailSender;
     private final AppProperties appProperties;
 
@@ -66,7 +69,7 @@ public class HandoverStageService {
         }
 
         stage.fallbackTo(backup);
-        sendHandoffInvite(stage, backup);
+        dispatchPosthumousHandoff(stage);
 
         return HandoverStageResponse.from(stage);
     }
@@ -88,20 +91,26 @@ public class HandoverStageService {
         }
 
         if (!stages.isEmpty()) {
-            HandoverStage firstStage = stages.get(0);
-            sendHandoffInvite(firstStage, firstStage.getRecipient());
+            dispatchPosthumousHandoff(stages.get(0));
         }
     }
 
-    private void sendHandoffInvite(HandoverStage stage, Recipient recipient) {
-        String plainToken = TokenProvider.generatePlainToken();
-        LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
-        recipient.issueInviteToken(TokenProvider.hashToken(plainToken), expiresAt);
+    // 명세서 "사후 인계 이메일" 화면 - 1통차(보안 링크). 담당자는 생전에 이미 역할을 수락했으므로 수락 여부를 다시 묻지 않는다
+    private void dispatchPosthumousHandoff(HandoverStage stage) {
+        Recipient recipient = stage.getRecipient();
 
-        String secureLink = appProperties.getBaseUrl() + "/recipient-acceptances/" + plainToken;
+        String plainToken = TokenProvider.generatePlainToken();
+        LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getPosthumousLinkTtlHours());
+        accessTokenRepository.save(AccessToken.builder()
+                .handoverStage(stage)
+                .tokenHash(TokenProvider.hashToken(plainToken))
+                .expiresAt(expiresAt)
+                .build());
+
+        String secureLink = appProperties.getBaseUrl() + "/posthumous-access/" + plainToken;
         EmailContent content = EmailBuilder.build(
-                "사후 인계 안내 (대체 담당자)",
-                "이전 담당자가 응답하지 않아 대체 담당자로 지정되었습니다. 역할 수락 여부를 확인해 주세요.",
+                "사후 인계",
+                "보안 링크를 연 뒤 별도 이메일로 받은 인증 코드를 입력해 주세요.",
                 expiresAt.atZone(ZoneId.systemDefault()),
                 secureLink,
                 appProperties.getContactEmail()
@@ -116,6 +125,7 @@ public class HandoverStageService {
                 .messageId(result.messageId())
                 .build());
         stage.send();
+        recipient.startWait();
     }
 
     private HandoverStage findStage(ReleaseCase releaseCase, Long stageId) {
