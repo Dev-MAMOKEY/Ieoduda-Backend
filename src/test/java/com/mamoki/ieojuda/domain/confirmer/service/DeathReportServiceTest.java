@@ -12,6 +12,8 @@ import com.mamoki.ieojuda.domain.plan.repository.PlanVersionRepository;
 import com.mamoki.ieojuda.domain.plan.service.PlanSnapshotService;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
+import com.mamoki.ieojuda.global.ratelimit.PublicLinkAuditor;
+import com.mamoki.ieojuda.global.ratelimit.TokenLookupGuard;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -22,6 +24,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,17 +36,32 @@ class DeathReportServiceTest {
     private ConfirmerRepository confirmerRepository;
     private ReleaseCaseRepository releaseCaseRepository;
     private PlanVersionRepository planVersionRepository;
+    private TokenLookupGuard tokenLookupGuard;
+    private PublicLinkAuditor publicLinkAuditor;
     private PlanSnapshotService planSnapshotService;
     private DeathReportService deathReportService;
 
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
         confirmerRepository = mock(ConfirmerRepository.class);
         releaseCaseRepository = mock(ReleaseCaseRepository.class);
         planVersionRepository = mock(PlanVersionRepository.class);
+        tokenLookupGuard = mock(TokenLookupGuard.class);
+        publicLinkAuditor = mock(PublicLinkAuditor.class);
         planSnapshotService = mock(PlanSnapshotService.class);
         deathReportService = new DeathReportService(
-                confirmerRepository, releaseCaseRepository, planVersionRepository, planSnapshotService);
+                confirmerRepository, releaseCaseRepository, planVersionRepository,
+                tokenLookupGuard, publicLinkAuditor, planSnapshotService);
+
+        // TokenLookupGuard는 issue #55에서 추가된 조회 래퍼 - 실제 구현처럼 supplier를 그대로 실행해
+        // confirmerRepository.findByInviteToken(...) 목 설정이 기존과 동일하게 동작하도록 위임한다.
+        when(tokenLookupGuard.resolve(anyString(), any())).thenAnswer(invocation -> {
+            java.util.function.Supplier<java.util.Optional<?>> lookup = invocation.getArgument(1);
+            return lookup.get().orElseThrow(() ->
+                    new com.mamoki.ieojuda.global.exception.CustomException(
+                            com.mamoki.ieojuda.global.exception.ErrorCode.TOKEN_INVALID));
+        });
     }
 
     @Test

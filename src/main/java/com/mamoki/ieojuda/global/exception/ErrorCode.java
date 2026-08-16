@@ -53,11 +53,14 @@ public enum ErrorCode {
     ACCOUNT_TEMPORARILY_LOCKED(HttpStatus.TOO_MANY_REQUESTS, "ACCOUNT_TEMPORARILY_LOCKED", "로그인 실패 횟수가 많아 잠시 후 다시 시도해 주세요."),
     TOKEN_TEMPORARILY_LOCKED(HttpStatus.TOO_MANY_REQUESTS, "TOKEN_TEMPORARILY_LOCKED", "이 링크로 실패 횟수가 많아 잠시 후 다시 시도해 주세요."),
     TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS", "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."),
+    REAUTH_FAILED(HttpStatus.UNAUTHORIZED, "REAUTH_FAILED", "비밀번호가 일치하지 않아 이 작업을 진행할 수 없습니다."),
 
     // 권한 에러 (403)
     FORBIDDEN(HttpStatus.FORBIDDEN, "FORBIDDEN", "해당 리소스에 대한 권한이 없습니다."),
     ROLE_PACKAGE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "ROLE_PACKAGE_ACCESS_DENIED", "본인의 역할 패키지가 아니거나 권한이 없는 요청입니다."),
     REVIEWER_CONFLICT_OF_INTEREST(HttpStatus.FORBIDDEN, "REVIEWER_CONFLICT_OF_INTEREST", "이해충돌 또는 권한 만료로 다른 검토자에게 재배정이 필요합니다."),
+    INSUFFICIENT_PERMISSION(HttpStatus.FORBIDDEN, "INSUFFICIENT_PERMISSION", "이 작업을 수행할 세부 권한이 없습니다."),
+    PARTNER_SCOPE_DENIED(HttpStatus.FORBIDDEN, "PARTNER_SCOPE_DENIED", "소속 파트너사에 배정되지 않은 증빙·사건입니다."),
 
     // 리소스 없음 (404)
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "요청한 리소스가 존재하지 않습니다."),
@@ -73,6 +76,7 @@ public enum ErrorCode {
     DISPUTE_CONTACT_NOT_FOUND(HttpStatus.NOT_FOUND, "DISPUTE_CONTACT_NOT_FOUND", "해당 이의 제기 연락처가 존재하지 않습니다."),
     HANDOVER_STAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "HANDOVER_STAGE_NOT_FOUND", "해당 인계 단계가 존재하지 않습니다."),
     PARTNER_REVIEWER_NOT_FOUND(HttpStatus.NOT_FOUND, "PARTNER_REVIEWER_NOT_FOUND", "해당 파트너 검토자가 존재하지 않습니다."),
+    EXTERNAL_PARTNER_NOT_FOUND(HttpStatus.NOT_FOUND, "EXTERNAL_PARTNER_NOT_FOUND", "해당 외부 파트너사가 존재하지 않습니다."),
 
     // 상태 충돌 (409)
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "DUPLICATE_EMAIL", "이미 사용 중인 이메일입니다."),
@@ -85,6 +89,7 @@ public enum ErrorCode {
     RECIPIENT_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "RECIPIENT_RESEND_NOT_ALLOWED", "현재 수락 상태에서는 수락 요청을 다시 보낼 수 없습니다."),
     CONFIRMER_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "CONFIRMER_RESEND_NOT_ALLOWED", "현재 수락 상태에서는 수락 요청을 다시 보낼 수 없습니다."),
     ITEM_ORDER_CONFLICT(HttpStatus.CONFLICT, "ITEM_ORDER_CONFLICT", "순서 충돌이 있어 확정할 수 없습니다."),
+    PARTNER_NOT_ASSIGNED(HttpStatus.CONFLICT, "PARTNER_NOT_ASSIGNED", "이 사건에는 아직 담당 파트너사가 배정되지 않았습니다."),
 
     // 서버 에러 (500)
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR","서버 오류가 발생했습니다.");

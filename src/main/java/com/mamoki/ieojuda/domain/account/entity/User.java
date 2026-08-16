@@ -8,6 +8,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "users")
@@ -42,12 +44,23 @@ public class User extends BaseCreatedAtEntity {
     @Column(name = "role", length = 20, nullable = false)
     private UserRole role;
 
+    // issue #59 - ADMIN/EXTERNAL 안에서도 업무 단위로 세분화된 권한. USER는 항상 비어있다.
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_permissions", joinColumns = @JoinColumn(name = "user_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "permission", length = 30)
+    private Set<AdminPermission> permissions = new HashSet<>();
+
     @Builder
     public User(String email, String password, String name) {
         this.email = email;
         this.password = password;
         this.name = name;
         this.role = UserRole.USER;
+    }
+
+    public boolean hasPermission(AdminPermission permission) {
+        return permissions.contains(permission);
     }
 
     public void updateRefreshToken(String refreshToken) {

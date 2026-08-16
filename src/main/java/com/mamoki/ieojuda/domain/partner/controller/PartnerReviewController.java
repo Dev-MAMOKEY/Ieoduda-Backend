@@ -31,17 +31,19 @@ public class PartnerReviewController {
     @Operation(summary = "검토 대상 조회", description = "대상자(신고 확인자) 정보와 증빙 메타데이터를 조회합니다. 역할별 패키지는 포함하지 않습니다.")
     @GetMapping
     public ResponseEntity<RsData<PartnerReviewResponse>> getReview(
+            @AuthenticationPrincipal Long userId,
             @Parameter(description = "검토 ID (증빙 ID)") @PathVariable Long reviewId
     ) {
-        return ResponseEntity.ok(RsData.success(partnerReviewService.getReview(reviewId)));
+        return ResponseEntity.ok(RsData.success(partnerReviewService.getReview(userId, reviewId)));
     }
 
     @Operation(summary = "증빙 원본 다운로드")
     @GetMapping("/file")
     public ResponseEntity<byte[]> getFile(
+            @AuthenticationPrincipal Long userId,
             @Parameter(description = "검토 ID (증빙 ID)") @PathVariable Long reviewId
     ) {
-        byte[] file = partnerReviewService.getFile(reviewId);
+        byte[] file = partnerReviewService.getFile(userId, reviewId);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(file);

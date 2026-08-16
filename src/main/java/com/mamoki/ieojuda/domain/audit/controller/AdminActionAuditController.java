@@ -1,8 +1,8 @@
 package com.mamoki.ieojuda.domain.audit.controller;
 
 import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
-import com.mamoki.ieojuda.domain.audit.dto.AuthAuditLogResponse;
-import com.mamoki.ieojuda.domain.audit.service.AuthAuditService;
+import com.mamoki.ieojuda.domain.audit.dto.AdminActionAuditLogResponse;
+import com.mamoki.ieojuda.domain.audit.service.AdminActionAuditService;
 import com.mamoki.ieojuda.global.rsdata.RsData;
 import com.mamoki.ieojuda.global.security.PermissionGuard;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,24 +17,23 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-// issue #55 "인증 실패 감사" 화면 - 운영관리자 전용. 로그인 실패/잠금, rate limit 초과 이력을 최신순으로 조회
-// issue #59 - ROLE_ADMIN이어도 AUDIT_VIEW 세부 권한이 있어야 조회 가능하도록 세분화
-@Tag(name = "Admin - Auth Audit", description = "운영관리자 - 로그인 실패 / 잠금 / rate limit 초과 감사")
+// issue #59 "고위험 조작 감사" 화면 - 사건 동결·파트너 배정·증빙 판정의 호출자와 결과를 조회
+@Tag(name = "Admin - Action Audit", description = "운영관리자 - 사건 동결/파트너 배정/증빙 판정 감사")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/admin/auth-audit-logs")
-public class AuthAuditController {
+@RequestMapping("/api/admin/action-audit-logs")
+public class AdminActionAuditController {
 
-    private final AuthAuditService authAuditService;
+    private final AdminActionAuditService adminActionAuditService;
     private final PermissionGuard permissionGuard;
 
-    @Operation(summary = "인증 실패 감사 조회", description = "로그인 실패/잠금, rate limit 초과 이력을 최신순으로 페이지 단위 조회합니다.")
+    @Operation(summary = "관리자 조작 감사 조회", description = "고위험 조작(사건 동결/파트너 배정/증빙 판정)의 호출자·성공 여부를 최신순으로 페이지 단위 조회합니다.")
     @GetMapping
-    public ResponseEntity<RsData<Page<AuthAuditLogResponse>>> getLogs(
+    public ResponseEntity<RsData<Page<AdminActionAuditLogResponse>>> getLogs(
             @AuthenticationPrincipal Long userId,
             @PageableDefault(size = 50) Pageable pageable
     ) {
         permissionGuard.require(userId, AdminPermission.AUDIT_VIEW);
-        return ResponseEntity.ok(RsData.success(authAuditService.getLogs(pageable)));
+        return ResponseEntity.ok(RsData.success(adminActionAuditService.getLogs(pageable)));
     }
 }
