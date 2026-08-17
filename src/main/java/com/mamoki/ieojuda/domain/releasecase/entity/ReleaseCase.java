@@ -129,4 +129,10 @@ public class ReleaseCase {
     public void startReleasing() {
         this.status = ReleaseCaseStatus.RELEASING;
     }
+
+    // issue #78 - 마지막 발송 단계까지 완료되면 사건 전체를 완료 처리
+    public void complete() {
+        this.status = ReleaseCaseStatus.COMPLETED;
+        this.completedAt = LocalDateTime.now();
+    }
 }

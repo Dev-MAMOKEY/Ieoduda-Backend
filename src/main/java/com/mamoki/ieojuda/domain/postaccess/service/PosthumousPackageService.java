@@ -14,6 +14,7 @@ import com.mamoki.ieojuda.domain.postaccess.repository.AccessTokenRepository;
 import com.mamoki.ieojuda.domain.postaccess.repository.PackageActionCompletionRepository;
 import com.mamoki.ieojuda.domain.postaccess.repository.PackageIssueRepository;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
+import com.mamoki.ieojuda.domain.stage.service.HandoverStageService;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
@@ -45,6 +46,7 @@ public class PosthumousPackageService {
     private final TokenLookupGuard tokenLookupGuard;
     private final PublicLinkAuditor publicLinkAuditor;
     private final IdempotencyGuard idempotencyGuard;
+    private final HandoverStageService handoverStageService;
 
     // ① 패키지 조회 - 자기 역할 항목만, 다른 역할·자격증명 원문은 응답에 포함하지 않는다
     @Transactional
@@ -71,14 +73,22 @@ public class PosthumousPackageService {
         );
     }
 
-    // ② 행동 완료
+    // ② 행동 완료 - 이 행동으로 단계의 모든 항목이 끝나면 단계를 완료 처리하고 다음 담당자에게 발송한다(issue #78)
     @Transactional
     public PackageActionResponse completeAction(String accessSessionId, Long actionId, String idempotencyKey) {
         idempotencyGuard.claim(COMPLETE_IDEMPOTENCY_SCOPE, idempotencyKey);
 
         AccessToken accessToken = findValidSession(accessSessionId);
         Recipient recipient = accessToken.getHandoverStage().getRecipient();
-        PlanSnapshotDto.ItemSnapshot item = findOwnedItem(accessToken, recipient, actionId);
+        PlanSnapshotDto snapshot = deserializeSnapshot(accessToken);
+        List<PlanSnapshotDto.ItemSnapshot> myItems = itemsOf(snapshot, recipient.getAssigneeId());
+        PlanSnapshotDto.ItemSnapshot item = myItems.stream()
+                .filter(i -> i.itemId().equals(actionId))
+                .findFirst()
+                .orElseThrow(() -> {
+                    publicLinkAuditor.recordStateFailure(ErrorCode.ROLE_PACKAGE_ACCESS_DENIED);
+                    return new CustomException(ErrorCode.ROLE_PACKAGE_ACCESS_DENIED);
+                });
 
         Long stageId = accessToken.getHandoverStage().getStageId();
         boolean alreadyCompleted = packageActionCompletionRepository
@@ -88,6 +98,9 @@ public class PosthumousPackageService {
                     .handoverStage(accessToken.getHandoverStage())
                     .itemId(actionId)
                     .build());
+            // 방금 저장한 완료가 이 단계의 마지막 항목이었는지는, 동시 요청 경쟁을 피하기 위해
+            // 비관적 잠금 아래에서 다시 세어 판정한다 (totalCount는 봉인된 스냅샷 기준이라 안전하게 미리 계산)
+            handoverStageService.completeStageIfAllActionsDone(stageId, myItems.size());
         }
 
         return PackageActionResponse.of(item, true);

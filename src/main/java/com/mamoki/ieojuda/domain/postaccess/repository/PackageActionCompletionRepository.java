@@ -13,4 +13,7 @@ public interface PackageActionCompletionRepository extends JpaRepository<Package
 
     // 행동 완료 처리 - 같은 행동을 다시 완료 요청했는지 확인
     Optional<PackageActionCompletion> findByHandoverStage_StageIdAndItemId(Long stageId, Long itemId);
+
+    // issue #78 - 단계 완료 판정(전체 항목 수 대비 완료된 항목 수)에 사용
+    long countByHandoverStage_StageId(Long stageId);
 }
