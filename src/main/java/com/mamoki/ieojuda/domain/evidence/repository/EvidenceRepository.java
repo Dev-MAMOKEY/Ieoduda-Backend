@@ -1,6 +1,7 @@
 package com.mamoki.ieojuda.domain.evidence.repository;
 
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
+import com.mamoki.ieojuda.domain.evidence.entity.EvidenceReviewStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -26,4 +27,12 @@ public interface EvidenceRepository extends JpaRepository<Evidence, UUID> {
             "LIMIT 100 " +
             "FOR UPDATE SKIP LOCKED", nativeQuery = true)
     List<Evidence> findDueForDeletionForUpdateSkipLocked(@Param("now") LocalDateTime now);
+
+    // "외부 파트너 증빙 검토" 목록 화면(issue #87) - 배정된 파트너와 무관하게 EVIDENCE_REVIEW 권한이 있으면
+    // 전체 검토 대상을 볼 수 있다. status가 null이면 전체 상태를 조회한다.
+    @Query("SELECT e FROM Evidence e " +
+            "WHERE e.deletedAt IS NULL " +
+            "AND (:status IS NULL OR e.reviewStatus = :status) " +
+            "ORDER BY e.submittedAt ASC")
+    List<Evidence> findAllByReviewStatus(@Param("status") EvidenceReviewStatus status);
 }

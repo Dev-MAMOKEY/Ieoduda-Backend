@@ -15,6 +15,7 @@ import com.mamoki.ieojuda.domain.evidence.repository.EvidenceDownloadTokenReposi
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
 import com.mamoki.ieojuda.domain.partner.dto.EvidenceDownloadLinkResponse;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewDecisionRequest;
+import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewListItemResponse;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewResponse;
 import com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer;
 import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
@@ -31,6 +32,8 @@ import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 // 명세서 "외부 파트너 증빙 검토" 화면 - 외부 법무·장례 파트너 전용. 역할별 패키지(계획 내용)는 절대 노출하지 않는다.
 // reviewId는 evidenceId와 1:1로 취급한다(증빙 1건 = 검토 1건).
@@ -62,6 +65,16 @@ public class PartnerReviewService {
         Evidence evidence = findEvidence(reviewId);
         requireAssignedPartner(findActiveReviewerByUser(userId), evidence);
         return PartnerReviewResponse.from(evidence);
+    }
+
+    // issue #87 - 목록은 배정된 파트너와 무관하게 EVIDENCE_REVIEW 권한만 있으면 전체를 조회한다.
+    // (getReview/downloadFile/decide의 조직 경계 검사는 그대로 유지, 목록에는 적용하지 않는다)
+    public List<PartnerReviewListItemResponse> getReviews(UUID userId, EvidenceReviewStatus status) {
+        permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
+        return evidenceRepository.findAllByReviewStatus(status)
+                .stream()
+                .map(PartnerReviewListItemResponse::from)
+                .toList();
     }
 
     // issue #43 - 원본을 직접 스트리밍하지 않고, 먼저 짧은 수명의 1회성 다운로드 토큰을 발급한다.
