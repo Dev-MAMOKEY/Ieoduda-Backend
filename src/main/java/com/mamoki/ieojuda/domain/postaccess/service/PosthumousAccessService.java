@@ -11,6 +11,7 @@ import com.mamoki.ieojuda.domain.postaccess.entity.AccessToken;
 import com.mamoki.ieojuda.domain.postaccess.repository.AccessTokenRepository;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStage;
+import com.mamoki.ieojuda.domain.stage.entity.HandoverStageStatus;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
 import com.mamoki.ieojuda.global.email.contract.EmailSendResult;
@@ -51,6 +52,7 @@ public class PosthumousAccessService {
     private final AppProperties appProperties;
     private final TokenLookupGuard tokenLookupGuard;
     private final PublicLinkAuditor publicLinkAuditor;
+    private final OtpAttemptRecorder otpAttemptRecorder;
 
     // ① 링크 검증 - 인증 전이므로 인계 내용은 어떤 필드에도 포함하지 않는다
     @Transactional
@@ -106,16 +108,18 @@ public class PosthumousAccessService {
         checkOtpNotExpired(accessToken);
 
         if (!accessToken.getOtpCodeHash().equals(TokenProvider.hashToken(request.otpCode()))) {
-            accessToken.incrementAttempt();
+            // 이 트랜잭션은 아래 예외로 곧 롤백되므로, 시도 횟수는 별도 트랜잭션(REQUIRES_NEW)으로 먼저 커밋한다.
+            otpAttemptRecorder.recordFailure(accessToken.getTokenId());
             publicLinkAuditor.recordStateFailure(ErrorCode.OTP_VERIFICATION_FAILED);
             throw new CustomException(ErrorCode.OTP_VERIFICATION_FAILED);
         }
 
-        String sessionToken = TokenProvider.generatePlainToken();
-        LocalDateTime sessionExpiresAt = LocalDateTime.now().plusMinutes(SESSION_TTL_MINUTES);
-        accessToken.verify(TokenProvider.hashToken(sessionToken), sessionExpiresAt);
+        // 새 컬럼을 두지 않고 같은 원본 토큰을 그대로 열람 세션 식별자로 쓴다 -
+        // 이후 조회는 verifiedAt(세션 시작 시각) 기준으로 60분 이내인지만 확인하면 된다.
+        accessToken.verify();
+        LocalDateTime sessionExpiresAt = accessToken.getVerifiedAt().plusMinutes(SESSION_TTL_MINUTES);
 
-        return new OtpVerifyResponse(sessionToken, sessionExpiresAt);
+        return new OtpVerifyResponse(plainToken, sessionExpiresAt);
     }
 
     // 발송 단계가 활성화될 때 호출 - AccessToken을 발급하고 평문 토큰을 반환한다.
@@ -137,7 +141,7 @@ public class PosthumousAccessService {
                 () -> accessTokenRepository.findByTokenHash(TokenProvider.hashToken(plainToken)));
     }
 
-    // 만료되었거나 이미 인증까지 끝나 소진된(1회성) 링크를 차단
+    // 만료·재사용(1회성 소진)·역할 불일치 링크를 차단 (이슈 #76 완료 조건 3가지)
     private void checkUsable(AccessToken accessToken) {
         Instant expiresAt = accessToken.getExpiresAt() == null
                 ? null
@@ -149,6 +153,16 @@ public class PosthumousAccessService {
         if (!TokenValidator.isUsable(Boolean.TRUE.equals(accessToken.getUsed()))) {
             publicLinkAuditor.recordStateFailure(ErrorCode.ACCESS_LINK_ALREADY_USED);
             throw new CustomException(ErrorCode.ACCESS_LINK_ALREADY_USED);
+        }
+        checkRoleConsistent(accessToken);
+    }
+
+    // 발급 이후 대체 담당자 전환(fallback)·차단(block) 등으로 이 단계가 더 이상 "발송됨(SENT)" 상태가
+    // 아니게 되면, 같은 토큰이 가리키는 담당자·역할이 이메일을 받았을 때와 달라졌다는 뜻이라 차단한다.
+    private void checkRoleConsistent(AccessToken accessToken) {
+        if (accessToken.getHandoverStage().getStatus() != HandoverStageStatus.SENT) {
+            publicLinkAuditor.recordStateFailure(ErrorCode.ACCESS_LINK_EXPIRED);
+            throw new CustomException(ErrorCode.ACCESS_LINK_EXPIRED);
         }
     }
 

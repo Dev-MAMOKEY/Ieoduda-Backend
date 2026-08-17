@@ -45,13 +45,6 @@ public class AccessToken {
     @Column(name = "used")
     private Boolean used;
 
-    // OTP 인증 성공 후 발급되는 열람 세션 식별자(해시만 저장, 평문은 응답으로만 반환)
-    @Column(name = "session_token_hash", length = 255)
-    private String sessionTokenHash;
-
-    @Column(name = "session_expires_at")
-    private LocalDateTime sessionExpiresAt;
-
     @Builder
     public AccessToken(HandoverStage handoverStage, String tokenHash, LocalDateTime expiresAt) {
         this.handoverStage = handoverStage;
@@ -73,11 +66,10 @@ public class AccessToken {
         return this.attemptCount;
     }
 
-    // OTP 검증 성공 - 열람 세션을 발급하고 링크 자체는 1회성으로 소진 처리
-    public void verify(String sessionTokenHash, LocalDateTime sessionExpiresAt) {
+    // OTP 검증 성공 - 링크 자체는 1회성으로 소진 처리(재검증·재조회 차단). 새 컬럼 없이 기존 필드만 사용:
+    // 같은 원본 토큰이 곧 열람 세션 식별자로도 쓰이고, verifiedAt이 세션 시작 시각(만료 판단 기준)이 된다.
+    public void verify() {
         this.verifiedAt = LocalDateTime.now();
         this.used = true;
-        this.sessionTokenHash = sessionTokenHash;
-        this.sessionExpiresAt = sessionExpiresAt;
     }
 }

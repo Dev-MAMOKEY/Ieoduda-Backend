@@ -43,6 +43,7 @@ class PosthumousAccessServiceTest {
     private AppProperties appProperties;
     private TokenLookupGuard tokenLookupGuard;
     private PublicLinkAuditor publicLinkAuditor;
+    private OtpAttemptRecorder otpAttemptRecorder;
     private PosthumousAccessService posthumousAccessService;
 
     private static final String PLAIN_TOKEN = "plain-access-token";
@@ -56,9 +57,12 @@ class PosthumousAccessServiceTest {
         appProperties = mock(AppProperties.class);
         tokenLookupGuard = mock(TokenLookupGuard.class);
         publicLinkAuditor = mock(PublicLinkAuditor.class);
+        // 실제 구현처럼 별도 REQUIRES_NEW 트랜잭션에서 시도 횟수를 증가시키는 동작을 재현하기 위해
+        // 목이 아닌 실제 인스턴스를 쓴다(트랜잭션 자체는 이 단위 테스트 범위 밖 - HTTP 통합 테스트가 검증).
+        otpAttemptRecorder = new OtpAttemptRecorder(accessTokenRepository);
         posthumousAccessService = new PosthumousAccessService(
                 accessTokenRepository, emailLogRepository, emailSender, appProperties,
-                tokenLookupGuard, publicLinkAuditor);
+                tokenLookupGuard, publicLinkAuditor, otpAttemptRecorder);
 
         when(appProperties.getContactEmail()).thenReturn("support@ieoduda.example");
         when(appProperties.getInviteTokenTtlHours()).thenReturn(72L);
@@ -73,7 +77,12 @@ class PosthumousAccessServiceTest {
         when(emailLogRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
+    // 기본값: 단계가 실제로 발송된(SENT) 상태 - 링크가 정상적으로 유효한 경우
     private AccessToken buildAccessToken(LocalDateTime expiresAt) {
+        return buildAccessToken(expiresAt, HandoverStage::send);
+    }
+
+    private AccessToken buildAccessToken(LocalDateTime expiresAt, java.util.function.Consumer<HandoverStage> stageState) {
         User user = mock(User.class);
         when(user.getName()).thenReturn("김나무");
         Plan plan = mock(Plan.class);
@@ -97,6 +106,7 @@ class PosthumousAccessServiceTest {
                 .recipient(recipient)
                 .stageOrder(0)
                 .build();
+        stageState.accept(stage);
 
         AccessToken accessToken = AccessToken.builder()
                 .handoverStage(stage)
@@ -105,6 +115,8 @@ class PosthumousAccessServiceTest {
                 .build();
         when(accessTokenRepository.findByTokenHash(TokenProvider.hashToken(PLAIN_TOKEN)))
                 .thenReturn(Optional.of(accessToken));
+        // OtpAttemptRecorder(REQUIRES_NEW)가 tokenId로 다시 조회하는 부분을 재현
+        when(accessTokenRepository.findById(any())).thenReturn(Optional.of(accessToken));
         return accessToken;
     }
 
@@ -132,11 +144,34 @@ class PosthumousAccessServiceTest {
     @Test
     void getAccess_whenAlreadyUsed_throwsAccessLinkAlreadyUsed() {
         AccessToken accessToken = buildAccessToken(LocalDateTime.now().plusHours(1));
-        accessToken.verify("session-hash", LocalDateTime.now().plusMinutes(60));
+        accessToken.verify();
 
         assertThatThrownBy(() -> posthumousAccessService.getAccess(PLAIN_TOKEN))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACCESS_LINK_ALREADY_USED));
+    }
+
+    // issue #76 완료 조건 - "역할 불일치" 차단: 링크 발급 이후 대체 담당자 전환(fallback) 등으로 이
+    // 단계가 더 이상 SENT 상태가 아니게 되면, 아직 만료되지 않은 링크라도 차단해야 한다.
+    @Test
+    void getAccess_whenStageNoLongerSent_throwsAccessLinkExpired() {
+        buildAccessToken(LocalDateTime.now().plusHours(1), stage -> {
+            stage.send();
+            stage.block(); // 대체 담당자 없이 fallback 시도 -> 단계 차단
+        });
+
+        assertThatThrownBy(() -> posthumousAccessService.getAccess(PLAIN_TOKEN))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACCESS_LINK_EXPIRED));
+    }
+
+    @Test
+    void sendOtp_whenStageNoLongerSent_throwsAccessLinkExpired() {
+        buildAccessToken(LocalDateTime.now().plusHours(1), stage -> {}); // send() 호출 안 함 -> 아직 PENDING
+
+        assertThatThrownBy(() -> posthumousAccessService.sendOtp(PLAIN_TOKEN))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACCESS_LINK_EXPIRED));
     }
 
     @Test
@@ -146,7 +181,8 @@ class PosthumousAccessServiceTest {
 
         var response = posthumousAccessService.verify(PLAIN_TOKEN, new OtpVerifyRequest("123456"));
 
-        assertThat(response.accessSessionId()).isNotBlank();
+        // 새 컬럼 없이 기존 필드만 재사용하는 설계 - 같은 원본 토큰이 그대로 열람 세션 식별자가 된다
+        assertThat(response.accessSessionId()).isEqualTo(PLAIN_TOKEN);
         assertThat(response.sessionExpiresAt()).isAfter(LocalDateTime.now());
         assertThat(accessToken.getUsed()).isTrue();
         assertThat(accessToken.getVerifiedAt()).isNotNull();
