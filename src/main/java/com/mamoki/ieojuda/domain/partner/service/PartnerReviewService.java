@@ -9,7 +9,9 @@ import com.mamoki.ieojuda.domain.audit.service.AdminActionAuditService;
 import com.mamoki.ieojuda.domain.confirmer.service.DisputeContactService;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
+import com.mamoki.ieojuda.domain.evidence.entity.EvidenceReviewStatus;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewDecisionRequest;
+import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewListItemResponse;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewResponse;
 import com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer;
 import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
@@ -25,6 +27,8 @@ import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 // 명세서 "외부 파트너 증빙 검토" 화면 - 외부 법무·장례 파트너 전용. 역할별 패키지(계획 내용)는 절대 노출하지 않는다.
 // reviewId는 evidenceId와 1:1로 취급한다(증빙 1건 = 검토 1건).
@@ -49,6 +53,16 @@ public class PartnerReviewService {
         Evidence evidence = findEvidence(reviewId);
         requireAssignedPartner(findReviewerByUser(userId), evidence);
         return PartnerReviewResponse.from(evidence);
+    }
+
+    // issue #87 - 목록은 배정된 파트너와 무관하게 EVIDENCE_REVIEW 권한만 있으면 전체를 조회한다.
+    // (getReview/getFile/decide의 조직 경계 검사는 그대로 유지, 목록에는 적용하지 않기로 결정)
+    public List<PartnerReviewListItemResponse> getReviews(UUID userId, EvidenceReviewStatus status) {
+        permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
+        return evidenceRepository.findAllByReviewStatus(status)
+                .stream()
+                .map(PartnerReviewListItemResponse::from)
+                .toList();
     }
 
     // 증빙 원본 다운로드 - JSON 응답에 바이너리를 섞지 않기 위해 별도 엔드포인트로 분리
