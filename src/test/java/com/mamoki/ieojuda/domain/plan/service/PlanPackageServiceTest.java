@@ -28,8 +28,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-// issue #81 - 역할별 패키지 미리보기 및 작성자 봉인. 봉인 차단 검사 3가지(확인자수/금지정보/근거)를 검증한다.
+// issue #81 - 역할별 패키지 미리보기 및 작성자 봉인. 봉인 차단 검사(확인자수/작성자 이름/금지정보/근거)를 검증한다.
 // 권한 집중·실행순서확정 검사는 #90 소관이라 이 이슈 범위에서 제외한다(사용자 확인됨).
+// issue #93 - 작성자 이름이 없으면 PartnerReviewResponse.targetName이 null이 되므로 봉인 시점에 차단한다.
 class PlanPackageServiceTest {
 
     private PlanOwnershipReader planOwnershipReader;
@@ -38,6 +39,7 @@ class PlanPackageServiceTest {
     private PlanPackageService planPackageService;
 
     private Plan plan;
+    private com.mamoki.ieojuda.domain.account.entity.User user;
     private static final UUID PLAN_ID = UUID.randomUUID();
     private static final UUID USER_ID = UUID.randomUUID();
 
@@ -48,7 +50,9 @@ class PlanPackageServiceTest {
         confirmerRepository = mock(ConfirmerRepository.class);
         planPackageService = new PlanPackageService(planOwnershipReader, itemRepository, confirmerRepository);
 
-        plan = Plan.builder().user(mock(com.mamoki.ieojuda.domain.account.entity.User.class)).build();
+        user = mock(com.mamoki.ieojuda.domain.account.entity.User.class);
+        when(user.getName()).thenReturn("김나무");
+        plan = Plan.builder().user(user).build();
         when(planOwnershipReader.findOwnedPlan(USER_ID, PLAN_ID)).thenReturn(plan);
     }
 
@@ -138,6 +142,17 @@ class PlanPackageServiceTest {
         assertThatThrownBy(() -> planPackageService.seal(USER_ID, PLAN_ID))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INSUFFICIENT_CONFIRMERS));
+        verify(itemRepository, never()).findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(any());
+    }
+
+    @Test
+    void seal_whenAuthorNameIsBlank_throwsPackageSealBlocked() {
+        stubAcceptedConfirmers(2);
+        when(user.getName()).thenReturn(null);
+
+        assertThatThrownBy(() -> planPackageService.seal(USER_ID, PLAN_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PACKAGE_SEAL_BLOCKED));
         verify(itemRepository, never()).findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(any());
     }
 

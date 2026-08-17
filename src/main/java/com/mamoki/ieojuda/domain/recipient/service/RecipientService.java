@@ -49,8 +49,6 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class RecipientService {
 
-    private static final Set<Integer> ALLOWED_WAIT_HOURS = Set.of(168, 336, 504); // 7일/14일/21일
-
     private final ItemRepository itemRepository;
     private final RecipientRepository recipientRepository;
     private final PlanOwnershipReader planOwnershipReader;
@@ -89,9 +87,6 @@ public class RecipientService {
             // 항목(박스) 하나당 담당자 한 명 규칙
             if (item.getRecipient() != null) {
                 throw new CustomException(ErrorCode.RECIPIENT_ALREADY_ASSIGNED);
-            }
-            if (!ALLOWED_WAIT_HOURS.contains(request.maxWaitHours())) {
-                throw new CustomException(ErrorCode.INVALID_WAITING_PERIOD);
             }
             // 대체 담당자가 주 담당자와 동일 이메일이면 실제 대체 전환 시 의미가 없으므로 차단
             if (request.backup() != null && request.backup().email().equals(request.email())) {

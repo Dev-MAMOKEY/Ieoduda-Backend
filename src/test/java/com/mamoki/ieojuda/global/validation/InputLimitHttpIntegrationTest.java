@@ -53,15 +53,15 @@ class InputLimitHttpIntegrationTest {
     }
 
     @Test
-    void fileLargerThanTwentyFiveMegabytesReturnsPayloadTooLarge() throws Exception {
-        HttpResponse<String> response = sendMultipart(25L * MEBIBYTE + 1, 0);
+    void fileLargerThanFiftyMegabytesReturnsPayloadTooLarge() throws Exception {
+        HttpResponse<String> response = sendMultipart(50L * MEBIBYTE + 1, 0);
 
         assertPayloadTooLarge(response);
     }
 
     @Test
-    void multipartRequestLargerThanThirtyMegabytesReturnsPayloadTooLarge() throws Exception {
-        HttpResponse<String> response = sendMultipart(25L * MEBIBYTE, 5L * MEBIBYTE + 1);
+    void multipartRequestLargerThanFiftyFiveMegabytesReturnsPayloadTooLarge() throws Exception {
+        HttpResponse<String> response = sendMultipart(50L * MEBIBYTE, 5L * MEBIBYTE + 1);
 
         assertPayloadTooLarge(response);
     }

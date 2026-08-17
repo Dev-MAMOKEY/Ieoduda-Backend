@@ -40,6 +40,7 @@ import java.io.InputStream;
 
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -141,25 +142,54 @@ class InputSizeConstraintTest {
         assertThat(validator.validate(new ObjectionRequest("token", "x".repeat(1001)))).hasSize(1);
     }
 
+    // issue #93 - maxWaitHours가 168/336/504 고정값이 아니라 168~720시간(7~30일) 범위를 자유롭게 받아야 한다
     @Test
-    void multipartLimitsAreTwentyFiveAndThirtyMegabytes() throws IOException {
+    void recipientRegisterRequestMaxWaitHoursAcceptsFullSevenToThirtyDayRangeAndRejectsOutOfRange() {
+        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+        UUID itemId = UUID.randomUUID();
+
+        RecipientRegisterRequest lowerBound = new RecipientRegisterRequest(itemId, "이지수", "test@test.com", 168, null);
+        RecipientRegisterRequest midRange = new RecipientRegisterRequest(itemId, "이지수", "test@test.com", 240, null);
+        RecipientRegisterRequest upperBound = new RecipientRegisterRequest(itemId, "이지수", "test@test.com", 720, null);
+        RecipientRegisterRequest belowRange = new RecipientRegisterRequest(itemId, "이지수", "test@test.com", 167, null);
+        RecipientRegisterRequest aboveRange = new RecipientRegisterRequest(itemId, "이지수", "test@test.com", 721, null);
+
+        assertThat(validator.validate(lowerBound)).isEmpty();
+        assertThat(validator.validate(midRange)).isEmpty();
+        assertThat(validator.validate(upperBound)).isEmpty();
+        assertThat(validator.validate(belowRange)).hasSize(1);
+        assertThat(validator.validate(aboveRange)).hasSize(1);
+    }
+
+    // issue #93 - 피그마 회원가입 화면은 이메일/비밀번호/비밀번호 확인 3개만 입력받으므로 이름 없이도 가입이 성공해야 한다
+    @Test
+    void signupRequestAcceptsMissingName() {
+        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+
+        SignupRequest withoutName = new SignupRequest("size-limit-test@example.com", "password1234", "password1234", null);
+
+        assertThat(validator.validate(withoutName)).isEmpty();
+    }
+
+    @Test
+    void multipartLimitsAreFiftyAndFiftyFiveMegabytes() throws IOException {
         Properties properties = new Properties();
         try (InputStream input = getClass().getResourceAsStream("/application.properties")) {
             assertThat(input).isNotNull();
             properties.load(input);
         }
 
-        assertThat(properties.getProperty("spring.servlet.multipart.max-file-size")).isEqualTo("25MB");
-        assertThat(properties.getProperty("spring.servlet.multipart.max-request-size")).isEqualTo("30MB");
-        assertThat(properties.getProperty("server.tomcat.max-swallow-size")).isEqualTo("35MB");
+        assertThat(properties.getProperty("spring.servlet.multipart.max-file-size")).isEqualTo("50MB");
+        assertThat(properties.getProperty("spring.servlet.multipart.max-request-size")).isEqualTo("55MB");
+        assertThat(properties.getProperty("server.tomcat.max-swallow-size")).isEqualTo("60MB");
     }
 
     @Test
-    void evidenceServiceFileLimitMatchesTheTwentyFiveMegabyteServletLimit() throws Exception {
+    void evidenceServiceFileLimitMatchesTheFiftyMegabyteServletLimit() throws Exception {
         var maxFileSize = EvidenceSubmitService.class.getDeclaredField("MAX_FILE_SIZE");
         maxFileSize.setAccessible(true);
 
-        assertThat(maxFileSize.getLong(null)).isEqualTo(25L * 1024 * 1024);
+        assertThat(maxFileSize.getLong(null)).isEqualTo(50L * 1024 * 1024);
     }
 
     @Test
