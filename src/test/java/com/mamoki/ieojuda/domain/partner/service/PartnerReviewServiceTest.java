@@ -7,9 +7,12 @@ import com.mamoki.ieojuda.domain.audit.service.AdminActionAuditService;
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
 import com.mamoki.ieojuda.domain.confirmer.service.DisputeContactService;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
+import com.mamoki.ieojuda.domain.evidence.entity.EvidenceDownloadToken;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceReviewStatus;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceType;
+import com.mamoki.ieojuda.domain.evidence.repository.EvidenceDownloadTokenRepository;
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
+import com.mamoki.ieojuda.domain.partner.dto.EvidenceDownloadLinkResponse;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewDecisionRequest;
 import com.mamoki.ieojuda.domain.partner.entity.ExternalPartner;
 import com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer;
@@ -39,8 +42,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-// issue #59 회귀 테스트 - 역할(EXTERNAL) 하나만으로는 소속 파트너사에 배정되지 않은 사건·증빙을
-// 조작할 수 없어야 하고(조직 경계), 증빙 판정은 재인증 없이는 실행되지 않아야 한다.
+// issue #59 회귀 테스트 - 역할(EXTERNAL) 하나만으로는 소속 파트너사에 배정되지 않은 사건·증빙을 조작할 수
+// 없어야 하고(조직 경계), 증빙 판정은 재인증 없이는 실행되지 않아야 한다.
+// issue #43 - 접근 경계는 조직(소속 파트너사) 단위까지다(개별 검토자 사전 지정은 별도 브랜치 소관).
+// 다만 판정은 한 번 완료되면 다시 바꿀 수 없고, 원본은 1회성 토큰으로만 내려받을 수 있어야 한다.
 class PartnerReviewServiceTest {
 
     private static final UUID USER_ID = UUID.randomUUID();
@@ -50,6 +55,7 @@ class PartnerReviewServiceTest {
 
     private EvidenceRepository evidenceRepository;
     private PartnerReviewerRepository partnerReviewerRepository;
+    private EvidenceDownloadTokenRepository evidenceDownloadTokenRepository;
     private EvidenceStorageClient evidenceStorageClient;
     private PermissionGuard permissionGuard;
     private ReauthGuard reauthGuard;
@@ -69,6 +75,7 @@ class PartnerReviewServiceTest {
     void setUp() {
         evidenceRepository = mock(EvidenceRepository.class);
         partnerReviewerRepository = mock(PartnerReviewerRepository.class);
+        evidenceDownloadTokenRepository = mock(EvidenceDownloadTokenRepository.class);
         evidenceStorageClient = mock(EvidenceStorageClient.class);
         permissionGuard = mock(PermissionGuard.class);
         reauthGuard = mock(ReauthGuard.class);
@@ -77,7 +84,7 @@ class PartnerReviewServiceTest {
         securityTokenService = mock(SecurityTokenService.class);
         disputeContactService = mock(DisputeContactService.class);
         partnerReviewService = new PartnerReviewService(
-                evidenceRepository, partnerReviewerRepository, evidenceStorageClient,
+                evidenceRepository, partnerReviewerRepository, evidenceDownloadTokenRepository, evidenceStorageClient,
                 permissionGuard, reauthGuard, adminActionAuditService, idempotencyGuard,
                 securityTokenService, disputeContactService);
 
@@ -87,11 +94,13 @@ class PartnerReviewServiceTest {
         reviewerPartner = mock(ExternalPartner.class);
         when(reviewerPartner.getPartnerId()).thenReturn(REVIEWER_PARTNER_ID);
         reviewer = mock(PartnerReviewer.class);
+        when(reviewer.getReviewerId()).thenReturn(UUID.randomUUID());
         when(reviewer.getIsActive()).thenReturn(true);
         when(reviewer.getPartner()).thenReturn(reviewerPartner);
         when(partnerReviewerRepository.findByUser_UserId(USER_ID)).thenReturn(Optional.of(reviewer));
 
         releaseCase = mock(ReleaseCase.class);
+        when(releaseCase.getAssignedPartner()).thenReturn(reviewerPartner); // 기본값: 같은 조직에 배정됨
         Plan plan = mock(Plan.class);
         User planOwner = mock(User.class);
         when(planOwner.getName()).thenReturn("작성자");
@@ -99,6 +108,7 @@ class PartnerReviewServiceTest {
         Confirmer confirmer = mock(Confirmer.class);
         when(confirmer.getName()).thenReturn("확인자");
         evidence = mock(Evidence.class);
+        when(evidence.getEvidenceId()).thenReturn(REVIEW_ID);
         when(evidence.getReleaseCase()).thenReturn(releaseCase);
         when(evidence.getPlan()).thenReturn(plan);
         when(evidence.getConfirmer()).thenReturn(confirmer);
@@ -134,8 +144,7 @@ class PartnerReviewServiceTest {
     }
 
     @Test
-    void decide_whenCaseAssignedToReviewersOwnPartner_proceeds() {
-        when(releaseCase.getAssignedPartner()).thenReturn(reviewerPartner); // 같은 조직
+    void decide_whenCaseAssignedToReviewersOwnPartner_proceedsAndRecordsReviewer() {
         PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
                 PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "correct-pw");
 
@@ -144,11 +153,61 @@ class PartnerReviewServiceTest {
         verify(evidence).approve();
         verify(releaseCase).approveEvidenceAndStartWaiting(any());
         verify(adminActionAuditService).record(actor, AdminActionType.EVIDENCE_DECISION, REVIEW_ID, true, "APPROVE");
+        // issue #43 - 개별 사전 배정은 없지만, 실제로 판정한 사람은 표시·감사용으로 기록해둔다
+        verify(evidence).assignReviewer(reviewer);
+    }
+
+    @Test
+    void decide_whenReviewerInactive_isBlockedByConflictOfInterest() {
+        when(reviewer.getIsActive()).thenReturn(false);
+        PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
+                PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "pw");
+
+        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.REVIEWER_CONFLICT_OF_INTEREST));
+        verify(evidence, never()).approve();
+    }
+
+    // issue #43 완료 조건 - 판정을 1회 상태 전이로 제한한다
+    @Test
+    void decide_whenAlreadyApproved_isBlockedFromDecidingAgain() {
+        when(evidence.getReviewStatus()).thenReturn(EvidenceReviewStatus.APPROVED);
+        PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
+                PartnerReviewDecisionRequest.PartnerReviewDecision.REJECT, "사유", "pw");
+
+        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_ALREADY_DECIDED));
+        verify(evidence, never()).reject(any());
+    }
+
+    @Test
+    void decide_whenAlreadyRejected_isBlockedFromDecidingAgain() {
+        when(evidence.getReviewStatus()).thenReturn(EvidenceReviewStatus.REJECTED);
+        PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
+                PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "pw");
+
+        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_ALREADY_DECIDED));
+        verify(evidence, never()).approve();
+    }
+
+    // 추가자료요청은 종결 상태가 아니므로, 그 이후에 다시 판정할 수 있어야 한다
+    @Test
+    void decide_whenAdditionalInfoRequested_canStillBeDecidedAgain() {
+        when(evidence.getReviewStatus()).thenReturn(EvidenceReviewStatus.ADDITIONAL_INFO_REQUESTED);
+        PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
+                PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "correct-pw");
+
+        partnerReviewService.decide(REVIEW_ID, USER_ID, request, null);
+
+        verify(evidence).approve();
     }
 
     @Test
     void decide_whenReauthFails_blocksTheDecisionAndRecordsTheFailure() {
-        when(releaseCase.getAssignedPartner()).thenReturn(reviewerPartner);
         doThrow(new CustomException(ErrorCode.REAUTH_FAILED))
                 .when(reauthGuard).verify(actor, "wrong-pw");
         PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
@@ -187,13 +246,12 @@ class PartnerReviewServiceTest {
     }
 
     @Test
-    void getFile_whenEvidenceAlreadyDeleted_isBlocked() {
+    void requestDownloadLink_whenEvidenceAlreadyDeleted_isBlocked() {
         when(evidence.getDeletedAt()).thenReturn(LocalDateTime.now());
 
-        assertThatThrownBy(() -> partnerReviewService.getFile(USER_ID, REVIEW_ID))
+        assertThatThrownBy(() -> partnerReviewService.requestDownloadLink(USER_ID, REVIEW_ID))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_ALREADY_DELETED));
-        verify(evidenceStorageClient, never()).load(any());
     }
 
     @Test
@@ -206,5 +264,81 @@ class PartnerReviewServiceTest {
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_ALREADY_DELETED));
         verify(evidence, never()).approve();
+    }
+
+    // issue #43 - 원본은 발급받은 1회성 토큰으로만 내려받을 수 있고, 같은 토큰을 두 번 쓸 수 없다
+    @Test
+    void requestDownloadLink_issuesTokenForOrgMemberReviewer() {
+        EvidenceDownloadLinkResponse response = partnerReviewService.requestDownloadLink(USER_ID, REVIEW_ID);
+
+        assertThat(response.downloadToken()).isNotBlank();
+        assertThat(response.expiresAt()).isAfter(LocalDateTime.now());
+        verify(evidenceDownloadTokenRepository).save(any(EvidenceDownloadToken.class));
+    }
+
+    @Test
+    void requestDownloadLink_whenDifferentOrg_isBlocked() {
+        ExternalPartner otherPartner = mock(ExternalPartner.class);
+        when(otherPartner.getPartnerId()).thenReturn(OTHER_PARTNER_ID);
+        when(releaseCase.getAssignedPartner()).thenReturn(otherPartner);
+
+        assertThatThrownBy(() -> partnerReviewService.requestDownloadLink(USER_ID, REVIEW_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PARTNER_SCOPE_DENIED));
+        verify(evidenceDownloadTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void downloadFile_whenTokenUnknown_throwsTokenInvalid() {
+        when(evidenceDownloadTokenRepository.findByTokenHash(any())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> partnerReviewService.downloadFile(USER_ID, REVIEW_ID, "unknown-token"))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.TOKEN_INVALID));
+        verify(evidenceStorageClient, never()).load(any());
+    }
+
+    @Test
+    void downloadFile_whenTokenExpired_throwsAccessLinkExpired() {
+        EvidenceDownloadToken token = mock(EvidenceDownloadToken.class);
+        when(token.getEvidence()).thenReturn(evidence);
+        when(token.isExpired()).thenReturn(true);
+        when(evidenceDownloadTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(token));
+
+        assertThatThrownBy(() -> partnerReviewService.downloadFile(USER_ID, REVIEW_ID, "expired-token"))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACCESS_LINK_EXPIRED));
+        verify(evidenceStorageClient, never()).load(any());
+    }
+
+    @Test
+    void downloadFile_whenTokenAlreadyUsed_throwsAccessLinkAlreadyUsed() {
+        EvidenceDownloadToken token = mock(EvidenceDownloadToken.class);
+        when(token.getEvidence()).thenReturn(evidence);
+        when(token.isExpired()).thenReturn(false);
+        when(evidenceDownloadTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(token));
+        when(evidenceDownloadTokenRepository.markUsedIfUnused(any(), any())).thenReturn(0);
+
+        assertThatThrownBy(() -> partnerReviewService.downloadFile(USER_ID, REVIEW_ID, "used-token"))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACCESS_LINK_ALREADY_USED));
+        verify(evidenceStorageClient, never()).load(any());
+    }
+
+    @Test
+    void downloadFile_whenTokenValid_loadsFileAndRecordsAuditByActor() {
+        EvidenceDownloadToken token = mock(EvidenceDownloadToken.class);
+        when(token.getEvidence()).thenReturn(evidence);
+        when(token.isExpired()).thenReturn(false);
+        when(evidenceDownloadTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(token));
+        when(evidenceDownloadTokenRepository.markUsedIfUnused(any(), any())).thenReturn(1);
+        when(evidence.getStorageKey()).thenReturn("storage/key");
+        byte[] bytes = {1, 2, 3};
+        when(evidenceStorageClient.load("storage/key")).thenReturn(bytes);
+
+        byte[] result = partnerReviewService.downloadFile(USER_ID, REVIEW_ID, "valid-token");
+
+        assertThat(result).isEqualTo(bytes);
+        verify(adminActionAuditService).record(actor, AdminActionType.EVIDENCE_DOWNLOAD, REVIEW_ID, true, null);
     }
 }

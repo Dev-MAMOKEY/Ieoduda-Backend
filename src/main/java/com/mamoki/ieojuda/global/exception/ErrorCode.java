@@ -99,6 +99,7 @@ public enum ErrorCode {
     ORDER_NOT_CONFIRMED(HttpStatus.CONFLICT, "ORDER_NOT_CONFIRMED", "실행 순서가 아직 확정되지 않아 패키지를 봉인할 수 없습니다."),
     PARTNER_NOT_ASSIGNED(HttpStatus.CONFLICT, "PARTNER_NOT_ASSIGNED", "이 사건에는 아직 담당 파트너사가 배정되지 않았습니다."),
     EVIDENCE_ALREADY_DELETED(HttpStatus.CONFLICT, "EVIDENCE_ALREADY_DELETED", "이미 삭제된 증빙입니다."),
+    EVIDENCE_ALREADY_DECIDED(HttpStatus.CONFLICT, "EVIDENCE_ALREADY_DECIDED", "이미 판정이 완료된 증빙은 다시 판정할 수 없습니다."),
     DUPLICATE_REQUEST(HttpStatus.CONFLICT, "DUPLICATE_REQUEST", "이미 처리 중이거나 처리된 요청입니다."),
     CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, "CONCURRENT_MODIFICATION", "다른 요청이 먼저 처리되어 현재 상태와 충돌합니다. 다시 시도해 주세요."),
 
