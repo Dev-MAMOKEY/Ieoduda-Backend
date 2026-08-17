@@ -13,6 +13,7 @@ import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
+import com.mamoki.ieojuda.global.idempotency.service.IdempotencyGuard;
 import com.mamoki.ieojuda.global.security.PermissionGuard;
 import com.mamoki.ieojuda.global.security.ReauthGuard;
 import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
@@ -34,6 +35,7 @@ public class PartnerReviewService {
     private final PermissionGuard permissionGuard;
     private final ReauthGuard reauthGuard;
     private final AdminActionAuditService adminActionAuditService;
+    private final IdempotencyGuard idempotencyGuard;
 
     public PartnerReviewResponse getReview(Long userId, Long reviewId) {
         permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
@@ -51,7 +53,7 @@ public class PartnerReviewService {
     }
 
     @Transactional
-    public PartnerReviewResponse decide(Long reviewId, Long userId, PartnerReviewDecisionRequest request) {
+    public PartnerReviewResponse decide(Long reviewId, Long userId, PartnerReviewDecisionRequest request, String idempotencyKey) {
         User actor = permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
         Evidence evidence = findEvidence(reviewId);
         PartnerReviewer reviewer = findReviewerByUser(userId);
@@ -69,6 +71,9 @@ public class PartnerReviewService {
             adminActionAuditService.record(actor, AdminActionType.EVIDENCE_DECISION, reviewId, false, "재인증 실패");
             throw e;
         }
+        // 재인증 성공 이후에 클레임해야, 재인증 실패로 아무 것도 안 바뀐 시도가 키를 낭비해서
+        // 정상적인 재시도까지 막는 일이 없다.
+        idempotencyGuard.claim("partner-review-decision", idempotencyKey);
 
         evidence.assignReviewer(reviewer);
 

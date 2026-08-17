@@ -58,6 +58,11 @@ public class ReleaseCase {
     @JoinColumn(name = "assigned_partner_id")
     private ExternalPartner assignedPartner;
 
+    // 동시에 여러 요청(파트너 승인, 스케줄러 등)이 같은 사건 상태를 전이시키려 할 때 뒤늦은 쪽을 밀어내기 위한 낙관적 잠금
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     @Builder
     public ReleaseCase(Plan plan, PlanVersion planVersion) {
         this.plan = plan;

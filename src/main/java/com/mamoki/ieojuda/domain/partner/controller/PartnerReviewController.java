@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -49,13 +50,14 @@ public class PartnerReviewController {
                 .body(file);
     }
 
-    @Operation(summary = "검토 결과 제출", description = "승인(APPROVE)/반려(REJECT)/추가자료요청(ADDITIONAL_INFO_REQUESTED) 중 하나를 기록합니다. AI 자동 승인은 없습니다.")
+    @Operation(summary = "검토 결과 제출", description = "승인(APPROVE)/반려(REJECT)/추가자료요청(ADDITIONAL_INFO_REQUESTED) 중 하나를 기록합니다. AI 자동 승인은 없습니다. Idempotency-Key 헤더를 보내면 같은 키의 재전송은 중복 요청(409)으로 응답합니다.")
     @PostMapping("/decision")
     public ResponseEntity<RsData<PartnerReviewResponse>> decide(
             @AuthenticationPrincipal Long userId,
             @Parameter(description = "검토 ID (증빙 ID)") @PathVariable Long reviewId,
-            @Valid @RequestBody PartnerReviewDecisionRequest request
+            @Valid @RequestBody PartnerReviewDecisionRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
     ) {
-        return ResponseEntity.ok(RsData.success(partnerReviewService.decide(reviewId, userId, request)));
+        return ResponseEntity.ok(RsData.success(partnerReviewService.decide(reviewId, userId, request, idempotencyKey)));
     }
 }

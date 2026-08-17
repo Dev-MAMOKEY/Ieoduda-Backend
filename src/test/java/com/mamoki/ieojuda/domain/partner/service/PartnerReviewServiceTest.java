@@ -16,6 +16,7 @@ import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
+import com.mamoki.ieojuda.global.idempotency.service.IdempotencyGuard;
 import com.mamoki.ieojuda.global.security.PermissionGuard;
 import com.mamoki.ieojuda.global.security.ReauthGuard;
 import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
@@ -46,6 +47,7 @@ class PartnerReviewServiceTest {
     private PermissionGuard permissionGuard;
     private ReauthGuard reauthGuard;
     private AdminActionAuditService adminActionAuditService;
+    private IdempotencyGuard idempotencyGuard;
     private PartnerReviewService partnerReviewService;
 
     private User actor;
@@ -62,9 +64,10 @@ class PartnerReviewServiceTest {
         permissionGuard = mock(PermissionGuard.class);
         reauthGuard = mock(ReauthGuard.class);
         adminActionAuditService = mock(AdminActionAuditService.class);
+        idempotencyGuard = mock(IdempotencyGuard.class);
         partnerReviewService = new PartnerReviewService(
                 evidenceRepository, partnerReviewerRepository, evidenceStorageClient,
-                permissionGuard, reauthGuard, adminActionAuditService);
+                permissionGuard, reauthGuard, adminActionAuditService, idempotencyGuard);
 
         actor = mock(User.class);
         when(permissionGuard.require(USER_ID, AdminPermission.EVIDENCE_REVIEW)).thenReturn(actor);
@@ -78,6 +81,9 @@ class PartnerReviewServiceTest {
 
         releaseCase = mock(ReleaseCase.class);
         Plan plan = mock(Plan.class);
+        User planOwner = mock(User.class);
+        when(planOwner.getName()).thenReturn("작성자");
+        when(plan.getUser()).thenReturn(planOwner);
         Confirmer confirmer = mock(Confirmer.class);
         when(confirmer.getName()).thenReturn("확인자");
         evidence = mock(Evidence.class);
@@ -94,7 +100,7 @@ class PartnerReviewServiceTest {
         PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
                 PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "pw");
 
-        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request))
+        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PARTNER_NOT_ASSIGNED));
         verify(evidence, never()).approve();
@@ -108,7 +114,7 @@ class PartnerReviewServiceTest {
         PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
                 PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "pw");
 
-        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request))
+        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PARTNER_SCOPE_DENIED));
         verify(evidence, never()).approve();
@@ -120,7 +126,7 @@ class PartnerReviewServiceTest {
         PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
                 PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "correct-pw");
 
-        partnerReviewService.decide(REVIEW_ID, USER_ID, request);
+        partnerReviewService.decide(REVIEW_ID, USER_ID, request, null);
 
         verify(evidence).approve();
         verify(releaseCase).approveEvidenceAndStartWaiting(any());
@@ -135,7 +141,7 @@ class PartnerReviewServiceTest {
         PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
                 PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "wrong-pw");
 
-        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request))
+        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.REAUTH_FAILED));
 
@@ -150,7 +156,7 @@ class PartnerReviewServiceTest {
         PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
                 PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "pw");
 
-        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request))
+        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INSUFFICIENT_PERMISSION));
         verify(evidenceRepository, never()).findById(any());

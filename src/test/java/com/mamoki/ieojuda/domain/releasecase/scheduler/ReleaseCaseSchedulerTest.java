@@ -10,7 +10,6 @@ import com.mamoki.ieojuda.domain.plan.service.PlanSnapshotService;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
-import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCaseStatus;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.domain.stage.service.HandoverStageService;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,8 +63,7 @@ class ReleaseCaseSchedulerTest {
         when(releaseCase.getPlan()).thenReturn(plan);
         when(releaseCase.getPlanVersion()).thenReturn(planVersion);
 
-        when(releaseCaseRepository.findByStatusAndFrozenFalseAndWaitingEndsAtLessThanEqual(
-                any(ReleaseCaseStatus.class), any(LocalDateTime.class)))
+        when(releaseCaseRepository.findDueCasesForUpdateSkipLocked(any(LocalDateTime.class)))
                 .thenReturn(List.of(releaseCase));
         when(planSnapshotService.deserialize("{\"frozen\":true}")).thenReturn(snapshot);
 
@@ -89,8 +87,7 @@ class ReleaseCaseSchedulerTest {
         ReleaseCase releaseCase = mock(ReleaseCase.class);
         when(releaseCase.getPlan()).thenReturn(plan);
 
-        when(releaseCaseRepository.findByStatusAndFrozenFalseAndWaitingEndsAtLessThanEqual(
-                any(ReleaseCaseStatus.class), any(LocalDateTime.class)))
+        when(releaseCaseRepository.findDueCasesForUpdateSkipLocked(any(LocalDateTime.class)))
                 .thenReturn(List.of(releaseCase));
 
         scheduler.progressExpiredWaitingCases();

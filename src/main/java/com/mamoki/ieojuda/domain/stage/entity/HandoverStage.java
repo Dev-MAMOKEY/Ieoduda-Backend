@@ -47,6 +47,11 @@ public class HandoverStage {
     @Column(name = "confirmed_at")
     private LocalDateTime confirmedAt;
 
+    // 대체 담당자 전환·완료 처리가 동시에 들어오는 경우를 막기 위한 낙관적 잠금
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     @Builder
     public HandoverStage(Plan plan, Recipient recipient, Integer stageOrder) {
         this.plan = plan;

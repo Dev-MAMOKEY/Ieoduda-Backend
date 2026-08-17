@@ -12,6 +12,7 @@ import com.mamoki.ieojuda.domain.plan.repository.PlanVersionRepository;
 import com.mamoki.ieojuda.domain.plan.service.PlanSnapshotService;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
+import com.mamoki.ieojuda.global.idempotency.service.IdempotencyGuard;
 import com.mamoki.ieojuda.global.ratelimit.PublicLinkAuditor;
 import com.mamoki.ieojuda.global.ratelimit.TokenLookupGuard;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +40,7 @@ class DeathReportServiceTest {
     private TokenLookupGuard tokenLookupGuard;
     private PublicLinkAuditor publicLinkAuditor;
     private PlanSnapshotService planSnapshotService;
+    private IdempotencyGuard idempotencyGuard;
     private DeathReportService deathReportService;
 
     @BeforeEach
@@ -50,9 +52,10 @@ class DeathReportServiceTest {
         tokenLookupGuard = mock(TokenLookupGuard.class);
         publicLinkAuditor = mock(PublicLinkAuditor.class);
         planSnapshotService = mock(PlanSnapshotService.class);
+        idempotencyGuard = mock(IdempotencyGuard.class);
         deathReportService = new DeathReportService(
                 confirmerRepository, releaseCaseRepository, planVersionRepository,
-                tokenLookupGuard, publicLinkAuditor, planSnapshotService);
+                tokenLookupGuard, publicLinkAuditor, planSnapshotService, idempotencyGuard);
 
         // TokenLookupGuard는 issue #55에서 추가된 조회 래퍼 - 실제 구현처럼 supplier를 그대로 실행해
         // confirmerRepository.findByInviteToken(...) 목 설정이 기존과 동일하게 동작하도록 위임한다.
@@ -89,9 +92,9 @@ class DeathReportServiceTest {
         when(planSnapshotService.hash("{\"planId\":1}")).thenReturn("deadbeef");
 
         when(planVersionRepository.save(any(PlanVersion.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(releaseCaseRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(releaseCaseRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        deathReportService.report("token-a", new DeathReportRequest(LocalDate.of(2026, 8, 15)));
+        deathReportService.report("token-a", new DeathReportRequest(LocalDate.of(2026, 8, 15)), null);
 
         ArgumentCaptor<PlanVersion> versionCaptor = ArgumentCaptor.forClass(PlanVersion.class);
         verify(planVersionRepository).save(versionCaptor.capture());

@@ -5,7 +5,6 @@ import com.mamoki.ieojuda.domain.plan.service.PlanSnapshotService;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
-import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCaseStatus;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.domain.stage.service.HandoverStageService;
 import lombok.RequiredArgsConstructor;
@@ -33,11 +32,13 @@ public class ReleaseCaseScheduler {
     private final HandoverStageService handoverStageService;
 
     // 10분마다 - 대기기간이 긴(일 단위) 도메인 특성상 촘촘한 주기가 필요하지 않음
+    // FOR UPDATE SKIP LOCKED로 조회하므로, 다중 인스턴스가 동시에 돌아도 각 인스턴스는
+    // 서로 다른 사건만 잠가서 처리한다 - 같은 사건이 중복으로 발송되지 않는다(issue #57).
     @Scheduled(fixedRate = 600_000)
     @Transactional
     public void progressExpiredWaitingCases() {
         List<ReleaseCase> dueCases = releaseCaseRepository
-                .findByStatusAndFrozenFalseAndWaitingEndsAtLessThanEqual(ReleaseCaseStatus.WAITING, LocalDateTime.now());
+                .findDueCasesForUpdateSkipLocked(LocalDateTime.now());
 
         for (ReleaseCase releaseCase : dueCases) {
             progressCase(releaseCase);
