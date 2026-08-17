@@ -65,7 +65,6 @@ public enum ErrorCode {
     ROLE_PACKAGE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "ROLE_PACKAGE_ACCESS_DENIED", "본인의 역할 패키지가 아니거나 권한이 없는 요청입니다."),
     REVIEWER_CONFLICT_OF_INTEREST(HttpStatus.FORBIDDEN, "REVIEWER_CONFLICT_OF_INTEREST", "이해충돌 또는 권한 만료로 다른 검토자에게 재배정이 필요합니다."),
     INSUFFICIENT_PERMISSION(HttpStatus.FORBIDDEN, "INSUFFICIENT_PERMISSION", "이 작업을 수행할 세부 권한이 없습니다."),
-    PARTNER_SCOPE_DENIED(HttpStatus.FORBIDDEN, "PARTNER_SCOPE_DENIED", "소속 파트너사에 배정되지 않은 증빙·사건입니다."),
     ACCOUNT_SUSPENDED(HttpStatus.FORBIDDEN, "ACCOUNT_SUSPENDED", "정지된 계정입니다."),
 
     // 리소스 없음 (404)
@@ -82,7 +81,6 @@ public enum ErrorCode {
     DISPUTE_CONTACT_NOT_FOUND(HttpStatus.NOT_FOUND, "DISPUTE_CONTACT_NOT_FOUND", "해당 이의 제기 연락처가 존재하지 않습니다."),
     HANDOVER_STAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "HANDOVER_STAGE_NOT_FOUND", "해당 인계 단계가 존재하지 않습니다."),
     PARTNER_REVIEWER_NOT_FOUND(HttpStatus.NOT_FOUND, "PARTNER_REVIEWER_NOT_FOUND", "해당 파트너 검토자가 존재하지 않습니다."),
-    EXTERNAL_PARTNER_NOT_FOUND(HttpStatus.NOT_FOUND, "EXTERNAL_PARTNER_NOT_FOUND", "해당 외부 파트너사가 존재하지 않습니다."),
 
     // 상태 충돌 (409)
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "DUPLICATE_EMAIL", "이미 사용 중인 이메일입니다."),
@@ -97,7 +95,6 @@ public enum ErrorCode {
     DISPUTE_CONTACT_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "DISPUTE_CONTACT_RESEND_NOT_ALLOWED", "이미 검증이 완료된 연락처에는 검증 메일을 다시 보낼 수 없습니다."),
     ITEM_ORDER_CONFLICT(HttpStatus.CONFLICT, "ITEM_ORDER_CONFLICT", "순서 충돌이 있어 확정할 수 없습니다."),
     ORDER_NOT_CONFIRMED(HttpStatus.CONFLICT, "ORDER_NOT_CONFIRMED", "실행 순서가 아직 확정되지 않아 패키지를 봉인할 수 없습니다."),
-    PARTNER_NOT_ASSIGNED(HttpStatus.CONFLICT, "PARTNER_NOT_ASSIGNED", "이 사건에는 아직 담당 파트너사가 배정되지 않았습니다."),
     EVIDENCE_ALREADY_DELETED(HttpStatus.CONFLICT, "EVIDENCE_ALREADY_DELETED", "이미 삭제된 증빙입니다."),
     DUPLICATE_REQUEST(HttpStatus.CONFLICT, "DUPLICATE_REQUEST", "이미 처리 중이거나 처리된 요청입니다."),
     CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, "CONCURRENT_MODIFICATION", "다른 요청이 먼저 처리되어 현재 상태와 충돌합니다. 다시 시도해 주세요."),

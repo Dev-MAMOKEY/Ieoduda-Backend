@@ -32,7 +32,8 @@ import java.util.List;
 
 // 명세서 "외부 파트너 증빙 검토" 화면 - 외부 법무·장례 파트너 전용. 역할별 패키지(계획 내용)는 절대 노출하지 않는다.
 // reviewId는 evidenceId와 1:1로 취급한다(증빙 1건 = 검토 1건).
-// issue #59 - EVIDENCE_REVIEW 세부 권한 + 소속 파트너사가 배정된 사건만 조작 가능(조직 경계) + 판정은 재인증 필요
+// issue #59 - EVIDENCE_REVIEW 세부 권한 + 판정은 재인증 필요. 배정/소속 개념은 폐지되어 EVIDENCE_REVIEW
+// 권한만 있으면 모든 증빙을 조회·다운로드·판정할 수 있다.
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -51,12 +52,10 @@ public class PartnerReviewService {
     public PartnerReviewResponse getReview(UUID userId, UUID reviewId) {
         permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
         Evidence evidence = findEvidence(reviewId);
-        requireAssignedPartner(findReviewerByUser(userId), evidence);
         return PartnerReviewResponse.from(evidence);
     }
 
-    // issue #87 - 목록은 배정된 파트너와 무관하게 EVIDENCE_REVIEW 권한만 있으면 전체를 조회한다.
-    // (getReview/getFile/decide의 조직 경계 검사는 그대로 유지, 목록에는 적용하지 않기로 결정)
+    // issue #87 - EVIDENCE_REVIEW 권한만 있으면 전체를 조회한다.
     public List<PartnerReviewListItemResponse> getReviews(UUID userId, EvidenceReviewStatus status) {
         permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
         return evidenceRepository.findAllByReviewStatus(status)
@@ -69,7 +68,6 @@ public class PartnerReviewService {
     public byte[] getFile(UUID userId, UUID reviewId) {
         permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
         Evidence evidence = findEvidence(reviewId);
-        requireAssignedPartner(findReviewerByUser(userId), evidence);
         return evidenceStorageClient.load(evidence.getStorageKey());
     }
 
@@ -83,7 +81,6 @@ public class PartnerReviewService {
         if (!Boolean.TRUE.equals(reviewer.getIsActive())) {
             throw new CustomException(ErrorCode.REVIEWER_CONFLICT_OF_INTEREST);
         }
-        requireAssignedPartner(reviewer, evidence);
 
         // 되돌리기 까다로운 고위험 조작이라 비밀번호 재확인 없이는 실행하지 않고, 성공/실패를 감사 로그에 남긴다.
         try {
@@ -123,18 +120,6 @@ public class PartnerReviewService {
         adminActionAuditService.record(actor, AdminActionType.EVIDENCE_DECISION, reviewId, true,
                 request.decision().name());
         return PartnerReviewResponse.from(evidence);
-    }
-
-    // issue #59 - 검토자 소속 파트너사와 사건에 배정된 파트너사가 같아야만 조작 가능. 아직 배정되지 않은
-    // 사건은 어떤 검토자도 손댈 수 없다(운영자 배정이 먼저 있어야 함).
-    private void requireAssignedPartner(PartnerReviewer reviewer, Evidence evidence) {
-        ReleaseCase releaseCase = evidence.getReleaseCase();
-        if (releaseCase.getAssignedPartner() == null) {
-            throw new CustomException(ErrorCode.PARTNER_NOT_ASSIGNED);
-        }
-        if (!releaseCase.getAssignedPartner().getPartnerId().equals(reviewer.getPartner().getPartnerId())) {
-            throw new CustomException(ErrorCode.PARTNER_SCOPE_DENIED);
-        }
     }
 
     // getReview/getFile/decide 세 경로가 모두 이 메서드를 거치므로, 원본이 이미 삭제된 증빙을
