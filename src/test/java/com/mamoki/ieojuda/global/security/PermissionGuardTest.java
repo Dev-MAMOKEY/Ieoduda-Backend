@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -29,31 +30,34 @@ class PermissionGuardTest {
 
     @Test
     void require_whenUserHasThePermission_returnsTheUser() {
+        UUID userId = UUID.randomUUID();
         User admin = mock(User.class);
         when(admin.hasPermission(AdminPermission.CASE_SUPERVISE)).thenReturn(true);
-        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(admin));
 
-        User result = permissionGuard.require(1L, AdminPermission.CASE_SUPERVISE);
+        User result = permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
 
         assertThat(result).isSameAs(admin);
     }
 
     @Test
     void require_whenUserLacksThePermission_throwsInsufficientPermission() {
+        UUID userId = UUID.randomUUID();
         User admin = mock(User.class);
         when(admin.hasPermission(AdminPermission.CASE_SUPERVISE)).thenReturn(false);
-        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(admin));
 
-        assertThatThrownBy(() -> permissionGuard.require(1L, AdminPermission.CASE_SUPERVISE))
+        assertThatThrownBy(() -> permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INSUFFICIENT_PERMISSION));
     }
 
     @Test
     void require_whenUserDoesNotExist_throwsUserNotFound() {
-        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+        UUID userId = UUID.randomUUID();
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> permissionGuard.require(99L, AdminPermission.AUDIT_VIEW))
+        assertThatThrownBy(() -> permissionGuard.require(userId, AdminPermission.AUDIT_VIEW))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.USER_NOT_FOUND));
     }

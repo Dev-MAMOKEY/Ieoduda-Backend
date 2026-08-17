@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -45,15 +46,16 @@ class EvidenceDeletionServiceTest {
 
     @Test
     void getStatus_afterSchedulerMarkedDeleted_exposesActualDeletionTimestamp() {
+        UUID evidenceId = UUID.randomUUID();
         Evidence evidence = Evidence.builder()
                 .confirmer(mock(Confirmer.class)).plan(mock(Plan.class)).releaseCase(mock(ReleaseCase.class))
                 .storageKey("evidence/7/proof.pdf").fileName("proof.pdf").mimeType("application/pdf")
                 .integrityHash("hash-xyz").evidenceType(EvidenceType.DEATH_CERTIFICATE).build();
         evidence.approve();
         evidence.markDeleted(); // 스케줄러가 실제로 지운 상황을 재현
-        when(evidenceRepository.findById(7L)).thenReturn(Optional.of(evidence));
+        when(evidenceRepository.findById(evidenceId)).thenReturn(Optional.of(evidence));
 
-        EvidenceDeletionStatusResponse response = evidenceDeletionService.getStatus(1L, 7L);
+        EvidenceDeletionStatusResponse response = evidenceDeletionService.getStatus(UUID.randomUUID(), evidenceId);
 
         assertThat(response.deletedAt()).isNotNull();
         assertThat(response.integrityHash()).isEqualTo("hash-xyz");
@@ -64,14 +66,15 @@ class EvidenceDeletionServiceTest {
 
     @Test
     void getStatus_whenScheduledButNotYetDeleted_reportsOverdue() {
+        UUID evidenceId = UUID.randomUUID();
         Evidence evidence = Evidence.builder()
                 .confirmer(mock(Confirmer.class)).plan(mock(Plan.class)).releaseCase(mock(ReleaseCase.class))
                 .storageKey("evidence/8/proof.pdf").fileName("proof.pdf").mimeType("application/pdf")
                 .integrityHash("hash-old").evidenceType(EvidenceType.DEATH_CERTIFICATE).build();
         evidence.approve(); // deleteScheduledAt = 지금 + 30일... 이므로 아직 미래 - overdue 아님을 함께 확인
-        when(evidenceRepository.findById(8L)).thenReturn(Optional.of(evidence));
+        when(evidenceRepository.findById(evidenceId)).thenReturn(Optional.of(evidence));
 
-        EvidenceDeletionStatusResponse response = evidenceDeletionService.getStatus(1L, 8L);
+        EvidenceDeletionStatusResponse response = evidenceDeletionService.getStatus(UUID.randomUUID(), evidenceId);
 
         assertThat(response.deletedAt()).isNull();
         assertThat(response.overdue()).isFalse();

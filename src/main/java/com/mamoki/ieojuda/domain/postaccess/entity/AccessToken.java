@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
 import java.time.LocalDateTime;
 
 @Entity
@@ -20,9 +21,9 @@ public class AccessToken {
     public static final int SESSION_TTL_MINUTES = 60;
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "token_id")
-    private Long tokenId;
+    private UUID tokenId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "stage_id", nullable = false)

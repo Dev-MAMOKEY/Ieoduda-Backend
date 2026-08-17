@@ -20,6 +20,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 // Authorization: Bearer {AT} 헤더를 검증해서 SecurityContext에 인증 정보(principal = userId)를 채운다.
 // 여기서 던져지는 ExpiredJwtException/JwtException은 GlobalExceptionHandler(컨트롤러 이후 계층)가 못 잡으므로
@@ -54,7 +55,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return;
                 }
 
-                Long userId = jwtTokenProvider.getUserId(token);
+                UUID userId = jwtTokenProvider.getUserId(token);
                 Integer tokenVersion = jwtTokenProvider.getTokenVersion(token);
 
                 User user = userRepository.findById(userId).orElse(null);

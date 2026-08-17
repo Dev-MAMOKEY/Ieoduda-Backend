@@ -23,6 +23,7 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.ServerSideEncryption;
 
+import java.util.UUID;
 import java.util.function.Supplier;
 
 // issue #51 - store/load/delete 각각 짧은 재시도+회로차단을 별도로 둔다. store는 사용자 대면 업로드
@@ -54,7 +55,7 @@ public class S3EvidenceStorageClient implements EvidenceStorageClient {
     }
 
     @Override
-    public StoredEvidence store(Long caseId, EvidenceUpload upload) {
+    public StoredEvidence store(UUID caseId, EvidenceUpload upload) {
         String storageKey = StorageKeyGenerator.generate(caseId, upload.mimeType());
 
         try {

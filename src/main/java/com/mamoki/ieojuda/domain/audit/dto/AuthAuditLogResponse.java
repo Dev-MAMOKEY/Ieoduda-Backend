@@ -3,10 +3,11 @@ package com.mamoki.ieojuda.domain.audit.dto;
 import com.mamoki.ieojuda.domain.audit.entity.AuthAuditEventType;
 import com.mamoki.ieojuda.domain.audit.entity.AuthAuditLog;
 
+import java.util.UUID;
 import java.time.LocalDateTime;
 
 public record AuthAuditLogResponse(
-        Long logId,
+        UUID logId,
         String email,
         String ipAddress,
         AuthAuditEventType eventType,

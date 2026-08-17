@@ -10,6 +10,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
 import java.time.LocalDateTime;
 
 @Entity
@@ -19,9 +20,9 @@ import java.time.LocalDateTime;
 public class Evidence {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "evidence_id")
-    private Long evidenceId;
+    private UUID evidenceId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "confirm_id", nullable = false)

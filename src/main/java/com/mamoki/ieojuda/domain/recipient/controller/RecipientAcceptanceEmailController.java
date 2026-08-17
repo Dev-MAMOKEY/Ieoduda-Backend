@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.recipient.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientAcceptanceEmailResponse;
 import com.mamoki.ieojuda.domain.recipient.service.RecipientService;
 import com.mamoki.ieojuda.global.rsdata.RsData;
@@ -26,8 +28,8 @@ public class RecipientAcceptanceEmailController {
     @Operation(summary = "역할 수락 요청 다시 보내기", description = "만료되었거나 아직 응답하지 않은 담당자에게 수락 이메일을 재발송합니다. 이미 수락하거나 거절한 담당자에게는 재발송할 수 없습니다.")
     @PostMapping("/{recipientId}/acceptance-email")
     public ResponseEntity<RsData<RecipientAcceptanceEmailResponse>> resendAcceptanceEmail(
-            @AuthenticationPrincipal Long userId, // 현재 로그인한 사용자 ID 식별
-            @Parameter(description = "담당자 ID") @PathVariable Long recipientId
+            @AuthenticationPrincipal UUID userId, // 현재 로그인한 사용자 ID 식별
+            @Parameter(description = "담당자 ID") @PathVariable UUID recipientId
     ) {
         RecipientAcceptanceEmailResponse result = recipientService.resendAcceptanceEmail(userId, recipientId);
         return ResponseEntity.ok(RsData.success(result));

@@ -17,6 +17,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -29,8 +30,8 @@ import static org.mockito.Mockito.when;
 
 class PlanServiceTest {
 
-    private static final Long USER_ID = 1L;
-    private static final Long PLAN_ID = 1L;
+    private static final UUID USER_ID = UUID.randomUUID();
+    private static final UUID PLAN_ID = UUID.randomUUID();
 
     private PlanRepository planRepository;
     private Plan plan;

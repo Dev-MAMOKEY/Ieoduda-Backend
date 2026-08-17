@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.postaccess.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.postaccess.dto.PackageActionResponse;
 import com.mamoki.ieojuda.domain.postaccess.dto.PackageIssueRequest;
 import com.mamoki.ieojuda.domain.postaccess.dto.PackageIssueResponse;
@@ -42,7 +44,7 @@ public class PosthumousPackageController {
     @PostMapping("/{accessSessionId}/actions/{actionId}/complete")
     public ResponseEntity<RsData<PackageActionResponse>> completeAction(
             @Parameter(description = "열람 세션 식별자") @PathVariable String accessSessionId,
-            @Parameter(description = "완료할 행동(항목) ID") @PathVariable Long actionId,
+            @Parameter(description = "완료할 행동(항목) ID") @PathVariable UUID actionId,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
     ) {
         return ResponseEntity.ok(RsData.success(

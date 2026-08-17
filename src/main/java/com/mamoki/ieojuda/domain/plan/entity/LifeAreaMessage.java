@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 @Entity
 @Table(name = "life_area_messages")
 @Getter
@@ -14,9 +16,9 @@ import lombok.NoArgsConstructor;
 public class LifeAreaMessage extends BaseCreatedAtEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "message_id")
-    private Long messageId;
+    private UUID messageId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "conversation_id", nullable = false)

@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.partner.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
 import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.audit.entity.AdminActionType;
@@ -37,7 +39,7 @@ public class PartnerReviewService {
     private final AdminActionAuditService adminActionAuditService;
     private final IdempotencyGuard idempotencyGuard;
 
-    public PartnerReviewResponse getReview(Long userId, Long reviewId) {
+    public PartnerReviewResponse getReview(UUID userId, UUID reviewId) {
         permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
         Evidence evidence = findEvidence(reviewId);
         requireAssignedPartner(findReviewerByUser(userId), evidence);
@@ -45,7 +47,7 @@ public class PartnerReviewService {
     }
 
     // 증빙 원본 다운로드 - JSON 응답에 바이너리를 섞지 않기 위해 별도 엔드포인트로 분리
-    public byte[] getFile(Long userId, Long reviewId) {
+    public byte[] getFile(UUID userId, UUID reviewId) {
         permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
         Evidence evidence = findEvidence(reviewId);
         requireAssignedPartner(findReviewerByUser(userId), evidence);
@@ -53,7 +55,7 @@ public class PartnerReviewService {
     }
 
     @Transactional
-    public PartnerReviewResponse decide(Long reviewId, Long userId, PartnerReviewDecisionRequest request, String idempotencyKey) {
+    public PartnerReviewResponse decide(UUID reviewId, UUID userId, PartnerReviewDecisionRequest request, String idempotencyKey) {
         User actor = permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
         Evidence evidence = findEvidence(reviewId);
         PartnerReviewer reviewer = findReviewerByUser(userId);
@@ -113,7 +115,7 @@ public class PartnerReviewService {
     // getReview/getFile/decide 세 경로가 모두 이 메서드를 거치므로, 원본이 이미 삭제된 증빙을
     // 여기서 한 번에 막는다. 원본 삭제 후 승인/반려를 허용하면 존재하지 않는 파일을 판정하는
     // 정합성 결함이 생기고, 다운로드는 지금까지 S3까지 갔다가 404로 새고 있었다.
-    private Evidence findEvidence(Long reviewId) {
+    private Evidence findEvidence(UUID reviewId) {
         Evidence evidence = evidenceRepository.findById(reviewId)
                 .orElseThrow(() -> new CustomException(ErrorCode.EVIDENCE_NOT_FOUND));
         if (evidence.getDeletedAt() != null) {
@@ -122,7 +124,7 @@ public class PartnerReviewService {
         return evidence;
     }
 
-    private PartnerReviewer findReviewerByUser(Long userId) {
+    private PartnerReviewer findReviewerByUser(UUID userId) {
         return partnerReviewerRepository.findByUser_UserId(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PARTNER_REVIEWER_NOT_FOUND));
     }

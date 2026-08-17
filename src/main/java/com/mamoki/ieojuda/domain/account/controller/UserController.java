@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.account.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.account.dto.ConsentResponse;
 import com.mamoki.ieojuda.domain.account.dto.UserResponse;
 import com.mamoki.ieojuda.domain.account.dto.UserUpdateRequest;
@@ -30,14 +32,14 @@ public class UserController {
 
     @Operation(summary = "내 정보 조회")
     @GetMapping
-    public ResponseEntity<RsData<UserResponse>> getMe(@AuthenticationPrincipal Long userId) {
+    public ResponseEntity<RsData<UserResponse>> getMe(@AuthenticationPrincipal UUID userId) {
         return ResponseEntity.ok(RsData.success(userService.getMe(userId)));
     }
 
     @Operation(summary = "이메일/이름 변경")
     @PutMapping
     public ResponseEntity<RsData<UserResponse>> update(
-            @AuthenticationPrincipal Long userId,
+            @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody UserUpdateRequest request
     ) {
         return ResponseEntity.ok(RsData.success(userService.updateProfile(userId, request)));
@@ -45,19 +47,19 @@ public class UserController {
 
     @Operation(summary = "필수 동의 상태 조회", description = "\"사후 인계 안내\" 화면의 필수 동의를 완료했는지 조회합니다.")
     @GetMapping("/consent")
-    public ResponseEntity<RsData<ConsentResponse>> getConsent(@AuthenticationPrincipal Long userId) {
+    public ResponseEntity<RsData<ConsentResponse>> getConsent(@AuthenticationPrincipal UUID userId) {
         return ResponseEntity.ok(RsData.success(userService.getConsentStatus(userId)));
     }
 
     @Operation(summary = "필수 동의", description = "\"사후 인계 안내\" 화면의 필수 동의를 완료합니다. 동의 전에는 다른 API를 호출할 수 없습니다.")
     @PostMapping("/consent")
-    public ResponseEntity<RsData<ConsentResponse>> agree(@AuthenticationPrincipal Long userId) {
+    public ResponseEntity<RsData<ConsentResponse>> agree(@AuthenticationPrincipal UUID userId) {
         return ResponseEntity.ok(RsData.success(userService.agree(userId)));
     }
 
     @Operation(summary = "계정 삭제", description = "계정과 계획(대화·항목·담당자 등) 데이터를 영구 삭제합니다. 되돌릴 수 없습니다.")
     @DeleteMapping
-    public ResponseEntity<RsData<Void>> delete(@AuthenticationPrincipal Long userId) {
+    public ResponseEntity<RsData<Void>> delete(@AuthenticationPrincipal UUID userId) {
         userService.deleteAccount(userId);
         return ResponseEntity.ok(RsData.success(null));
     }

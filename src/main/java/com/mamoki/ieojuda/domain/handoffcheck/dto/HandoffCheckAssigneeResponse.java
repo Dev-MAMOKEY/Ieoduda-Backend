@@ -1,12 +1,14 @@
 package com.mamoki.ieojuda.domain.handoffcheck.dto;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 // "선택형 생전 인계 점검" 화면 - 역할 담당자 한 명당 박스 하나
 public record HandoffCheckAssigneeResponse(
-        @Schema(description = "담당자 ID") Long assigneeId,
+        @Schema(description = "담당자 ID") UUID assigneeId,
         @Schema(description = "담당자 이름") String name,
         @Schema(description = "역할 유형", example = "RELATIONSHIP_MANAGER", allowableValues = {"FAMILY_MANAGER", "WORK_MANAGER", "RELATIONSHIP_MANAGER"}) String roleType,
         @Schema(description = "수락 요청 이메일 발송 완료 여부") boolean isEmailSent,

@@ -29,6 +29,7 @@ import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -46,6 +47,9 @@ import static org.mockito.Mockito.when;
 // issue #78 - HandoverStage.complete()가 정의만 되고 호출되지 않아 발송 체인이 1단계에서 멈추던 문제.
 // "전부 완료 -> 다음 단계 발송 -> 마지막이면 사건 완료", "BLOCKED는 다음 단계를 열지 않는다"를 검증한다.
 class HandoverStageServiceTest {
+
+    private static final UUID STAGE_ID = UUID.randomUUID();
+    private static final UUID CASE_ID = UUID.randomUUID();
 
     private ReleaseCaseRepository releaseCaseRepository;
     private HandoverStageRepository handoverStageRepository;
@@ -83,7 +87,7 @@ class HandoverStageServiceTest {
         Plan plan = mock(Plan.class);
         PlanVersion planVersion = mock(PlanVersion.class);
         releaseCase = ReleaseCase.builder().plan(plan).planVersion(planVersion).build();
-        setId(releaseCase, "caseId", 2L);
+        setId(releaseCase, "caseId", CASE_ID);
 
         Recipient recipient = mock(Recipient.class);
         when(recipient.getEmail()).thenReturn("target@test.com");
@@ -91,7 +95,7 @@ class HandoverStageServiceTest {
         currentStage.assignToCase(releaseCase);
         currentStage.send(); // 활성 발송 상태(SENT)에서 시작
 
-        when(handoverStageRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(currentStage));
+        when(handoverStageRepository.findByIdForUpdate(STAGE_ID)).thenReturn(Optional.of(currentStage));
     }
 
     // 버그 회귀 방지(#79) - 이메일 링크에 박힌 평문 토큰이, 실제로 AccessToken 테이블에 그 해시로
@@ -107,7 +111,7 @@ class HandoverStageServiceTest {
         assertThat(tokenCaptor.getValue().getTokenHash()).isEqualTo(expectedHash);
     }
 
-    private void setId(Object entity, String fieldName, Long id) {
+    private void setId(Object entity, String fieldName, UUID id) {
         try {
             var field = entity.getClass().getDeclaredField(fieldName);
             field.setAccessible(true);
@@ -146,9 +150,9 @@ class HandoverStageServiceTest {
 
     @Test
     void completeStageIfAllActionsDone_whenNotAllCompleted_doesNothing() {
-        when(packageActionCompletionRepository.countByHandoverStage_StageId(1L)).thenReturn(1L);
+        when(packageActionCompletionRepository.countByHandoverStage_StageId(STAGE_ID)).thenReturn(1L);
 
-        handoverStageService.completeStageIfAllActionsDone(1L, 3);
+        handoverStageService.completeStageIfAllActionsDone(STAGE_ID, 3);
 
         assertThat(currentStage.getStatus()).isNotEqualTo(HandoverStageStatus.COMPLETED);
         verify(emailOutboxService, never()).enqueue(any(), any(), any(), anyString(), any());
@@ -156,7 +160,7 @@ class HandoverStageServiceTest {
 
     @Test
     void completeStageIfAllActionsDone_whenAllCompletedAndNextExists_completesAndDispatchesNext() {
-        when(packageActionCompletionRepository.countByHandoverStage_StageId(1L)).thenReturn(2L);
+        when(packageActionCompletionRepository.countByHandoverStage_StageId(STAGE_ID)).thenReturn(2L);
 
         Recipient nextRecipient = mock(Recipient.class);
         when(nextRecipient.getEmail()).thenReturn("next@test.com");
@@ -166,7 +170,7 @@ class HandoverStageServiceTest {
         when(handoverStageRepository.findFirstByReleaseCase_CaseIdAndStageOrderGreaterThanOrderByStageOrderAsc(any(), eq(0)))
                 .thenReturn(Optional.of(nextStage));
 
-        handoverStageService.completeStageIfAllActionsDone(1L, 2);
+        handoverStageService.completeStageIfAllActionsDone(STAGE_ID, 2);
 
         assertThat(currentStage.getStatus()).isEqualTo(HandoverStageStatus.COMPLETED);
         assertThat(nextStage.getStatus()).isEqualTo(HandoverStageStatus.PENDING); // 아직 발송은 워커가 처리 전
@@ -185,11 +189,11 @@ class HandoverStageServiceTest {
 
     @Test
     void completeStageIfAllActionsDone_whenLastStage_completesReleaseCase() {
-        when(packageActionCompletionRepository.countByHandoverStage_StageId(1L)).thenReturn(1L);
+        when(packageActionCompletionRepository.countByHandoverStage_StageId(STAGE_ID)).thenReturn(1L);
         when(handoverStageRepository.findFirstByReleaseCase_CaseIdAndStageOrderGreaterThanOrderByStageOrderAsc(any(), any()))
                 .thenReturn(Optional.empty());
 
-        handoverStageService.completeStageIfAllActionsDone(1L, 1);
+        handoverStageService.completeStageIfAllActionsDone(STAGE_ID, 1);
 
         assertThat(currentStage.getStatus()).isEqualTo(HandoverStageStatus.COMPLETED);
         assertThat(releaseCase.getStatus()).isEqualTo(ReleaseCaseStatus.COMPLETED);
@@ -200,9 +204,9 @@ class HandoverStageServiceTest {
     @Test
     void completeStageIfAllActionsDone_whenAlreadyCompleted_doesNotDispatchAgain() {
         currentStage.complete(); // 동시 요청으로 이미 처리된 상황을 재현
-        when(packageActionCompletionRepository.countByHandoverStage_StageId(1L)).thenReturn(1L);
+        when(packageActionCompletionRepository.countByHandoverStage_StageId(STAGE_ID)).thenReturn(1L);
 
-        handoverStageService.completeStageIfAllActionsDone(1L, 1);
+        handoverStageService.completeStageIfAllActionsDone(STAGE_ID, 1);
 
         verify(emailOutboxService, never()).enqueue(any(), any(), any(), anyString(), any());
         verify(handoverStageRepository, never())
@@ -213,9 +217,9 @@ class HandoverStageServiceTest {
     @Test
     void completeStageIfAllActionsDone_whenStageBlocked_doesNotOpenNextStage() {
         currentStage.block();
-        when(packageActionCompletionRepository.countByHandoverStage_StageId(1L)).thenReturn(1L);
+        when(packageActionCompletionRepository.countByHandoverStage_StageId(STAGE_ID)).thenReturn(1L);
 
-        handoverStageService.completeStageIfAllActionsDone(1L, 1);
+        handoverStageService.completeStageIfAllActionsDone(STAGE_ID, 1);
 
         assertThat(currentStage.getStatus()).isEqualTo(HandoverStageStatus.BLOCKED);
         verify(emailOutboxService, never()).enqueue(any(), any(), any(), anyString(), any());
@@ -245,7 +249,7 @@ class HandoverStageServiceTest {
     // issue #79 완료 조건 - "대체 담당자는 기존 문구를 그대로 받는다" + 링크만 사후 인증 화면으로 교체
     @Test
     void fallback_sendsFallbackWordingUnchangedButWithPosthumousAccessLink() {
-        Long userId = 1L, caseId = 2L, stageId = 3L;
+        UUID userId = UUID.randomUUID(), caseId = UUID.randomUUID(), stageId = UUID.randomUUID();
         when(permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE)).thenReturn(null);
         when(releaseCaseRepository.findById(caseId)).thenReturn(Optional.of(releaseCase));
         currentStage.assignToCase(releaseCase);

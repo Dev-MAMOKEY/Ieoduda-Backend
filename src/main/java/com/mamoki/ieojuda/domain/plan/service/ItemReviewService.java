@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.plan.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.plan.dto.ItemReviewRequest;
 import com.mamoki.ieojuda.domain.plan.dto.ItemResponse;
 import com.mamoki.ieojuda.domain.plan.dto.ItemUpdateRequest;
@@ -23,12 +25,12 @@ public class ItemReviewService {
     private final PlanOwnershipReader planOwnershipReader;
 
     // 항목 단건 조회
-    public ItemResponse getItem(Long userId, Long planId, Long itemId) {
+    public ItemResponse getItem(UUID userId, UUID planId, UUID itemId) {
         return ItemResponse.from(findItem(userId, planId, itemId));
     }
 
     @Transactional
-    public ItemResponse approve(Long userId, Long planId, ItemReviewRequest request) {
+    public ItemResponse approve(UUID userId, UUID planId, ItemReviewRequest request) {
         Item item = findItem(userId, planId, request.itemId());
 
         // 명세서 예외 처리: 원문 근거 없는 항목은 승인할 수 없음
@@ -42,14 +44,14 @@ public class ItemReviewService {
 
     // "삭제" 버튼 - 기각(상태만 변경) 대신 항목을 DB에서 완전히 제거
     @Transactional
-    public void delete(Long userId, Long planId, Long itemId) {
+    public void delete(UUID userId, UUID planId, UUID itemId) {
         Item item = findItem(userId, planId, itemId);
         itemRepository.delete(item);
     }
 
     // 대화창 인라인 "수정" 버튼 - AI가 만든 초안을 사용자가 직접 고쳐서 저장 (대화 화면 전환 없이 처리)
     @Transactional
-    public ItemResponse update(Long userId, Long planId, Long itemId, ItemUpdateRequest request) {
+    public ItemResponse update(UUID userId, UUID planId, UUID itemId, ItemUpdateRequest request) {
         Item item = findItem(userId, planId, itemId);
 
         DisclosureScope disclosureScope;
@@ -72,7 +74,7 @@ public class ItemReviewService {
         return ItemResponse.from(item);
     }
 
-    private Item findItem(Long userId, Long planId, Long itemId) {
+    private Item findItem(UUID userId, UUID planId, UUID itemId) {
         planOwnershipReader.findOwnedPlan(userId, planId);
         Item item = itemRepository.findById(itemId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ITEM_NOT_FOUND));

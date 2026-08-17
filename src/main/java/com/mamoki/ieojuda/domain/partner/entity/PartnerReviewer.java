@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 @Entity
 @Table(name = "partner_reviewers")
 @Getter
@@ -14,9 +16,9 @@ import lombok.NoArgsConstructor;
 public class PartnerReviewer {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "reviewer_id")
-    private Long reviewerId;
+    private UUID reviewerId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "partner_id", nullable = false)

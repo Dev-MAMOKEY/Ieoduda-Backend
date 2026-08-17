@@ -1,11 +1,13 @@
 package com.mamoki.ieojuda.domain.recipient.dto;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 // 역할 수락 요청 재전송 결과
 public record RecipientAcceptanceEmailResponse(
-        @Schema(description = "담당자 ID") Long recipientId,
+        @Schema(description = "담당자 ID") UUID recipientId,
         @Schema(description = "담당자 이메일") String email,
         @Schema(description = "수락 상태", example = "PENDING", allowableValues = {"PENDING", "ACCEPTED", "DECLINED", "EXPIRED"}) String acceptanceStatus,
         @Schema(description = "역할 수락 이메일 발송 성공 여부") boolean emailSent,

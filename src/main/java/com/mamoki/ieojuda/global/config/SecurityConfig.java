@@ -40,11 +40,19 @@ public class SecurityConfig {
             // 이메일 링크를 클릭해서 접근하는 검증 엔드포인트 - 로그인 상태가 아니므로 인증 요구하지 않음
             "/api/self-warning-email/**",
             "/api/dispute-contacts/*/verify",
-            "/api/dispute-contacts/*/objections", // 이의 제기 접수
+            "/api/release-cases/*/disputes", // 이의 제기 접수 (초대 토큰이 곧 인증)
+            "/api/release-cases/*/evidence/**", // 증빙 제출 (초대 토큰이 곧 인증)
             "/api/recipient-acceptances/**",// 역할 담당자 수락
-            "/api/confirmer-acceptances/**", // 지정확인자 수락 / 사망 신고 / 증빙 제출
+            "/api/confirmer-acceptances/**", // 지정확인자 수락 / 사망 신고
             "/api/posthumous-access/**", // 사후 인계 링크 검증 / OTP 발송·확인
             "/api/posthumous-packages/**" // 역할별 사후 패키지 조회 / 행동 완료 / 문제 신고 (열람 세션이 곧 인증)
+    };
+
+    // 로그인한 작성자 본인 - 자기 계획의 대기 상태 조회 / 취소 (ADMIN_ONLY_PATHS의 /api/release-cases/**보다
+    // 먼저 매칭되어야 하므로 filterChain에서 ADMIN_ONLY_PATHS 검사 앞에 등록한다)
+    private static final String[] AUTHENTICATED_RELEASE_CASE_PATHS = {
+            "/api/release-cases/*/waiting",
+            "/api/release-cases/*/cancel"
     };
 
     // 운영관리자 전용 - 이메일 발송 감사/재시도/사건 동결/단계 조회·대체담당자 전환
@@ -76,8 +84,8 @@ public class SecurityConfig {
                 new RateLimitRule("login", "/auth/login", "POST", 10, Duration.ofMinutes(15)),
                 new RateLimitRule("refresh", "/auth/refresh", "POST", 20, Duration.ofMinutes(15)),
                 new RateLimitRule("death-report", "/api/confirmer-acceptances/*/death-report", "POST", 10, Duration.ofHours(1)),
-                new RateLimitRule("evidence-submit", "/api/confirmer-acceptances/*/evidences", "POST", 10, Duration.ofHours(1)),
-                new RateLimitRule("objection", "/api/dispute-contacts/*/objections", "POST", 10, Duration.ofHours(1)),
+                new RateLimitRule("evidence-submit", "/api/release-cases/*/evidence/submit", "POST", 10, Duration.ofHours(1)),
+                new RateLimitRule("objection", "/api/release-cases/*/disputes", "POST", 10, Duration.ofHours(1)),
                 new RateLimitRule("dispute-verify", "/api/dispute-contacts/*/verify", null, 20, Duration.ofHours(1)),
                 new RateLimitRule("self-warning-email", "/api/self-warning-email/**", null, 20, Duration.ofHours(1)),
                 new RateLimitRule("posthumous-otp", "/api/posthumous-access/*/otp", "POST", 5, Duration.ofHours(1)),
@@ -132,6 +140,7 @@ public class SecurityConfig {
                 .formLogin(formLogin -> formLogin.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PERMIT_ALL_PATHS).permitAll()
+                        .requestMatchers(AUTHENTICATED_RELEASE_CASE_PATHS).authenticated()
                         .requestMatchers(ADMIN_ONLY_PATHS).hasRole("ADMIN")
                         .requestMatchers(ADMIN_OR_EXTERNAL_PATHS).hasAnyRole("ADMIN", "EXTERNAL")
                         .anyRequest().authenticated()

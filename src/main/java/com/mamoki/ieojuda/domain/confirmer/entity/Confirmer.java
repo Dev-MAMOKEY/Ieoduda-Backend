@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 
 
 import java.time.LocalDate;
+import java.util.UUID;
 import java.time.LocalDateTime;
 
 @Entity
@@ -19,9 +20,9 @@ import java.time.LocalDateTime;
 public class Confirmer {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "confirm_id")
-    private Long confirmId;
+    private UUID confirmId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "plan_id", nullable = false)

@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.stage.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.stage.dto.HandoverStageResponse;
 import com.mamoki.ieojuda.domain.stage.service.HandoverStageService;
 import com.mamoki.ieojuda.global.rsdata.RsData;
@@ -28,9 +30,9 @@ public class HandoverStageController {
     @Operation(summary = "단계 상태 조회", description = "현재 단계, 완료 조건, 남은 시간, 담당자 정보를 조회합니다.")
     @GetMapping
     public ResponseEntity<RsData<HandoverStageResponse>> getStage(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "사건 ID") @PathVariable Long caseId,
-            @Parameter(description = "단계 ID") @PathVariable Long stageId
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "사건 ID") @PathVariable UUID caseId,
+            @Parameter(description = "단계 ID") @PathVariable UUID stageId
     ) {
         return ResponseEntity.ok(RsData.success(handoverStageService.getStage(userId, caseId, stageId)));
     }
@@ -38,9 +40,9 @@ public class HandoverStageController {
     @Operation(summary = "대체 담당자 전환", description = "무응답·영구 반송·문제 신고 시 사전 등록된 대체 담당자로 전환하고 안내 메일을 발송합니다. 대체 담당자가 없으면 사건을 차단 상태로 유지합니다.")
     @PostMapping("/fallback")
     public ResponseEntity<RsData<HandoverStageResponse>> fallback(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "사건 ID") @PathVariable Long caseId,
-            @Parameter(description = "단계 ID") @PathVariable Long stageId
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "사건 ID") @PathVariable UUID caseId,
+            @Parameter(description = "단계 ID") @PathVariable UUID stageId
     ) {
         return ResponseEntity.ok(RsData.success(handoverStageService.fallback(userId, caseId, stageId)));
     }

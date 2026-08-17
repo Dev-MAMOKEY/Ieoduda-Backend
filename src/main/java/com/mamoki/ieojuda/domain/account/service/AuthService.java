@@ -145,7 +145,7 @@ public class AuthService {
     // AT는 만료 전까지 계속 유효하지만 tokenVersion 대조로 걸러진다 - 로그아웃 시 tokenVersion도 함께 올려서
     // 이미 발급된 Access Token도 즉시 폐기되게 한다.
     @Transactional
-    public void logout(Long userId) {
+    public void logout(UUID userId) {
         if (userId == null) {
             throw new CustomException(ErrorCode.TOKEN_INVALID);
         }

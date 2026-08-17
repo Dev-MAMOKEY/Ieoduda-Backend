@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.evidence.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
 import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
 import com.mamoki.ieojuda.domain.evidence.dto.EvidenceSubmitResponse;
@@ -60,7 +62,7 @@ public class EvidenceSubmitService {
     private final EvidenceOrphanCleanupService evidenceOrphanCleanupService;
 
     @Transactional
-    public EvidenceSubmitResponse submit(String plainToken, MultipartFile file, EvidenceType evidenceType, String idempotencyKey) {
+    public EvidenceSubmitResponse submit(UUID caseId, String plainToken, MultipartFile file, EvidenceType evidenceType, String idempotencyKey) {
         Confirmer confirmer = findByToken(plainToken);
         if (confirmer.getAcceptanceStatus() != AcceptanceStatus.ACCEPTED) {
             publicLinkAuditor.recordStateFailure(ErrorCode.FORBIDDEN);
@@ -69,13 +71,18 @@ public class EvidenceSubmitService {
         idempotencyGuard.claim("evidence-submit", idempotencyKey);
 
         Plan plan = confirmer.getPlan();
-        ReleaseCase releaseCase = releaseCaseRepository.findFirstByPlan_PlanIdOrderByCaseIdDesc(plan.getPlanId())
-                .orElseThrow(() -> new CustomException(ErrorCode.RELEASE_CASE_NOT_FOUND));
 
         // "개수 확인 후 저장" 사이에 다른 요청이 끼어들지 못하도록, 이 트랜잭션이 끝날 때까지
         // 같은 사건에 대한 다른 증빙 제출을 사건 행 잠금으로 직렬화한다.
-        releaseCase = releaseCaseRepository.findByIdForUpdate(releaseCase.getCaseId())
+        ReleaseCase releaseCase = releaseCaseRepository.findByIdForUpdate(caseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RELEASE_CASE_NOT_FOUND));
+
+        // URL의 caseId가 토큰이 가리키는 확인자의 사건과 실제로 같은지 검증 - 토큰은 유효하지만
+        // 다른 사건의 caseId를 끼워 넣는 시도를 막는다 (증빙이 엉뚱한 사건에 붙는 것을 방지).
+        if (!releaseCase.getPlan().getPlanId().equals(plan.getPlanId())) {
+            publicLinkAuditor.recordStateFailure(ErrorCode.FORBIDDEN);
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
 
         validateBasics(file);
         InspectionResult inspection = inspect(file);

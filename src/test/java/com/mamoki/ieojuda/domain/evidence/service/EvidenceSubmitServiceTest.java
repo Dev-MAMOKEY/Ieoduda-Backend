@@ -29,6 +29,7 @@ import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,6 +46,9 @@ import static org.mockito.Mockito.when;
 // issue "증빙 격리·검사" - 클라이언트가 보낸 Content-Type이 아니라 매직바이트로 실제 형식을 판별하고,
 // 악성코드 시그니처를 통과한 파일만 저장소에 올라가야 한다.
 class EvidenceSubmitServiceTest {
+
+    private static final UUID PLAN_ID = UUID.randomUUID();
+    private static final UUID CASE_ID = UUID.randomUUID();
 
     private ConfirmerRepository confirmerRepository;
     private ReleaseCaseRepository releaseCaseRepository;
@@ -86,17 +90,18 @@ class EvidenceSubmitServiceTest {
         confirmer = mock(Confirmer.class);
         when(confirmer.getAcceptanceStatus()).thenReturn(AcceptanceStatus.ACCEPTED);
         plan = mock(Plan.class);
-        when(plan.getPlanId()).thenReturn(1L);
+        when(plan.getPlanId()).thenReturn(PLAN_ID);
         when(confirmer.getPlan()).thenReturn(plan);
         when(confirmerRepository.findByInviteToken(any())).thenReturn(Optional.of(confirmer));
 
         releaseCase = mock(ReleaseCase.class);
-        when(releaseCase.getCaseId()).thenReturn(10L);
+        when(releaseCase.getCaseId()).thenReturn(CASE_ID);
         when(releaseCase.getStatus()).thenReturn(ReleaseCaseStatus.EVIDENCE_PENDING);
-        when(releaseCaseRepository.findFirstByPlan_PlanIdOrderByCaseIdDesc(1L)).thenReturn(Optional.of(releaseCase));
-        when(releaseCaseRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(releaseCase));
+        when(releaseCase.getPlan()).thenReturn(plan);
+        when(releaseCaseRepository.findFirstByPlan_PlanIdOrderByCaseIdDesc(PLAN_ID)).thenReturn(Optional.of(releaseCase));
+        when(releaseCaseRepository.findByIdForUpdate(CASE_ID)).thenReturn(Optional.of(releaseCase));
 
-        when(evidenceRepository.countByReleaseCase_CaseId(10L)).thenReturn(0L);
+        when(evidenceRepository.countByReleaseCase_CaseId(CASE_ID)).thenReturn(0L);
         when(evidenceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -115,7 +120,7 @@ class EvidenceSubmitServiceTest {
         byte[] exeBytes = {'M', 'Z', (byte) 0x90, 0x00, 0x03, 0x00, 0x00, 0x00};
         MockMultipartFile file = new MockMultipartFile("file", "proof.pdf", "application/pdf", exeBytes);
 
-        assertThatThrownBy(() -> evidenceSubmitService.submit("token", file, EvidenceType.DEATH_CERTIFICATE, null))
+        assertThatThrownBy(() -> evidenceSubmitService.submit(CASE_ID, "token", file, EvidenceType.DEATH_CERTIFICATE, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_SUBMISSION_INVALID));
         verify(evidenceStorageClient, never()).store(any(), any());
@@ -128,7 +133,7 @@ class EvidenceSubmitServiceTest {
         MockMultipartFile file = new MockMultipartFile("file", "proof.pdf", "application/pdf", pdfBytes);
         when(malwareScanner.scan(any())).thenReturn(ScanResult.infected("EICAR_TEST_SIGNATURE_DETECTED"));
 
-        assertThatThrownBy(() -> evidenceSubmitService.submit("token", file, EvidenceType.DEATH_CERTIFICATE, null))
+        assertThatThrownBy(() -> evidenceSubmitService.submit(CASE_ID, "token", file, EvidenceType.DEATH_CERTIFICATE, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_SUBMISSION_INVALID));
         verify(evidenceStorageClient, never()).store(any(), any());
@@ -141,7 +146,7 @@ class EvidenceSubmitServiceTest {
         when(file.getOriginalFilename()).thenReturn("proof.pdf");
         when(file.getSize()).thenReturn(26L * 1024 * 1024);
 
-        assertThatThrownBy(() -> evidenceSubmitService.submit("token", file, EvidenceType.DEATH_CERTIFICATE, null))
+        assertThatThrownBy(() -> evidenceSubmitService.submit(CASE_ID, "token", file, EvidenceType.DEATH_CERTIFICATE, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PAYLOAD_TOO_LARGE));
         verify(evidenceStorageClient, never()).store(any(), any());
@@ -152,11 +157,11 @@ class EvidenceSubmitServiceTest {
         byte[] pdfBytes = "%PDF-1.4\n1 0 obj << >> endobj\n%%EOF".getBytes(StandardCharsets.US_ASCII);
         MockMultipartFile file = new MockMultipartFile("file", "proof.pdf", "application/pdf", pdfBytes);
         when(malwareScanner.scan(any())).thenReturn(ScanResult.passed());
-        when(evidenceStorageClient.store(eq(10L), any())).thenReturn(new StoredEvidence("evidence/10/uuid.pdf", pdfBytes.length));
+        when(evidenceStorageClient.store(eq(CASE_ID), any())).thenReturn(new StoredEvidence("evidence/10/uuid.pdf", pdfBytes.length));
 
-        evidenceSubmitService.submit("token", file, EvidenceType.DEATH_CERTIFICATE, null);
+        evidenceSubmitService.submit(CASE_ID, "token", file, EvidenceType.DEATH_CERTIFICATE, null);
 
-        verify(evidenceStorageClient).store(eq(10L), any());
+        verify(evidenceStorageClient).store(eq(CASE_ID), any());
         verify(releaseCase).startEvidenceReview();
 
         // issue #88 완료 조건 - 제출한 증빙 종류가 실제로 저장되어야 한다
@@ -171,9 +176,9 @@ class EvidenceSubmitServiceTest {
         byte[] pdfBytes = "%PDF-1.4\n%%EOF".getBytes(StandardCharsets.US_ASCII);
         MockMultipartFile file = new MockMultipartFile("file", "proof.pdf", "application/pdf", pdfBytes);
         when(malwareScanner.scan(any())).thenReturn(ScanResult.passed());
-        when(evidenceStorageClient.store(eq(10L), any())).thenReturn(new StoredEvidence("evidence/10/uuid.pdf", pdfBytes.length));
+        when(evidenceStorageClient.store(eq(CASE_ID), any())).thenReturn(new StoredEvidence("evidence/10/uuid.pdf", pdfBytes.length));
 
-        evidenceSubmitService.submit("token", file, EvidenceType.DEATH_CERTIFICATE, null);
+        evidenceSubmitService.submit(CASE_ID, "token", file, EvidenceType.DEATH_CERTIFICATE, null);
 
         verify(releaseCase, never()).startEvidenceReview();
     }
@@ -185,14 +190,14 @@ class EvidenceSubmitServiceTest {
         byte[] pdfBytes = "%PDF-1.4\n%%EOF".getBytes(StandardCharsets.US_ASCII);
         MockMultipartFile file = new MockMultipartFile("file", "proof.pdf", "application/pdf", pdfBytes);
         when(malwareScanner.scan(any())).thenReturn(ScanResult.passed());
-        when(evidenceStorageClient.store(eq(10L), any()))
+        when(evidenceStorageClient.store(eq(CASE_ID), any()))
                 .thenReturn(new StoredEvidence("evidence/10/uuid.pdf", pdfBytes.length));
         // 보정 삭제 자체가 실패하는 상황을 재현
         doThrow(new RuntimeException("S3 unreachable")).when(evidenceStorageClient).delete("evidence/10/uuid.pdf");
 
         TransactionSynchronizationManager.initSynchronization();
         try {
-            evidenceSubmitService.submit("token", file, EvidenceType.DEATH_CERTIFICATE, null);
+            evidenceSubmitService.submit(CASE_ID, "token", file, EvidenceType.DEATH_CERTIFICATE, null);
             // 실제 Spring 트랜잭션이 롤백된 뒤 afterCompletion을 호출하는 것과 동일하게 재현
             TransactionSynchronizationUtils.triggerAfterCompletion(
                     org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK);

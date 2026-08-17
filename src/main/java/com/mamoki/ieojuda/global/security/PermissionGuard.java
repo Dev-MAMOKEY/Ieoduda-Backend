@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.global.security;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
 import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.account.repository.UserRepository;
@@ -17,7 +19,7 @@ public class PermissionGuard {
 
     private final UserRepository userRepository;
 
-    public User require(Long userId, AdminPermission permission) {
+    public User require(UUID userId, AdminPermission permission) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         if (!user.hasPermission(permission)) {

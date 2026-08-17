@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -40,8 +41,10 @@ import static org.mockito.Mockito.when;
 // 조작할 수 없어야 하고(조직 경계), 증빙 판정은 재인증 없이는 실행되지 않아야 한다.
 class PartnerReviewServiceTest {
 
-    private static final Long USER_ID = 1L;
-    private static final Long REVIEW_ID = 10L;
+    private static final UUID USER_ID = UUID.randomUUID();
+    private static final UUID REVIEW_ID = UUID.randomUUID();
+    private static final UUID REVIEWER_PARTNER_ID = UUID.randomUUID();
+    private static final UUID OTHER_PARTNER_ID = UUID.randomUUID();
 
     private EvidenceRepository evidenceRepository;
     private PartnerReviewerRepository partnerReviewerRepository;
@@ -75,7 +78,7 @@ class PartnerReviewServiceTest {
         when(permissionGuard.require(USER_ID, AdminPermission.EVIDENCE_REVIEW)).thenReturn(actor);
 
         reviewerPartner = mock(ExternalPartner.class);
-        when(reviewerPartner.getPartnerId()).thenReturn(100L);
+        when(reviewerPartner.getPartnerId()).thenReturn(REVIEWER_PARTNER_ID);
         reviewer = mock(PartnerReviewer.class);
         when(reviewer.getIsActive()).thenReturn(true);
         when(reviewer.getPartner()).thenReturn(reviewerPartner);
@@ -112,7 +115,7 @@ class PartnerReviewServiceTest {
     @Test
     void decide_whenCaseAssignedToAnotherPartner_isBlockedByOrgBoundary() {
         ExternalPartner otherPartner = mock(ExternalPartner.class);
-        when(otherPartner.getPartnerId()).thenReturn(999L); // reviewerPartner는 100L - 다른 조직
+        when(otherPartner.getPartnerId()).thenReturn(OTHER_PARTNER_ID); // reviewerPartner와 다른 조직
         when(releaseCase.getAssignedPartner()).thenReturn(otherPartner);
         PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
                 PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "pw");
@@ -125,7 +128,7 @@ class PartnerReviewServiceTest {
 
     @Test
     void decide_whenCaseAssignedToReviewersOwnPartner_proceeds() {
-        when(releaseCase.getAssignedPartner()).thenReturn(reviewerPartner); // 같은 조직(100L)
+        when(releaseCase.getAssignedPartner()).thenReturn(reviewerPartner); // 같은 조직
         PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
                 PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "correct-pw");
 

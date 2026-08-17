@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.handoffcheck.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.handoffcheck.dto.HandoffCheckStatusResponse;
 import com.mamoki.ieojuda.domain.handoffcheck.service.HandoffCheckService;
 import com.mamoki.ieojuda.global.rsdata.RsData;
@@ -26,8 +28,8 @@ public class HandoffCheckController {
     @Operation(summary = "인계 점검 화면 조회", description = "역할 담당자와 지정 확인자의 이메일 발송, 역할 수락, 대체 담당자, 문의 사항, 준비 완료 여부를 함께 조회합니다.")
     @GetMapping
     public ResponseEntity<RsData<HandoffCheckStatusResponse>> getHandoffCheck(
-            @AuthenticationPrincipal Long userId, // 현재 로그인한 사용자 ID 식별
-            @Parameter(description = "계획 ID") @PathVariable Long planId
+            @AuthenticationPrincipal UUID userId, // 현재 로그인한 사용자 ID 식별
+            @Parameter(description = "계획 ID") @PathVariable UUID planId
     ) {
         HandoffCheckStatusResponse result = handoffCheckService.getHandoffCheck(userId, planId);
         return ResponseEntity.ok(RsData.success(result));

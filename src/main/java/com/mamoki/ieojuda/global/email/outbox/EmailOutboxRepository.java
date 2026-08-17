@@ -3,9 +3,10 @@ package com.mamoki.ieojuda.global.email.outbox;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.util.UUID;
 import java.util.List;
 
-public interface EmailOutboxRepository extends JpaRepository<EmailOutbox, Long> {
+public interface EmailOutboxRepository extends JpaRepository<EmailOutbox, UUID> {
 
     // EmailOutboxScheduler - 발송 대기 중인 행을 가져온다. EvidenceRepository의
     // findDueForDeletionForUpdateSkipLocked와 동일한 이유로 FOR UPDATE SKIP LOCKED + LIMIT 사용

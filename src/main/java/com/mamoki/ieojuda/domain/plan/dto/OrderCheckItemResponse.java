@@ -1,10 +1,12 @@
 package com.mamoki.ieojuda.domain.plan.dto;
 
+import java.util.UUID;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 
 // "실행 순서 점검" 화면 - 카드 하나 (담당자/대기기간/승인여부 + 순서 충돌 여부)
 public record OrderCheckItemResponse(
-        @Schema(description = "항목 ID") Long itemId,
+        @Schema(description = "항목 ID") UUID itemId,
         @Schema(description = "실행 순서 (낮을수록 먼저, 화면 표시 번호는 이 순서 기준 1부터)") Integer sortOrder,
         @Schema(description = "짧은 제목") String title,
         @Schema(description = "실행 순서 충돌 판정용 분류", example = "DELETE", allowableValues = {"DELETE", "TRANSFER", "OTHER"}) String actionType,

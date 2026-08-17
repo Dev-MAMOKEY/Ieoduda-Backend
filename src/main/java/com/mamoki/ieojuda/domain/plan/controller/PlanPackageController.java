@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.plan.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.plan.dto.PackagePreviewResponse;
 import com.mamoki.ieojuda.domain.plan.dto.PlanResponse;
 import com.mamoki.ieojuda.domain.plan.service.PlanPackageService;
@@ -28,8 +30,8 @@ public class PlanPackageController {
     @Operation(summary = "패키지 미리보기", description = "역할별로 공개될 대상·행동·선행 조건을 담당자 단위로 묶어 보여줍니다. 다른 역할의 항목은 섞이지 않습니다.")
     @GetMapping("/preview")
     public ResponseEntity<RsData<PackagePreviewResponse>> getPreview(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "계획 ID") @PathVariable Long planId
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "계획 ID") @PathVariable UUID planId
     ) {
         return ResponseEntity.ok(RsData.success(planPackageService.getPreview(userId, planId)));
     }
@@ -37,8 +39,8 @@ public class PlanPackageController {
     @Operation(summary = "패키지 봉인", description = "작성자가 역할별 패키지를 최종 승인합니다. 수락 확인자 2명 미만, 금지정보 포함, 원문 근거 없는 항목이 있으면 차단됩니다.")
     @PostMapping("/seal")
     public ResponseEntity<RsData<PlanResponse>> seal(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "계획 ID") @PathVariable Long planId
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "계획 ID") @PathVariable UUID planId
     ) {
         return ResponseEntity.ok(RsData.success(planPackageService.seal(userId, planId)));
     }

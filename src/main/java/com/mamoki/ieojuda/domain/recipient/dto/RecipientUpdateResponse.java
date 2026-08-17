@@ -1,11 +1,13 @@
 package com.mamoki.ieojuda.domain.recipient.dto;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 // 담당자 수정 결과
 public record RecipientUpdateResponse(
-        @Schema(description = "담당자 ID") Long assigneeId,
+        @Schema(description = "담당자 ID") UUID assigneeId,
         @Schema(description = "담당자 이름") String name,
         @Schema(description = "담당자 이메일") String email,
         @Schema(description = "역할 유형", example = "FAMILY_MANAGER", allowableValues = {"FAMILY_MANAGER", "WORK_MANAGER", "RELATIONSHIP_MANAGER"}) String roleType,

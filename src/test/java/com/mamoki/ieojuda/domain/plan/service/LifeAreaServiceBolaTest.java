@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.plan.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
 import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
@@ -19,9 +21,9 @@ import static org.mockito.Mockito.when;
 // 사용자 B가 사용자 A의 planId로 삶의 구역별 항목 조회를 시도하면 PLAN_NOT_FOUND로 막혀야 한다
 class LifeAreaServiceBolaTest {
 
-    private static final Long OWNER_ID = 1L;
-    private static final Long ATTACKER_ID = 2L;
-    private static final Long PLAN_ID = 10L;
+    private static final UUID OWNER_ID = UUID.randomUUID();
+    private static final UUID ATTACKER_ID = UUID.randomUUID();
+    private static final UUID PLAN_ID = UUID.randomUUID();
 
     private PlanRepository planRepository;
     private ItemRepository itemRepository;

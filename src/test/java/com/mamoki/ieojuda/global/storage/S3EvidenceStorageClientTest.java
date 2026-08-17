@@ -23,6 +23,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import java.io.ByteArrayInputStream;
 import java.time.Duration;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -67,7 +68,7 @@ class S3EvidenceStorageClientTest {
         EvidenceUpload upload = new EvidenceUpload("proof.pdf", "application/pdf",
                 () -> new ByteArrayInputStream(new byte[]{1, 2, 3}), 3);
 
-        var stored = storageClient.store(1L, upload);
+        var stored = storageClient.store(UUID.randomUUID(), upload);
 
         assertThat(stored.fileSize()).isEqualTo(3);
         verify(s3Client, times(3)).putObject(any(PutObjectRequest.class), any(software.amazon.awssdk.core.sync.RequestBody.class));
@@ -80,7 +81,7 @@ class S3EvidenceStorageClientTest {
         EvidenceUpload upload = new EvidenceUpload("proof.pdf", "application/pdf",
                 () -> new ByteArrayInputStream(new byte[]{1}), 1);
 
-        assertThatThrownBy(() -> storageClient.store(1L, upload))
+        assertThatThrownBy(() -> storageClient.store(UUID.randomUUID(), upload))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_STORAGE_FAILED));
         verify(s3Client, times(3)).putObject(any(PutObjectRequest.class), any(software.amazon.awssdk.core.sync.RequestBody.class));
