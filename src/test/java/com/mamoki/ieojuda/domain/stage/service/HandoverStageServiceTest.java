@@ -4,6 +4,8 @@ import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
 import com.mamoki.ieojuda.domain.audit.repository.EmailLogRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.entity.PlanVersion;
+import com.mamoki.ieojuda.domain.postaccess.entity.AccessToken;
+import com.mamoki.ieojuda.domain.postaccess.repository.AccessTokenRepository;
 import com.mamoki.ieojuda.domain.postaccess.repository.PackageActionCompletionRepository;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.entity.RoleType;
@@ -17,6 +19,7 @@ import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
 import com.mamoki.ieojuda.global.email.contract.EmailSendResult;
 import com.mamoki.ieojuda.global.email.sender.EmailSender;
+import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.security.PermissionGuard;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +27,8 @@ import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,6 +51,7 @@ class HandoverStageServiceTest {
     private AppProperties appProperties;
     private PermissionGuard permissionGuard;
     private PackageActionCompletionRepository packageActionCompletionRepository;
+    private AccessTokenRepository accessTokenRepository;
     private HandoverStageService handoverStageService;
 
     private ReleaseCase releaseCase;
@@ -61,9 +67,10 @@ class HandoverStageServiceTest {
         appProperties = mock(AppProperties.class);
         permissionGuard = mock(PermissionGuard.class);
         packageActionCompletionRepository = mock(PackageActionCompletionRepository.class);
+        accessTokenRepository = mock(AccessTokenRepository.class);
         handoverStageService = new HandoverStageService(
                 releaseCaseRepository, handoverStageRepository, recipientRepository, emailLogRepository,
-                emailSender, appProperties, permissionGuard, packageActionCompletionRepository);
+                emailSender, appProperties, permissionGuard, packageActionCompletionRepository, accessTokenRepository);
 
         when(appProperties.getContactEmail()).thenReturn("support@ieoduda.example");
         when(appProperties.getInviteTokenTtlHours()).thenReturn(72L);
@@ -71,6 +78,7 @@ class HandoverStageServiceTest {
         when(emailSender.send(anyString(), any())).thenReturn(EmailSendResult.success("msg-1"));
         when(emailLogRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(handoverStageRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(accessTokenRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         Plan plan = mock(Plan.class);
         PlanVersion planVersion = mock(PlanVersion.class);
@@ -84,6 +92,19 @@ class HandoverStageServiceTest {
         currentStage.send(); // 활성 발송 상태(SENT)에서 시작
 
         when(handoverStageRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(currentStage));
+    }
+
+    // 버그 회귀 방지(#79) - 이메일 링크에 박힌 평문 토큰이, 실제로 AccessToken 테이블에 그 해시로
+    // 저장됐는지까지 끝까지 추적해서 확인한다. 링크 문자열만 바뀌고 발급처는 그대로였던 버그를 이 검증이 잡는다.
+    private void assertLinkTokenWasIssuedAsAccessToken(EmailContent content) {
+        Matcher matcher = Pattern.compile("/posthumous-access/([\\w-]+)").matcher(content.body());
+        assertThat(matcher.find()).as("본문에 /posthumous-access/{token} 링크가 있어야 한다").isTrue();
+        String plainToken = matcher.group(1);
+        String expectedHash = TokenProvider.hashToken(plainToken);
+
+        ArgumentCaptor<AccessToken> tokenCaptor = ArgumentCaptor.forClass(AccessToken.class);
+        verify(accessTokenRepository).save(tokenCaptor.capture());
+        assertThat(tokenCaptor.getValue().getTokenHash()).isEqualTo(expectedHash);
     }
 
     private void setId(Object entity, String fieldName, Long id) {
@@ -132,6 +153,7 @@ class HandoverStageServiceTest {
         assertThat(content.body()).contains("업무 담당자 역할로 전달드릴 내용이 있습니다");
         assertThat(content.body()).contains("https://ieoduda.example/posthumous-access/");
         assertThat(content.body()).doesNotContain("/recipient-acceptances/");
+        assertLinkTokenWasIssuedAsAccessToken(content);
     }
 
     @Test
@@ -190,6 +212,7 @@ class HandoverStageServiceTest {
         assertThat(content.body()).doesNotContain("이전 담당자가 응답하지 않아");
         assertThat(content.body()).contains("가족 담당자 역할로 전달드릴 내용이 있습니다");
         assertThat(content.body()).contains("/posthumous-access/");
+        assertLinkTokenWasIssuedAsAccessToken(content);
     }
 
     // issue #79 완료 조건 - "대체 담당자는 기존 문구를 그대로 받는다" + 링크만 사후 인증 화면으로 교체
@@ -214,5 +237,6 @@ class HandoverStageServiceTest {
         assertThat(content.body()).contains("이전 담당자가 응답하지 않아 대체 담당자로 지정되었습니다. 역할 수락 여부를 확인해 주세요.");
         assertThat(content.body()).contains("/posthumous-access/");
         assertThat(content.body()).doesNotContain("/recipient-acceptances/");
+        assertLinkTokenWasIssuedAsAccessToken(content);
     }
 }
