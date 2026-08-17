@@ -3,11 +3,12 @@ package com.mamoki.ieojuda.domain.evidence.dto;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.util.UUID;
 import java.time.LocalDateTime;
 
 // "증빙 삭제 감사" 화면
 public record EvidenceDeletionStatusResponse(
-        @Schema(description = "증빙 ID") Long evidenceId,
+        @Schema(description = "증빙 ID") UUID evidenceId,
         @Schema(description = "파일명") String fileName,
         @Schema(description = "증빙 종류", example = "DEATH_CERTIFICATE", allowableValues = {"DEATH_CERTIFICATE", "DEATH_REPORT", "POSTMORTEM_REPORT"}) String evidenceType,
         @Schema(description = "검토 완료일 (없으면 null)") LocalDateTime reviewedAt,

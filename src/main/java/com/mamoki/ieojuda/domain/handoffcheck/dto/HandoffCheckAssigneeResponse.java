@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.handoffcheck.dto;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.handoffcheck.entity.HandoffCheckResponse;
 import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
@@ -16,7 +18,7 @@ import java.time.LocalDateTime;
 //      → 이 화면 자체의 "인계 점검" 메일(HandoffCheck/HandoffCheckResponse)에 대해 담당자가 실제로 답한 내용
 // 명세서 「선택형 생전 인계 점검」의 "이메일 도달·역할 이해·공개 범주 이해·문의 사항"은 2)번 check* 필드가 정확히 대응한다.
 public record HandoffCheckAssigneeResponse(
-        @Schema(description = "담당자 ID") Long assigneeId,
+        @Schema(description = "담당자 ID") UUID assigneeId,
         @Schema(description = "담당자 이름") String name,
         @Schema(description = "역할 유형", example = "RELATIONSHIP_MANAGER", allowableValues = {"FAMILY_MANAGER", "WORK_MANAGER", "RELATIONSHIP_MANAGER"}) String roleType,
         @Schema(description = "[역할 수락 초대] 수락 요청 이메일 발송 완료 여부 - 인계 점검 메일과 무관, checkEmailReached와 혼동 금지") boolean isEmailSent,

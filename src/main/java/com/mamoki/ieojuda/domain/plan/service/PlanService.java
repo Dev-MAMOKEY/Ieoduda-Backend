@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.UUID;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
@@ -43,19 +44,19 @@ public class PlanService {
     private final EmailOutboxService emailOutboxService;
     private final AppProperties appProperties;
 
-    public PlanResponse getPlan(Long userId, Long planId) {
+    public PlanResponse getPlan(UUID userId, UUID planId) {
         return PlanResponse.from(planOwnershipReader.findOwnedPlan(userId, planId));
     }
 
     @Transactional
-    public PlanResponse deactivate(Long userId, Long planId) {
+    public PlanResponse deactivate(UUID userId, UUID planId) {
         Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
         plan.deactivate();
         return PlanResponse.from(plan);
     }
 
     // "대기 이의제기 수정" 화면 - 저장된 대기기간/본인경고이메일/이의제기연락처를 한 번에 조회
-    public ReleaseSettingsResponse getReleaseSettings(Long userId, Long planId) {
+    public ReleaseSettingsResponse getReleaseSettings(UUID userId, UUID planId) {
         Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
         var disputeContact = disputeContactRepository.findFirstByPlan_PlanIdOrderByContactIdDesc(planId).orElse(null);
         return ReleaseSettingsResponse.of(plan, disputeContact);
@@ -64,7 +65,7 @@ public class PlanService {
     // "대기 이의제기 설정" 화면 - 대기 기간 저장
     // 소유권 검증을 범위 검증보다 먼저 수행한다 - 순서가 반대면 "타인 planId + 잘못된 값" 조합이 400을 돌려줘 존재를 흘린다
     @Transactional
-    public ReleasePolicyResponse updateReleasePolicy(Long userId, Long planId, ReleasePolicyRequest request) {
+    public ReleasePolicyResponse updateReleasePolicy(UUID userId, UUID planId, ReleasePolicyRequest request) {
         Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
         if (request.waitingDays() == null
                 || request.waitingDays() < MIN_WAITING_DAYS
@@ -77,7 +78,7 @@ public class PlanService {
 
     // "대기 이의제기 설정" 화면 - 본인 경고 이메일 등록 + 검증 메일 발송
     @Transactional
-    public SelfWarningEmailResponse requestSelfWarningEmailVerification(Long userId, Long planId, SelfWarningEmailRequest request) {
+    public SelfWarningEmailResponse requestSelfWarningEmailVerification(UUID userId, UUID planId, SelfWarningEmailRequest request) {
         Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
 
         String plainToken = TokenProvider.generatePlainToken();

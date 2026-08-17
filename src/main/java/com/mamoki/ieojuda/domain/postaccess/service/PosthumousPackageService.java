@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.postaccess.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.plan.dto.PlanSnapshotDto;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
 import com.mamoki.ieojuda.domain.plan.service.PlanSnapshotService;
@@ -56,7 +58,7 @@ public class PosthumousPackageService {
         PlanSnapshotDto snapshot = deserializeSnapshot(accessToken);
 
         List<PlanSnapshotDto.ItemSnapshot> myItems = itemsOf(snapshot, recipient.getAssigneeId());
-        Set<Long> completedItemIds = completedItemIds(accessToken.getHandoverStage().getStageId());
+        Set<UUID> completedItemIds = completedItemIds(accessToken.getHandoverStage().getStageId());
 
         List<PackageActionResponse> actions = myItems.stream()
                 .map(item -> PackageActionResponse.of(item, completedItemIds.contains(item.itemId())))
@@ -75,7 +77,7 @@ public class PosthumousPackageService {
 
     // ② 행동 완료 - 이 행동으로 단계의 모든 항목이 끝나면 단계를 완료 처리하고 다음 담당자에게 발송한다(issue #78)
     @Transactional
-    public PackageActionResponse completeAction(String accessSessionId, Long actionId, String idempotencyKey) {
+    public PackageActionResponse completeAction(String accessSessionId, UUID actionId, String idempotencyKey) {
         idempotencyGuard.claim(COMPLETE_IDEMPOTENCY_SCOPE, idempotencyKey);
 
         AccessToken accessToken = findValidSession(accessSessionId);
@@ -90,7 +92,7 @@ public class PosthumousPackageService {
                     return new CustomException(ErrorCode.ROLE_PACKAGE_ACCESS_DENIED);
                 });
 
-        Long stageId = accessToken.getHandoverStage().getStageId();
+        UUID stageId = accessToken.getHandoverStage().getStageId();
         boolean alreadyCompleted = packageActionCompletionRepository
                 .findByHandoverStage_StageIdAndItemId(stageId, actionId).isPresent();
         if (!alreadyCompleted) {
@@ -133,7 +135,7 @@ public class PosthumousPackageService {
     }
 
     // 요청한 actionId가 실제로 이 세션 담당자의 항목인지 매번 검사 - 다른 역할 요청 차단
-    private PlanSnapshotDto.ItemSnapshot findOwnedItem(AccessToken accessToken, Recipient recipient, Long actionId) {
+    private PlanSnapshotDto.ItemSnapshot findOwnedItem(AccessToken accessToken, Recipient recipient, UUID actionId) {
         PlanSnapshotDto snapshot = deserializeSnapshot(accessToken);
         return itemsOf(snapshot, recipient.getAssigneeId()).stream()
                 .filter(item -> item.itemId().equals(actionId))
@@ -149,13 +151,13 @@ public class PosthumousPackageService {
         return planSnapshotService.deserialize(snapshotData);
     }
 
-    private List<PlanSnapshotDto.ItemSnapshot> itemsOf(PlanSnapshotDto snapshot, Long recipientId) {
+    private List<PlanSnapshotDto.ItemSnapshot> itemsOf(PlanSnapshotDto snapshot, UUID recipientId) {
         return snapshot.items().stream()
                 .filter(item -> recipientId.equals(item.recipientId()))
                 .toList();
     }
 
-    private Set<Long> completedItemIds(Long stageId) {
+    private Set<UUID> completedItemIds(UUID stageId) {
         return packageActionCompletionRepository.findByHandoverStage_StageId(stageId).stream()
                 .map(PackageActionCompletion::getItemId)
                 .collect(java.util.stream.Collectors.toSet());

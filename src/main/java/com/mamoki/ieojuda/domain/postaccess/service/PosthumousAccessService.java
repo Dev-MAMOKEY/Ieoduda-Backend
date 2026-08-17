@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.postaccess.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.audit.entity.EmailType;
 import com.mamoki.ieojuda.domain.postaccess.dto.OtpSendResponse;
 import com.mamoki.ieojuda.domain.postaccess.dto.OtpVerifyRequest;

@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.plan.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.plan.dto.ItemReviewRequest;
 import com.mamoki.ieojuda.domain.plan.dto.ItemResponse;
 import com.mamoki.ieojuda.domain.plan.dto.ItemUpdateRequest;
@@ -33,9 +35,9 @@ public class ItemReviewController {
     @Operation(summary = "항목 단건 조회")
     @GetMapping("/{itemId}")
     public ResponseEntity<RsData<ItemResponse>> getItem(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "계획 ID") @PathVariable Long planId,
-            @Parameter(description = "항목 ID") @PathVariable Long itemId
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "계획 ID") @PathVariable UUID planId,
+            @Parameter(description = "항목 ID") @PathVariable UUID itemId
     ) {
         return ResponseEntity.ok(RsData.success(itemReviewService.getItem(userId, planId, itemId)));
     }
@@ -43,8 +45,8 @@ public class ItemReviewController {
     @Operation(summary = "항목 승인", description = "AI가 만든 항목을 승인합니다. 원문 근거가 없는 항목은 승인할 수 없습니다.")
     @PostMapping("/review")
     public ResponseEntity<RsData<ItemResponse>> approve(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "계획 ID") @PathVariable Long planId,
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "계획 ID") @PathVariable UUID planId,
             @Valid @RequestBody ItemReviewRequest request
     ) {
         ItemResponse result = itemReviewService.approve(userId, planId, request);
@@ -54,9 +56,9 @@ public class ItemReviewController {
     @Operation(summary = "항목 인라인 수정", description = "대화창에서 AI가 만든 항목을 화면 전환 없이 사용자가 직접 고쳐서 저장합니다.")
     @PutMapping("/{itemId}")
     public ResponseEntity<RsData<ItemResponse>> update(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "계획 ID") @PathVariable Long planId,
-            @Parameter(description = "항목 ID") @PathVariable Long itemId,
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "계획 ID") @PathVariable UUID planId,
+            @Parameter(description = "항목 ID") @PathVariable UUID itemId,
             @Valid @RequestBody ItemUpdateRequest request
     ) {
         ItemResponse result = itemReviewService.update(userId, planId, itemId, request);
@@ -66,9 +68,9 @@ public class ItemReviewController {
     @Operation(summary = "항목 삭제", description = "AI가 만든 항목을 완전히 삭제합니다(상태 변경이 아닌 실제 삭제).")
     @DeleteMapping("/{itemId}")
     public ResponseEntity<RsData<Void>> delete(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "계획 ID") @PathVariable Long planId,
-            @Parameter(description = "항목 ID") @PathVariable Long itemId
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "계획 ID") @PathVariable UUID planId,
+            @Parameter(description = "항목 ID") @PathVariable UUID itemId
     ) {
         itemReviewService.delete(userId, planId, itemId);
         return ResponseEntity.ok(RsData.success(null));

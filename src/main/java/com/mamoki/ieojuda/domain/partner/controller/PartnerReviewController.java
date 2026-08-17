@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.partner.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewDecisionRequest;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewResponse;
 import com.mamoki.ieojuda.domain.partner.service.PartnerReviewService;
@@ -32,8 +34,8 @@ public class PartnerReviewController {
     @Operation(summary = "검토 대상 조회", description = "대상자(신고 확인자) 정보와 증빙 메타데이터를 조회합니다. 역할별 패키지는 포함하지 않습니다.")
     @GetMapping
     public ResponseEntity<RsData<PartnerReviewResponse>> getReview(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "검토 ID (증빙 ID)") @PathVariable Long reviewId
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "검토 ID (증빙 ID)") @PathVariable UUID reviewId
     ) {
         return ResponseEntity.ok(RsData.success(partnerReviewService.getReview(userId, reviewId)));
     }
@@ -41,8 +43,8 @@ public class PartnerReviewController {
     @Operation(summary = "증빙 원본 다운로드")
     @GetMapping("/file")
     public ResponseEntity<byte[]> getFile(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "검토 ID (증빙 ID)") @PathVariable Long reviewId
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "검토 ID (증빙 ID)") @PathVariable UUID reviewId
     ) {
         byte[] file = partnerReviewService.getFile(userId, reviewId);
         return ResponseEntity.ok()
@@ -53,8 +55,8 @@ public class PartnerReviewController {
     @Operation(summary = "검토 결과 제출", description = "승인(APPROVE)/반려(REJECT)/추가자료요청(ADDITIONAL_INFO_REQUESTED) 중 하나를 기록합니다. AI 자동 승인은 없습니다. Idempotency-Key 헤더를 보내면 같은 키의 재전송은 중복 요청(409)으로 응답합니다.")
     @PostMapping("/decision")
     public ResponseEntity<RsData<PartnerReviewResponse>> decide(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "검토 ID (증빙 ID)") @PathVariable Long reviewId,
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "검토 ID (증빙 ID)") @PathVariable UUID reviewId,
             @Valid @RequestBody PartnerReviewDecisionRequest request,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
     ) {

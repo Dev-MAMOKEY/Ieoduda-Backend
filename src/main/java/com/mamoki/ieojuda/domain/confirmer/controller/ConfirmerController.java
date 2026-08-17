@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.confirmer.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.confirmer.dto.ConfirmerBulkRegisterRequest;
 import com.mamoki.ieojuda.domain.confirmer.dto.ConfirmerBulkRegisterResponse;
 import com.mamoki.ieojuda.domain.confirmer.dto.ConfirmerDetailResponse;
@@ -34,8 +36,8 @@ public class ConfirmerController {
     @Operation(summary = "지정 확인자 일괄 등록", description = "입력한 확인자 정보를 한 번에 등록하고, 등록 즉시 수락 이메일을 발송합니다. 일부 발송이 실패해도 확인자 저장은 유지되며 건별 발송 결과가 응답에 담깁니다.")
     @PostMapping
     public ResponseEntity<RsData<ConfirmerBulkRegisterResponse>> registerAll(
-            @AuthenticationPrincipal Long userId, // 현재 로그인한 사용자 ID 식별
-            @Parameter(description = "계획 ID") @PathVariable Long planId,
+            @AuthenticationPrincipal UUID userId, // 현재 로그인한 사용자 ID 식별
+            @Parameter(description = "계획 ID") @PathVariable UUID planId,
             @Valid @RequestBody ConfirmerBulkRegisterRequest request
     ) {
         ConfirmerBulkRegisterResponse result = confirmerService.registerAll(userId, planId, request);
@@ -46,9 +48,9 @@ public class ConfirmerController {
     @Operation(summary = "지정 확인자 상세 조회", description = "이름 클릭 시 해당 확인자의 이름, 이메일, 수락 상태를 조회합니다.")
     @GetMapping("/{confirmId}")
     public ResponseEntity<RsData<ConfirmerDetailResponse>> getConfirmer(
-            @AuthenticationPrincipal Long userId, // 현재 로그인한 사용자 ID 식별
-            @Parameter(description = "계획 ID") @PathVariable Long planId,
-            @Parameter(description = "확인자 ID") @PathVariable Long confirmId
+            @AuthenticationPrincipal UUID userId, // 현재 로그인한 사용자 ID 식별
+            @Parameter(description = "계획 ID") @PathVariable UUID planId,
+            @Parameter(description = "확인자 ID") @PathVariable UUID confirmId
     ) {
         ConfirmerDetailResponse result = confirmerService.getConfirmer(userId, planId, confirmId);
         return ResponseEntity.ok(RsData.success(result));
@@ -58,9 +60,9 @@ public class ConfirmerController {
     @Operation(summary = "지정 확인자 수정", description = "확인자 이름/이메일을 수정합니다. 이메일이 바뀌면 수락 상태가 초기화되고 새 수락 이메일이 발송됩니다.")
     @PutMapping("/{confirmId}")
     public ResponseEntity<RsData<ConfirmerUpdateResponse>> updateConfirmer(
-            @AuthenticationPrincipal Long userId, // 현재 로그인한 사용자 ID 식별
-            @Parameter(description = "계획 ID") @PathVariable Long planId,
-            @Parameter(description = "확인자 ID") @PathVariable Long confirmId,
+            @AuthenticationPrincipal UUID userId, // 현재 로그인한 사용자 ID 식별
+            @Parameter(description = "계획 ID") @PathVariable UUID planId,
+            @Parameter(description = "확인자 ID") @PathVariable UUID confirmId,
             @Valid @RequestBody ConfirmerUpdateRequest request
     ) {
         ConfirmerUpdateResponse result = confirmerService.updateConfirmer(userId, planId, confirmId, request);

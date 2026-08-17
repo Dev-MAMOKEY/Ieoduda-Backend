@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -44,9 +45,9 @@ import static org.mockito.Mockito.when;
 
 class HandoffCheckServiceTest {
 
-    private static final Long OWNER_ID = 1L;
-    private static final Long ATTACKER_ID = 2L;
-    private static final Long PLAN_ID = 10L;
+    private static final UUID OWNER_ID = UUID.randomUUID();
+    private static final UUID ATTACKER_ID = UUID.randomUUID();
+    private static final UUID PLAN_ID = UUID.randomUUID();
 
     private PlanRepository planRepository;
     private RecipientRepository recipientRepository;
@@ -90,11 +91,11 @@ class HandoffCheckServiceTest {
         return plan;
     }
 
-    private Recipient recipient(Long assigneeId, Plan plan, RoleType roleType) {
+    private Recipient recipient(UUID assigneeId, Plan plan, RoleType roleType) {
         Recipient recipient = mock(Recipient.class);
         when(recipient.getAssigneeId()).thenReturn(assigneeId);
         when(recipient.getPlan()).thenReturn(plan);
-        when(recipient.getEmail()).thenReturn("recipient" + assigneeId + "@test.com");
+        when(recipient.getEmail()).thenReturn("recipient-" + assigneeId + "@test.com");
         when(recipient.getRoleType()).thenReturn(roleType);
         return recipient;
     }
@@ -127,8 +128,8 @@ class HandoffCheckServiceTest {
     void sendCheck_sendsToAllNonBackupRecipients_whenRecipientIdsOmitted() {
         Plan plan = sealedPlan();
         when(planRepository.findByPlanIdAndUser_UserId(PLAN_ID, OWNER_ID)).thenReturn(Optional.of(plan));
-        Recipient r1 = recipient(100L, plan, RoleType.FAMILY_MANAGER);
-        Recipient r2 = recipient(101L, plan, RoleType.WORK_MANAGER);
+        Recipient r1 = recipient(UUID.randomUUID(), plan, RoleType.FAMILY_MANAGER);
+        Recipient r2 = recipient(UUID.randomUUID(), plan, RoleType.WORK_MANAGER);
         when(recipientRepository.findByPlan_PlanIdAndIsBackupFalseOrderByAssigneeIdAsc(PLAN_ID)).thenReturn(List.of(r1, r2));
 
         HandoffCheckSendResponse result = handoffCheckService.sendCheck(OWNER_ID, PLAN_ID, null);
@@ -144,26 +145,28 @@ class HandoffCheckServiceTest {
     void sendCheck_sendsOnlyToRequestedRecipients_whenRecipientIdsProvided() {
         Plan plan = sealedPlan();
         when(planRepository.findByPlanIdAndUser_UserId(PLAN_ID, OWNER_ID)).thenReturn(Optional.of(plan));
-        Recipient r1 = recipient(100L, plan, RoleType.FAMILY_MANAGER);
-        when(recipientRepository.findAllById(List.of(100L))).thenReturn(List.of(r1));
+        UUID recipientId = UUID.randomUUID();
+        Recipient r1 = recipient(recipientId, plan, RoleType.FAMILY_MANAGER);
+        when(recipientRepository.findAllById(List.of(recipientId))).thenReturn(List.of(r1));
 
-        HandoffCheckSendResponse result = handoffCheckService.sendCheck(OWNER_ID, PLAN_ID, new HandoffCheckSendRequest(List.of(100L)));
+        HandoffCheckSendResponse result = handoffCheckService.sendCheck(OWNER_ID, PLAN_ID, new HandoffCheckSendRequest(List.of(recipientId)));
 
         assertThat(result.targetCount()).isEqualTo(1);
         verify(emailOutboxService, times(1))
-                .enqueue(eq(plan), isNull(), eq(EmailType.HANDOFF_CHECK), eq("recipient100@test.com"), any(EmailContent.class));
+                .enqueue(eq(plan), isNull(), eq(EmailType.HANDOFF_CHECK), eq("recipient-" + recipientId + "@test.com"), any(EmailContent.class));
     }
 
     @Test
     void sendCheck_throwsRecipientNotFound_whenRequestedRecipientBelongsToAnotherPlan() {
         Plan plan = sealedPlan();
         Plan otherPlan = mock(Plan.class);
-        when(otherPlan.getPlanId()).thenReturn(999L);
+        when(otherPlan.getPlanId()).thenReturn(UUID.randomUUID());
         when(planRepository.findByPlanIdAndUser_UserId(PLAN_ID, OWNER_ID)).thenReturn(Optional.of(plan));
-        Recipient foreign = recipient(555L, otherPlan, RoleType.FAMILY_MANAGER);
-        when(recipientRepository.findAllById(List.of(555L))).thenReturn(List.of(foreign));
+        UUID foreignId = UUID.randomUUID();
+        Recipient foreign = recipient(foreignId, otherPlan, RoleType.FAMILY_MANAGER);
+        when(recipientRepository.findAllById(List.of(foreignId))).thenReturn(List.of(foreign));
 
-        assertThatThrownBy(() -> handoffCheckService.sendCheck(OWNER_ID, PLAN_ID, new HandoffCheckSendRequest(List.of(555L))))
+        assertThatThrownBy(() -> handoffCheckService.sendCheck(OWNER_ID, PLAN_ID, new HandoffCheckSendRequest(List.of(foreignId))))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.RECIPIENT_NOT_FOUND));
         verifyNoInteractions(handoffCheckRepository, emailOutboxService);
@@ -173,11 +176,13 @@ class HandoffCheckServiceTest {
     void sendCheck_throwsRecipientNotFound_whenSomeRequestedIdsDoNotExist() {
         Plan plan = sealedPlan();
         when(planRepository.findByPlanIdAndUser_UserId(PLAN_ID, OWNER_ID)).thenReturn(Optional.of(plan));
-        Recipient r1 = recipient(100L, plan, RoleType.FAMILY_MANAGER);
-        // 100L, 999L 두 개를 요청했지만 999L은 존재하지 않아 한 건만 조회됨
-        when(recipientRepository.findAllById(List.of(100L, 999L))).thenReturn(List.of(r1));
+        UUID existingId = UUID.randomUUID();
+        UUID missingId = UUID.randomUUID();
+        Recipient r1 = recipient(existingId, plan, RoleType.FAMILY_MANAGER);
+        // 두 ID를 요청했지만 missingId는 존재하지 않아 한 건만 조회됨
+        when(recipientRepository.findAllById(List.of(existingId, missingId))).thenReturn(List.of(r1));
 
-        assertThatThrownBy(() -> handoffCheckService.sendCheck(OWNER_ID, PLAN_ID, new HandoffCheckSendRequest(List.of(100L, 999L))))
+        assertThatThrownBy(() -> handoffCheckService.sendCheck(OWNER_ID, PLAN_ID, new HandoffCheckSendRequest(List.of(existingId, missingId))))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.RECIPIENT_NOT_FOUND));
         verifyNoInteractions(handoffCheckRepository, emailOutboxService);
@@ -190,7 +195,7 @@ class HandoffCheckServiceTest {
         when(planRepository.findByPlanIdAndUser_UserId(PLAN_ID, OWNER_ID)).thenReturn(Optional.of(plan));
 
         Recipient r1 = mock(Recipient.class);
-        when(r1.getAssigneeId()).thenReturn(100L);
+        when(r1.getAssigneeId()).thenReturn(UUID.randomUUID());
         when(r1.getName()).thenReturn("A");
         when(r1.getRoleType()).thenReturn(RoleType.FAMILY_MANAGER);
         when(r1.getIsBackup()).thenReturn(false);
@@ -232,7 +237,7 @@ class HandoffCheckServiceTest {
         when(planRepository.findByPlanIdAndUser_UserId(PLAN_ID, OWNER_ID)).thenReturn(Optional.of(plan));
 
         Recipient r1 = mock(Recipient.class);
-        when(r1.getAssigneeId()).thenReturn(100L);
+        when(r1.getAssigneeId()).thenReturn(UUID.randomUUID());
         when(r1.getName()).thenReturn("A");
         when(r1.getRoleType()).thenReturn(RoleType.FAMILY_MANAGER);
         when(r1.getIsBackup()).thenReturn(false);

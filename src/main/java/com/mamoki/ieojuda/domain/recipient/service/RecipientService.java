@@ -38,6 +38,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.UUID;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -57,7 +58,7 @@ public class RecipientService {
     private final AppProperties appProperties;
 
     @Transactional
-    public RecipientBulkRegisterResponse registerAll(Long userId, Long planId, RecipientBulkRegisterRequest request) {
+    public RecipientBulkRegisterResponse registerAll(UUID userId, UUID planId, RecipientBulkRegisterRequest request) {
         planOwnershipReader.findOwnedPlan(userId, planId);
         List<Item> items = validateAll(planId, request.recipients());
 
@@ -70,8 +71,8 @@ public class RecipientService {
     }
 
     // 이메일은 발송 후 되돌릴 수 없으므로, 저장·발송을 시작하기 전에 요청 전체를 먼저 검증한다
-    private List<Item> validateAll(Long planId, List<RecipientRegisterRequest> requests) {
-        Set<Long> requestedItemIds = new HashSet<>();
+    private List<Item> validateAll(UUID planId, List<RecipientRegisterRequest> requests) {
+        Set<UUID> requestedItemIds = new HashSet<>();
         List<Item> items = new ArrayList<>();
 
         for (RecipientRegisterRequest request : requests) {
@@ -189,7 +190,7 @@ public class RecipientService {
         };
     }
 
-    private Item findItem(Long planId, Long itemId) {
+    private Item findItem(UUID planId, UUID itemId) {
         Item item = itemRepository.findById(itemId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ITEM_NOT_FOUND));
         if (!item.getLifeArea().getPlan().getPlanId().equals(planId)) {
@@ -199,7 +200,7 @@ public class RecipientService {
     }
 
     // "역할 점검" 화면 상세 - 이름 클릭 시 해당 담당자에게 배정된 항목 전체
-    public RecipientDetailResponse getRecipient(Long userId, Long planId, Long assigneeId) {
+    public RecipientDetailResponse getRecipient(UUID userId, UUID planId, UUID assigneeId) {
         planOwnershipReader.findOwnedPlan(userId, planId);
         Recipient recipient = findOwnedRecipient(planId, assigneeId);
 
@@ -212,7 +213,7 @@ public class RecipientService {
 
     // "수락 요청 다시 보내기" - 이미 수락/거절한 담당자에게는 재전송하지 않는다
     @Transactional
-    public RecipientAcceptanceEmailResponse resendAcceptanceEmail(Long userId, Long recipientId) {
+    public RecipientAcceptanceEmailResponse resendAcceptanceEmail(UUID userId, UUID recipientId) {
         Recipient recipient = recipientRepository.findById(recipientId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RECIPIENT_NOT_FOUND));
         if (!recipient.getPlan().getUser().getUserId().equals(userId)) {
@@ -231,7 +232,7 @@ public class RecipientService {
 
     // "담당자 수정하기" - 이름/이메일 수정. 이메일이 바뀌면 재검증이 필요하므로 수락 이메일을 다시 보낸다
     @Transactional
-    public RecipientUpdateResponse updateRecipient(Long userId, Long planId, Long assigneeId, RecipientUpdateRequest request) {
+    public RecipientUpdateResponse updateRecipient(UUID userId, UUID planId, UUID assigneeId, RecipientUpdateRequest request) {
         planOwnershipReader.findOwnedPlan(userId, planId);
         Recipient recipient = findOwnedRecipient(planId, assigneeId);
 
@@ -243,7 +244,7 @@ public class RecipientService {
         return RecipientUpdateResponse.of(recipient, emailChanged, null);
     }
 
-    private Recipient findOwnedRecipient(Long planId, Long assigneeId) {
+    private Recipient findOwnedRecipient(UUID planId, UUID assigneeId) {
         Recipient recipient = recipientRepository.findById(assigneeId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RECIPIENT_NOT_FOUND));
         if (!recipient.getPlan().getPlanId().equals(planId)) {

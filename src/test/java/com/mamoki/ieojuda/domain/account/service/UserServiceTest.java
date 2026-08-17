@@ -29,7 +29,6 @@ import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
 import com.mamoki.ieojuda.domain.releasecase.repository.ObjectionRepository;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.domain.releasecase.service.ReleaseCaseGuardService;
-import com.mamoki.ieojuda.domain.stage.repository.DependencyRepository;
 import com.mamoki.ieojuda.domain.stage.repository.HandoverStageRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
@@ -39,6 +38,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -50,6 +50,9 @@ import static org.mockito.Mockito.when;
 
 // issue #48 회귀 테스트 - 계정 이메일 변경 시 토큰 무효화, 계정 삭제 시 진행 중 사건 차단/고아 데이터 방지를 검증한다.
 class UserServiceTest {
+
+    private static final UUID USER_ID = UUID.randomUUID();
+    private static final UUID PLAN_ID = UUID.randomUUID();
 
     private UserRepository userRepository;
     private PlanRepository planRepository;
@@ -69,7 +72,6 @@ class UserServiceTest {
     private HandoffCheckRepository handoffCheckRepository;
     private HandoffCheckResponseRepository handoffCheckResponseRepository;
     private PackageIssueRepository packageIssueRepository;
-    private DependencyRepository dependencyRepository;
     private EvidenceStorageClient evidenceStorageClient;
     private ReleaseCaseGuardService releaseCaseGuardService;
     private SessionRevocationService sessionRevocationService;
@@ -97,7 +99,6 @@ class UserServiceTest {
         handoffCheckRepository = mock(HandoffCheckRepository.class);
         handoffCheckResponseRepository = mock(HandoffCheckResponseRepository.class);
         packageIssueRepository = mock(PackageIssueRepository.class);
-        dependencyRepository = mock(DependencyRepository.class);
         evidenceStorageClient = mock(EvidenceStorageClient.class);
         releaseCaseGuardService = mock(ReleaseCaseGuardService.class);
         sessionRevocationService = mock(SessionRevocationService.class);
@@ -109,16 +110,16 @@ class UserServiceTest {
                 itemRepository, recipientRepository, disputeContactRepository, confirmerRepository,
                 releaseCaseRepository, planVersionRepository, evidenceRepository, emailLogRepository,
                 handoverStageRepository, objectionRepository, handoffCheckRepository, handoffCheckResponseRepository,
-                packageIssueRepository, dependencyRepository, evidenceStorageClient, releaseCaseGuardService,
+                packageIssueRepository, evidenceStorageClient, releaseCaseGuardService,
                 sessionRevocationService, refreshSessionRepository, partnerReviewerRepository);
     }
 
     @Test
     void getMe_returnsUserResponse() {
         User user = User.builder().email("owner@test.com").password("hash").name("A").build();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
-        UserResponse response = userService.getMe(1L);
+        UserResponse response = userService.getMe(USER_ID);
 
         assertThat(response.email()).isEqualTo("owner@test.com");
         assertThat(response.name()).isEqualTo("A");
@@ -127,24 +128,24 @@ class UserServiceTest {
     @Test
     void updateProfile_whenEmailChanges_invalidatesEveryPlanInviteToken() {
         User user = User.builder().email("old@test.com").password("hash").name("A").build();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.existsByEmailAndUserIdNot("new@test.com", 1L)).thenReturn(false);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(userRepository.existsByEmailAndUserIdNot("new@test.com", USER_ID)).thenReturn(false);
 
         Plan plan = mock(Plan.class);
-        when(plan.getPlanId()).thenReturn(10L);
-        when(planRepository.findByUser_UserId(1L)).thenReturn(Optional.of(plan));
+        when(plan.getPlanId()).thenReturn(PLAN_ID);
+        when(planRepository.findByUser_UserId(USER_ID)).thenReturn(Optional.of(plan));
 
         Recipient recipient = mock(Recipient.class);
-        when(recipientRepository.findByPlan_PlanId(10L)).thenReturn(List.of(recipient));
+        when(recipientRepository.findByPlan_PlanId(PLAN_ID)).thenReturn(List.of(recipient));
 
         Confirmer confirmer = Confirmer.builder().plan(plan).name("B").relationship(Relationship.FRIEND).email("b@test.com").build();
         confirmer.issueInviteToken("some-hash", null);
-        when(confirmerRepository.findByPlan_PlanIdOrderByConfirmIdAsc(10L)).thenReturn(List.of(confirmer));
+        when(confirmerRepository.findByPlan_PlanIdOrderByConfirmIdAsc(PLAN_ID)).thenReturn(List.of(confirmer));
 
         DisputeContact disputeContact = mock(DisputeContact.class);
-        when(disputeContactRepository.findByPlan_PlanId(10L)).thenReturn(List.of(disputeContact));
+        when(disputeContactRepository.findByPlan_PlanId(PLAN_ID)).thenReturn(List.of(disputeContact));
 
-        userService.updateProfile(1L, new UserUpdateRequest("new@test.com", "A"));
+        userService.updateProfile(USER_ID, new UserUpdateRequest("new@test.com", "A"));
 
         assertThat(user.getEmail()).isEqualTo("new@test.com");
         verify(recipient).invalidateInviteToken();
@@ -159,15 +160,15 @@ class UserServiceTest {
     @Test
     void updateProfile_whenEmailChangesAndActiveCaseExists_isBlockedAndDoesNotChangeEmail() {
         User user = User.builder().email("old@test.com").password("hash").name("A").build();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.existsByEmailAndUserIdNot("new@test.com", 1L)).thenReturn(false);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(userRepository.existsByEmailAndUserIdNot("new@test.com", USER_ID)).thenReturn(false);
 
         Plan plan = mock(Plan.class);
-        when(plan.getPlanId()).thenReturn(10L);
-        when(planRepository.findByUser_UserId(1L)).thenReturn(Optional.of(plan));
-        when(releaseCaseGuardService.freezeIfActiveCaseExists(10L)).thenReturn(true);
+        when(plan.getPlanId()).thenReturn(PLAN_ID);
+        when(planRepository.findByUser_UserId(USER_ID)).thenReturn(Optional.of(plan));
+        when(releaseCaseGuardService.freezeIfActiveCaseExists(PLAN_ID)).thenReturn(true);
 
-        assertThatThrownBy(() -> userService.updateProfile(1L, new UserUpdateRequest("new@test.com", "A")))
+        assertThatThrownBy(() -> userService.updateProfile(USER_ID, new UserUpdateRequest("new@test.com", "A")))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACTIVE_RELEASE_CASE_EXISTS));
 
@@ -178,9 +179,9 @@ class UserServiceTest {
     @Test
     void updateProfile_whenEmailUnchanged_doesNotTouchInviteTokens() {
         User user = User.builder().email("same@test.com").password("hash").name("A").build();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
-        userService.updateProfile(1L, new UserUpdateRequest("same@test.com", "New Name"));
+        userService.updateProfile(USER_ID, new UserUpdateRequest("same@test.com", "New Name"));
 
         assertThat(user.getName()).isEqualTo("New Name");
         verifyNoInteractions(planRepository, recipientRepository, confirmerRepository, disputeContactRepository,
@@ -190,14 +191,14 @@ class UserServiceTest {
     @Test
     void deleteAccount_whenActiveCaseExists_isBlockedAndDeletesNothing() {
         User user = User.builder().email("owner@test.com").password("hash").name("A").build();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
         Plan plan = mock(Plan.class);
-        when(plan.getPlanId()).thenReturn(10L);
-        when(planRepository.findByUser_UserId(1L)).thenReturn(Optional.of(plan));
-        when(releaseCaseGuardService.freezeIfActiveCaseExists(10L)).thenReturn(true);
+        when(plan.getPlanId()).thenReturn(PLAN_ID);
+        when(planRepository.findByUser_UserId(USER_ID)).thenReturn(Optional.of(plan));
+        when(releaseCaseGuardService.freezeIfActiveCaseExists(PLAN_ID)).thenReturn(true);
 
-        assertThatThrownBy(() -> userService.deleteAccount(1L))
+        assertThatThrownBy(() -> userService.deleteAccount(USER_ID))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACTIVE_RELEASE_CASE_EXISTS));
 
@@ -208,12 +209,12 @@ class UserServiceTest {
     @Test
     void deleteAccount_whenNoActiveCase_deletesPlanDataAndEvidenceStorageThenUser() {
         User user = User.builder().email("owner@test.com").password("hash").name("A").build();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
         Plan plan = mock(Plan.class);
-        when(plan.getPlanId()).thenReturn(10L);
-        when(planRepository.findByUser_UserId(1L)).thenReturn(Optional.of(plan));
-        when(releaseCaseGuardService.freezeIfActiveCaseExists(10L)).thenReturn(false);
+        when(plan.getPlanId()).thenReturn(PLAN_ID);
+        when(planRepository.findByUser_UserId(USER_ID)).thenReturn(Optional.of(plan));
+        when(releaseCaseGuardService.freezeIfActiveCaseExists(PLAN_ID)).thenReturn(false);
 
         Evidence undeletedEvidence = mock(Evidence.class);
         when(undeletedEvidence.getDeletedAt()).thenReturn(null);
@@ -222,9 +223,9 @@ class UserServiceTest {
         Evidence alreadyDeletedEvidence = mock(Evidence.class);
         when(alreadyDeletedEvidence.getDeletedAt()).thenReturn(java.time.LocalDateTime.now());
 
-        when(evidenceRepository.findByPlan_PlanId(10L)).thenReturn(List.of(undeletedEvidence, alreadyDeletedEvidence));
+        when(evidenceRepository.findByPlan_PlanId(PLAN_ID)).thenReturn(List.of(undeletedEvidence, alreadyDeletedEvidence));
 
-        userService.deleteAccount(1L);
+        userService.deleteAccount(USER_ID);
 
         // S3 원본은 아직 안 지워진 증빙만 골라서 지운다
         verify(evidenceStorageClient).delete("evidence/10/real-file.pdf");
@@ -239,18 +240,18 @@ class UserServiceTest {
     @Test
     void deleteAccount_deletesRefreshSessionsAndPartnerReviewerBeforeDeletingUser() {
         User user = User.builder().email("owner@test.com").password("hash").name("A").build();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(planRepository.findByUser_UserId(1L)).thenReturn(Optional.empty());
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(planRepository.findByUser_UserId(USER_ID)).thenReturn(Optional.empty());
 
         com.mamoki.ieojuda.domain.account.entity.RefreshSession session =
                 mock(com.mamoki.ieojuda.domain.account.entity.RefreshSession.class);
-        when(refreshSessionRepository.findByUser_UserId(1L)).thenReturn(List.of(session));
+        when(refreshSessionRepository.findByUser_UserId(USER_ID)).thenReturn(List.of(session));
 
         com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer reviewer =
                 mock(com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer.class);
-        when(partnerReviewerRepository.findByUser_UserId(1L)).thenReturn(Optional.of(reviewer));
+        when(partnerReviewerRepository.findByUser_UserId(USER_ID)).thenReturn(Optional.of(reviewer));
 
-        userService.deleteAccount(1L);
+        userService.deleteAccount(USER_ID);
 
         verify(refreshSessionRepository).deleteAll(List.of(session));
         verify(partnerReviewerRepository).delete(reviewer);

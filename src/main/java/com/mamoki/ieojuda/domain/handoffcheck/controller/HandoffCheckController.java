@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.handoffcheck.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.handoffcheck.dto.HandoffCheckSendRequest;
 import com.mamoki.ieojuda.domain.handoffcheck.dto.HandoffCheckSendResponse;
 import com.mamoki.ieojuda.domain.handoffcheck.dto.HandoffCheckStatusResponse;
@@ -30,8 +32,8 @@ public class HandoffCheckController {
     @Operation(summary = "인계 점검 화면 조회", description = "역할 담당자와 지정 확인자의 이메일 발송, 역할 수락, 대체 담당자, 문의 사항, 준비 완료 여부를 함께 조회합니다.")
     @GetMapping
     public ResponseEntity<RsData<HandoffCheckStatusResponse>> getHandoffCheck(
-            @AuthenticationPrincipal Long userId, // 현재 로그인한 사용자 ID 식별
-            @Parameter(description = "계획 ID") @PathVariable Long planId
+            @AuthenticationPrincipal UUID userId, // 현재 로그인한 사용자 ID 식별
+            @Parameter(description = "계획 ID") @PathVariable UUID planId
     ) {
         HandoffCheckStatusResponse result = handoffCheckService.getHandoffCheck(userId, planId);
         return ResponseEntity.ok(RsData.success(result));
@@ -41,8 +43,8 @@ public class HandoffCheckController {
     @Operation(summary = "인계 점검 발송", description = "봉인된 계획의 담당자에게 만료형 링크의 점검 메일을 발송합니다. recipientIds를 생략하면 대체 담당자를 제외한 전체 담당자에게 발송합니다.")
     @PostMapping
     public ResponseEntity<RsData<HandoffCheckSendResponse>> sendCheck(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "계획 ID") @PathVariable Long planId,
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "계획 ID") @PathVariable UUID planId,
             @RequestBody(required = false) HandoffCheckSendRequest request
     ) {
         HandoffCheckSendResponse result = handoffCheckService.sendCheck(userId, planId, request);

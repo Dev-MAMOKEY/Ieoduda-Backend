@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,8 +51,12 @@ import static org.mockito.Mockito.when;
 class PosthumousPackageServiceTest {
 
     private static final String SESSION_ID = "session-token";
-    private static final Long MY_RECIPIENT_ID = 4L;
-    private static final Long OTHER_RECIPIENT_ID = 5L;
+    private static final UUID MY_RECIPIENT_ID = UUID.randomUUID();
+    private static final UUID OTHER_RECIPIENT_ID = UUID.randomUUID();
+    private static final UUID STAGE_ID = UUID.randomUUID();
+    private static final UUID MY_ITEM_ID = UUID.randomUUID();
+    private static final UUID OTHER_ITEM_ID = UUID.randomUUID();
+    private static final UUID ISSUE_ID = UUID.randomUUID();
 
     private AccessTokenRepository accessTokenRepository;
     private PackageActionCompletionRepository packageActionCompletionRepository;
@@ -102,7 +107,7 @@ class PosthumousPackageServiceTest {
         setId(myRecipient, MY_RECIPIENT_ID);
 
         HandoverStage stage = HandoverStage.builder().plan(plan).recipient(myRecipient).stageOrder(0).build();
-        setId(stage, 10L);
+        setId(stage, STAGE_ID);
         stage.send();
 
         PlanVersion planVersion = mock(PlanVersion.class);
@@ -118,17 +123,15 @@ class PosthumousPackageServiceTest {
                 .thenReturn(Optional.of(accessToken));
 
         // 스냅샷: 내 항목 1개(itemId=100) + 다른 담당자 항목 1개(itemId=200)
-        PlanSnapshotDto.ItemSnapshot myItem = new PlanSnapshotDto.ItemSnapshot(
-                100L, MY_RECIPIENT_ID, "이지수", "인스타그램", "비공개 전환", "SNS 계정 처리", "비공개로 전환",
+        PlanSnapshotDto.ItemSnapshot myItem = new PlanSnapshotDto.ItemSnapshot(                MY_ITEM_ID, MY_RECIPIENT_ID, "이지수", "인스타그램", "비공개 전환", "SNS 계정 처리", "비공개로 전환",
                 "", DisclosureScope.RELATIONSHIP, "지수에게 SNS 정리를 부탁", ItemStatus.APPROVED, 0, ItemActionType.DELETE);
-        PlanSnapshotDto.ItemSnapshot otherItem = new PlanSnapshotDto.ItemSnapshot(
-                200L, OTHER_RECIPIENT_ID, "다른사람", "이메일", "정리", "업무 메일 정리", "내용",
+        PlanSnapshotDto.ItemSnapshot otherItem = new PlanSnapshotDto.ItemSnapshot(                OTHER_ITEM_ID, OTHER_RECIPIENT_ID, "다른사람", "이메일", "정리", "업무 메일 정리", "내용",
                 "", DisclosureScope.WORK, "근거", ItemStatus.APPROVED, 0, ItemActionType.TRANSFER);
-        PlanSnapshotDto snapshot = new PlanSnapshotDto(1L, 7, List.of(myItem, otherItem), List.of(), List.of());
+        PlanSnapshotDto snapshot = new PlanSnapshotDto(UUID.randomUUID(), 7, List.of(myItem, otherItem), List.of());
         when(planSnapshotService.deserialize("{\"frozen\":true}")).thenReturn(snapshot);
     }
 
-    private void setId(Object entity, Long id) {
+    private void setId(Object entity, UUID id) {
         try {
             String fieldName = entity instanceof Recipient ? "assigneeId" : "stageId";
             var field = entity.getClass().getDeclaredField(fieldName);
@@ -148,7 +151,7 @@ class PosthumousPackageServiceTest {
         assertThat(response.authorName()).isEqualTo("김나무");
         assertThat(response.notice()).contains("김나무");
         assertThat(response.actions()).hasSize(1);
-        assertThat(response.actions().get(0).actionId()).isEqualTo(100L);
+        assertThat(response.actions().get(0).actionId()).isEqualTo(MY_ITEM_ID);
         assertThat(response.actions().get(0).action()).isEqualTo("비공개 전환");
         assertThat(response.actions().get(0).status()).isEqualTo("PENDING");
     }
@@ -171,8 +174,8 @@ class PosthumousPackageServiceTest {
     @Test
     void getPackage_reflectsCompletedCount() {
         PackageActionCompletion completion = PackageActionCompletion.builder()
-                .handoverStage(accessToken.getHandoverStage()).itemId(100L).build();
-        when(packageActionCompletionRepository.findByHandoverStage_StageId(10L)).thenReturn(List.of(completion));
+                .handoverStage(accessToken.getHandoverStage()).itemId(MY_ITEM_ID).build();
+        when(packageActionCompletionRepository.findByHandoverStage_StageId(STAGE_ID)).thenReturn(List.of(completion));
 
         var response = posthumousPackageService.getPackage(SESSION_ID);
 
@@ -183,7 +186,7 @@ class PosthumousPackageServiceTest {
     // issue #77 완료 조건 - "다른 역할의 항목 요청 시 차단"
     @Test
     void completeAction_whenActionBelongsToOtherRole_throwsRolePackageAccessDenied() {
-        assertThatThrownBy(() -> posthumousPackageService.completeAction(SESSION_ID, 200L, null))
+        assertThatThrownBy(() -> posthumousPackageService.completeAction(SESSION_ID, OTHER_ITEM_ID, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ROLE_PACKAGE_ACCESS_DENIED));
         verify(packageActionCompletionRepository, never()).save(any());
@@ -191,26 +194,26 @@ class PosthumousPackageServiceTest {
 
     @Test
     void completeAction_whenOwned_savesCompletionAndReturnsCompletedStatus() {
-        when(packageActionCompletionRepository.findByHandoverStage_StageIdAndItemId(10L, 100L))
+        when(packageActionCompletionRepository.findByHandoverStage_StageIdAndItemId(STAGE_ID, MY_ITEM_ID))
                 .thenReturn(Optional.empty());
 
-        var response = posthumousPackageService.completeAction(SESSION_ID, 100L, null);
+        var response = posthumousPackageService.completeAction(SESSION_ID, MY_ITEM_ID, null);
 
         assertThat(response.status()).isEqualTo("COMPLETED");
         verify(packageActionCompletionRepository, times(1)).save(any());
         verify(idempotencyGuard).claim("package-action-complete", null);
         // issue #78 - 내 역할 항목이 1개뿐이라 이 완료로 단계 전체가 끝남 -> 단계 완료 판정 호출로 이어져야 한다
-        verify(handoverStageService).completeStageIfAllActionsDone(10L, 1);
+        verify(handoverStageService).completeStageIfAllActionsDone(STAGE_ID, 1);
     }
 
     @Test
     void completeAction_whenAlreadyCompleted_doesNotDuplicateSave() {
         PackageActionCompletion existing = PackageActionCompletion.builder()
-                .handoverStage(accessToken.getHandoverStage()).itemId(100L).build();
-        when(packageActionCompletionRepository.findByHandoverStage_StageIdAndItemId(10L, 100L))
+                .handoverStage(accessToken.getHandoverStage()).itemId(MY_ITEM_ID).build();
+        when(packageActionCompletionRepository.findByHandoverStage_StageIdAndItemId(STAGE_ID, MY_ITEM_ID))
                 .thenReturn(Optional.of(existing));
 
-        posthumousPackageService.completeAction(SESSION_ID, 100L, "same-key");
+        posthumousPackageService.completeAction(SESSION_ID, MY_ITEM_ID, "same-key");
 
         // 이미 완료된 행동을 재요청했을 때는 단계 완료 판정도 다시 트리거하지 않는다(불필요한 재판정 방지)
         verify(handoverStageService, never()).completeStageIfAllActionsDone(any(), org.mockito.ArgumentMatchers.anyInt());
@@ -220,7 +223,7 @@ class PosthumousPackageServiceTest {
 
     @Test
     void reportIssue_whenActionBelongsToOtherRole_throwsRolePackageAccessDenied() {
-        PackageIssueRequest request = new PackageIssueRequest(200L, "문제 있음");
+        PackageIssueRequest request = new PackageIssueRequest(OTHER_ITEM_ID, "문제 있음");
 
         assertThatThrownBy(() -> posthumousPackageService.reportIssue(SESSION_ID, request))
                 .isInstanceOfSatisfying(CustomException.class,
@@ -230,18 +233,18 @@ class PosthumousPackageServiceTest {
 
     @Test
     void reportIssue_whenOwned_savesIssue() {
-        when(itemRepository.getReferenceById(100L)).thenReturn(mock(com.mamoki.ieojuda.domain.plan.entity.Item.class));
+        when(itemRepository.getReferenceById(MY_ITEM_ID)).thenReturn(mock(com.mamoki.ieojuda.domain.plan.entity.Item.class));
         when(packageIssueRepository.save(any())).thenAnswer(invocation -> {
             PackageIssue issue = invocation.getArgument(0);
             var field = PackageIssue.class.getDeclaredField("issueId");
             field.setAccessible(true);
-            field.set(issue, 1L);
+            field.set(issue, ISSUE_ID);
             return issue;
         });
 
-        var response = posthumousPackageService.reportIssue(SESSION_ID, new PackageIssueRequest(100L, "접근 불가"));
+        var response = posthumousPackageService.reportIssue(SESSION_ID, new PackageIssueRequest(MY_ITEM_ID, "접근 불가"));
 
-        assertThat(response.issueId()).isEqualTo(1L);
+        assertThat(response.issueId()).isEqualTo(ISSUE_ID);
         assertThat(response.status()).isEqualTo("OPEN");
     }
 }

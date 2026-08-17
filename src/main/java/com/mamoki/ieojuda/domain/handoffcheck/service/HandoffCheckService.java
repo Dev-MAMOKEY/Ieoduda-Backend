@@ -32,6 +32,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.UUID;
 import java.util.List;
 import java.util.Map;
 
@@ -49,7 +50,7 @@ public class HandoffCheckService {
     private final EmailOutboxService emailOutboxService;
     private final AppProperties appProperties;
 
-    public HandoffCheckStatusResponse getHandoffCheck(Long userId, Long planId) {
+    public HandoffCheckStatusResponse getHandoffCheck(UUID userId, UUID planId) {
         planOwnershipReader.findOwnedPlan(userId, planId);
 
         List<HandoffCheckAssigneeResponse> assignees = buildAssignees(planId);
@@ -62,7 +63,7 @@ public class HandoffCheckService {
 
     // 작성자가 담당자에게 점검 메일을 발송 - 봉인된 계획에서만 가능 (명세서 "선택형 생전 인계 점검" 진입 조건)
     @Transactional
-    public HandoffCheckSendResponse sendCheck(Long userId, Long planId, HandoffCheckSendRequest request) {
+    public HandoffCheckSendResponse sendCheck(UUID userId, UUID planId, HandoffCheckSendRequest request) {
         Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
         if (plan.getStatus() != PlanStatus.SEALED) {
             throw new CustomException(ErrorCode.PLAN_NOT_SEALED);
@@ -79,7 +80,7 @@ public class HandoffCheckService {
     }
 
     // recipientIds 생략 시 대체 담당자를 제외한 전체 담당자에게 발송 (기존 점검 화면 대상 목록과 동일한 기준)
-    private List<Recipient> resolveTargets(Long planId, HandoffCheckSendRequest request) {
+    private List<Recipient> resolveTargets(UUID planId, HandoffCheckSendRequest request) {
         if (request == null || request.recipientIds() == null || request.recipientIds().isEmpty()) {
             return recipientRepository.findByPlan_PlanIdAndIsBackupFalseOrderByAssigneeIdAsc(planId);
         }
@@ -116,10 +117,10 @@ public class HandoffCheckService {
     }
 
     // 대체 담당자는 별도 박스가 아니라 주 담당자 박스 안에 표시되므로, 대체 담당자를 주 담당자 ID로 매핑해 함께 조회한다 (N+1 방지)
-    private List<HandoffCheckAssigneeResponse> buildAssignees(Long planId) {
+    private List<HandoffCheckAssigneeResponse> buildAssignees(UUID planId) {
         List<Recipient> recipients = recipientRepository.findByPlan_PlanId(planId);
 
-        Map<Long, Recipient> backupByPrimaryId = new HashMap<>();
+        Map<UUID, Recipient> backupByPrimaryId = new HashMap<>();
         for (Recipient recipient : recipients) {
             if (Boolean.TRUE.equals(recipient.getIsBackup()) && recipient.getBackupFor() != null) {
                 backupByPrimaryId.put(recipient.getBackupFor().getAssigneeId(), recipient);
@@ -127,9 +128,9 @@ public class HandoffCheckService {
         }
 
         // 담당자별 최신 점검 응답 행 - 여러 번 점검을 보냈다면 가장 최근에 발송된 점검 것만 화면에 반영
-        Map<Long, HandoffCheckResponse> latestResponseByAssigneeId = new HashMap<>();
+        Map<UUID, HandoffCheckResponse> latestResponseByAssigneeId = new HashMap<>();
         for (HandoffCheckResponse response : handoffCheckResponseRepository.findByHandoffCheck_Plan_PlanId(planId)) {
-            Long assigneeId = response.getRecipient().getAssigneeId();
+            UUID assigneeId = response.getRecipient().getAssigneeId();
             HandoffCheckResponse current = latestResponseByAssigneeId.get(assigneeId);
             if (current == null || isMoreRecent(response, current)) {
                 latestResponseByAssigneeId.put(assigneeId, response);

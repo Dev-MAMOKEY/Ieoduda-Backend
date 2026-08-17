@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
 import java.time.LocalDateTime;
 
 // 명세서 "역할별 사후 패키지" - 행동(항목) 완료 기록. 조회는 봉인된 스냅샷(PlanSnapshotDto)만 읽으므로
@@ -21,22 +22,22 @@ import java.time.LocalDateTime;
 public class PackageActionCompletion {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "completion_id")
-    private Long completionId;
+    private UUID completionId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "stage_id", nullable = false)
     private HandoverStage handoverStage;
 
     @Column(name = "item_id", nullable = false)
-    private Long itemId;
+    private UUID itemId;
 
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
     @Builder
-    public PackageActionCompletion(HandoverStage handoverStage, Long itemId) {
+    public PackageActionCompletion(HandoverStage handoverStage, UUID itemId) {
         this.handoverStage = handoverStage;
         this.itemId = itemId;
         this.completedAt = LocalDateTime.now();

@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.UUID;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,7 +33,7 @@ public class ItemOrderService {
     private final PlanOwnershipReader planOwnershipReader;
     private final ItemRepository itemRepository;
 
-    public OrderCheckResponse getOrderCheck(Long userId, Long planId) {
+    public OrderCheckResponse getOrderCheck(UUID userId, UUID planId) {
         planOwnershipReader.findOwnedPlan(userId, planId);
         List<Item> items = itemRepository.findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(planId);
         return OrderCheckResponse.of(buildItemResponses(items));
@@ -40,12 +41,12 @@ public class ItemOrderService {
 
     // 드래그로 바뀐 순서를 저장 - 순서가 바뀌었으므로 기존 확정 상태는 초기화한다
     @Transactional
-    public OrderCheckResponse reorder(Long userId, Long planId, ItemReorderRequest request) {
+    public OrderCheckResponse reorder(UUID userId, UUID planId, ItemReorderRequest request) {
         Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
         List<Item> items = itemRepository.findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(planId);
 
-        Map<Long, Item> itemsById = items.stream().collect(Collectors.toMap(Item::getItemId, item -> item));
-        Set<Long> requestedIds = new HashSet<>(request.itemIds());
+        Map<UUID, Item> itemsById = items.stream().collect(Collectors.toMap(Item::getItemId, item -> item));
+        Set<UUID> requestedIds = new HashSet<>(request.itemIds());
         // 순서 점검 대상 전체가 빠짐없이, 중복 없이 와야 한다 - 일부만 오면 나머지 항목의 순서가 불명확해짐
         if (requestedIds.size() != request.itemIds().size() || !requestedIds.equals(itemsById.keySet())) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
@@ -62,7 +63,7 @@ public class ItemOrderService {
 
     // "순서 확정하기" - 충돌이 하나라도 남아있으면 확정할 수 없다
     @Transactional
-    public OrderConfirmResponse confirm(Long userId, Long planId) {
+    public OrderConfirmResponse confirm(UUID userId, UUID planId) {
         Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
         List<Item> items = itemRepository.findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(planId);
 
@@ -81,7 +82,7 @@ public class ItemOrderService {
                 .filter(item -> item.getLocationType() != null && !item.getLocationType().isBlank())
                 .collect(Collectors.groupingBy(Item::getLocationType));
 
-        Map<Long, String> conflictMessages = new HashMap<>();
+        Map<UUID, String> conflictMessages = new HashMap<>();
         for (List<Item> group : byLocation.values()) {
             if (group.size() < 2) {
                 continue;

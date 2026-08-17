@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.audit.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
 import com.mamoki.ieojuda.domain.audit.dto.AuthAuditLogResponse;
 import com.mamoki.ieojuda.domain.audit.service.AuthAuditService;
@@ -31,7 +33,7 @@ public class AuthAuditController {
     @Operation(summary = "인증 실패 감사 조회", description = "로그인 실패/잠금, rate limit 초과 이력을 최신순으로 페이지 단위 조회합니다.")
     @GetMapping
     public ResponseEntity<RsData<Page<AuthAuditLogResponse>>> getLogs(
-            @AuthenticationPrincipal Long userId,
+            @AuthenticationPrincipal UUID userId,
             @PageableDefault(size = 50) Pageable pageable
     ) {
         permissionGuard.require(userId, AdminPermission.AUDIT_VIEW);

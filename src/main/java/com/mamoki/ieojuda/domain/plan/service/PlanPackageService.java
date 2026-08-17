@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.UUID;
 import java.util.List;
 import java.util.Map;
 
@@ -33,13 +34,13 @@ public class PlanPackageService {
     private final ItemRepository itemRepository;
     private final ConfirmerRepository confirmerRepository;
 
-    public PackagePreviewResponse getPreview(Long userId, Long planId) {
+    public PackagePreviewResponse getPreview(UUID userId, UUID planId) {
         planOwnershipReader.findOwnedPlan(userId, planId);
 
         List<Item> items = itemRepository
                 .findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(planId);
 
-        Map<Long, List<Item>> itemsByRecipientId = new LinkedHashMap<>();
+        Map<UUID, List<Item>> itemsByRecipientId = new LinkedHashMap<>();
         for (Item item : items) {
             itemsByRecipientId.computeIfAbsent(item.getRecipient().getAssigneeId(), key -> new ArrayList<>()).add(item);
         }
@@ -56,7 +57,7 @@ public class PlanPackageService {
     // 봉인 차단 검사(이슈 #81 명시 범위 3가지, 순서대로) - 과도한 권한 집중 판정은 기준 비율이 아직
     // 정해지지 않아 #90에서 다룬다.
     @Transactional
-    public PlanResponse seal(Long userId, Long planId) {
+    public PlanResponse seal(UUID userId, UUID planId) {
         Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
 
         long acceptedConfirmerCount = confirmerRepository.findByPlan_PlanIdOrderByConfirmIdAsc(planId).stream()

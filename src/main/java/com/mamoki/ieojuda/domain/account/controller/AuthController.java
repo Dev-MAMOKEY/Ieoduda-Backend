@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.account.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.account.dto.LoginRequest;
 import com.mamoki.ieojuda.domain.account.dto.RefreshRequest;
 import com.mamoki.ieojuda.domain.account.dto.SignupRequest;
@@ -47,7 +49,7 @@ public class AuthController {
 
     @Operation(summary = "로그아웃", description = "저장된 Refresh Token을 무효화해 재발급을 막습니다. 이미 발급된 Access Token은 만료 전까지 계속 유효합니다. Authorization 헤더의 Access Token으로 사용자를 식별합니다.")
     @PostMapping("/logout")
-    public ResponseEntity<RsData<Void>> logout(@AuthenticationPrincipal Long userId) {
+    public ResponseEntity<RsData<Void>> logout(@AuthenticationPrincipal UUID userId) {
         authService.logout(userId);
         return ResponseEntity.ok(RsData.success(null));
     }

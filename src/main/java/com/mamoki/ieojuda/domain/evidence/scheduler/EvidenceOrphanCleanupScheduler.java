@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
 import java.util.List;
 
 // issue #51 - DB 트랜잭션 롤백 시 EvidenceSubmitService의 즉시 보정 삭제가 실패해 기록된 S3 고아

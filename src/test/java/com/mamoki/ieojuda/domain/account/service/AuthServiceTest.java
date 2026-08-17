@@ -24,6 +24,7 @@ import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -76,7 +77,9 @@ class AuthServiceTest {
                 jwtProperties, refreshSessionRepository, sessionRevocationService);
     }
 
-    private User userWithId(Long id) {
+    private static final UUID USER_ID = UUID.randomUUID();
+
+    private User userWithId(UUID id) {
         User user = User.builder().email("owner@test.com").password("hash").name("A").build();
         setField(user, "userId", id);
         return user;
@@ -94,11 +97,11 @@ class AuthServiceTest {
 
     @Test
     void login_success_createsNewSessionFamily() {
-        User user = userWithId(1L);
+        User user = userWithId(USER_ID);
         when(userRepository.findByEmail("owner@test.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("password1234", "hash")).thenReturn(true);
-        when(jwtTokenProvider.generateRefreshToken(eq(1L), any(), anyLong())).thenReturn("rt-jwt");
-        when(jwtTokenProvider.generateAccessToken(eq(1L), eq("owner@test.com"), eq("USER"), eq(0))).thenReturn("at-jwt");
+        when(jwtTokenProvider.generateRefreshToken(eq(USER_ID), any(), anyLong())).thenReturn("rt-jwt");
+        when(jwtTokenProvider.generateAccessToken(eq(USER_ID), eq("owner@test.com"), eq("USER"), eq(0))).thenReturn("at-jwt");
 
         TokenResponse response = authService.login(new LoginRequest("owner@test.com", "password1234"));
 
@@ -117,7 +120,7 @@ class AuthServiceTest {
 
     @Test
     void refresh_validUnusedSession_rotatesAndLinksToNewSession() {
-        User user = userWithId(1L);
+        User user = userWithId(USER_ID);
         RefreshSession oldSession = RefreshSession.builder()
                 .sessionId("old-id")
                 .user(user)
@@ -130,9 +133,9 @@ class AuthServiceTest {
         when(jwtTokenProvider.isRefreshToken("presented-rt")).thenReturn(true);
         when(jwtTokenProvider.getJti("presented-rt")).thenReturn("old-id");
         when(refreshSessionRepository.findById("old-id")).thenReturn(Optional.of(oldSession));
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(jwtTokenProvider.generateRefreshToken(eq(1L), any(), anyLong())).thenReturn("new-rt-jwt");
-        when(jwtTokenProvider.generateAccessToken(eq(1L), any(), any(), any())).thenReturn("new-at-jwt");
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(jwtTokenProvider.generateRefreshToken(eq(USER_ID), any(), anyLong())).thenReturn("new-rt-jwt");
+        when(jwtTokenProvider.generateAccessToken(eq(USER_ID), any(), any(), any())).thenReturn("new-at-jwt");
 
         TokenResponse response = authService.refresh(new RefreshRequest("presented-rt"));
 
@@ -148,7 +151,7 @@ class AuthServiceTest {
 
     @Test
     void refresh_alreadyUsedSession_isTreatedAsTheftAndRevokesWholeFamily() {
-        User user = userWithId(1L);
+        User user = userWithId(USER_ID);
         RefreshSession reusedSession = RefreshSession.builder()
                 .sessionId("stolen-id")
                 .user(user)
@@ -185,7 +188,7 @@ class AuthServiceTest {
 
     @Test
     void refresh_revokedSession_isRejected() {
-        User user = userWithId(1L);
+        User user = userWithId(USER_ID);
         RefreshSession revokedSession = RefreshSession.builder()
                 .sessionId("revoked-id")
                 .user(user)
@@ -207,8 +210,8 @@ class AuthServiceTest {
 
     @Test
     void logout_revokesAllActiveSessionsAndBumpsTokenVersion() {
-        User user = userWithId(1L);
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        User user = userWithId(USER_ID);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
         RefreshSession sessionA = RefreshSession.builder()
                 .sessionId("a").user(user).familyId("fam-a").tokenHash("h")
@@ -217,10 +220,10 @@ class AuthServiceTest {
                 .sessionId("b").user(user).familyId("fam-b").tokenHash("h")
                 .issuedAt(LocalDateTime.now()).expiresAt(LocalDateTime.now().plusDays(14)).build();
 
-        when(refreshSessionRepository.findByUser_UserIdAndRevokedAtIsNull(1L)).thenReturn(List.of(sessionA, sessionB));
+        when(refreshSessionRepository.findByUser_UserIdAndRevokedAtIsNull(USER_ID)).thenReturn(List.of(sessionA, sessionB));
 
         int versionBefore = user.getTokenVersion();
-        authService.logout(1L);
+        authService.logout(USER_ID);
 
         assertThat(sessionA.getRevokedAt()).isNotNull();
         assertThat(sessionB.getRevokedAt()).isNotNull();

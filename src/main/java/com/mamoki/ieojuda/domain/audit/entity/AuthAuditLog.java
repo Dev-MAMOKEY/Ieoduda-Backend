@@ -13,6 +13,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
 import java.time.LocalDateTime;
 
 // issue #55 - 고위험 인증 실패(로그인 실패/잠금, rate limit 초과)를 운영자가 추적할 수 있게 남기는 감사 로그
@@ -23,9 +24,9 @@ import java.time.LocalDateTime;
 public class AuthAuditLog {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "log_id")
-    private Long logId;
+    private UUID logId;
 
     // 시도된 이메일 - 실제 존재하는 계정이 아닐 수도 있음(존재 여부를 노출하지 않기 위해 그대로 기록만 함)
     @Column(name = "email", length = 255)

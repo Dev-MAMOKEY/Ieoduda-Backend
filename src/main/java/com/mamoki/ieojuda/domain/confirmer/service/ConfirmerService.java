@@ -29,6 +29,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.UUID;
 import java.util.List;
 import java.util.Set;
 
@@ -45,7 +46,7 @@ public class ConfirmerService {
 
     @Transactional
     // 특정 계획에 여러 명의 확인자를 한번에 등록하는 함수
-    public ConfirmerBulkRegisterResponse registerAll(Long userId, Long planId, ConfirmerBulkRegisterRequest request) {
+    public ConfirmerBulkRegisterResponse registerAll(UUID userId, UUID planId, ConfirmerBulkRegisterRequest request) {
         Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
         validateAll(planId, request.confirmers());
 
@@ -58,7 +59,7 @@ public class ConfirmerService {
     }
 
     // 이메일은 발송 후 되돌릴 수 없으므로, 저장·발송을 시작하기 전에 요청 전체를 먼저 검증한다
-    private void validateAll(Long planId, List<ConfirmerRegisterRequest> requests) {
+    private void validateAll(UUID planId, List<ConfirmerRegisterRequest> requests) {
         Set<String> requestedEmails = new HashSet<>();
 
         for (ConfirmerRegisterRequest request : requests) {
@@ -105,7 +106,7 @@ public class ConfirmerService {
     }
 
     // "역할 점검" 화면 상세 - 이름 클릭 시 해당 확인자 정보
-    public ConfirmerDetailResponse getConfirmer(Long userId, Long planId, Long confirmId) {
+    public ConfirmerDetailResponse getConfirmer(UUID userId, UUID planId, UUID confirmId) {
         planOwnershipReader.findOwnedPlan(userId, planId);
         Confirmer confirmer = findOwnedConfirmer(planId, confirmId);
         return ConfirmerDetailResponse.from(confirmer);
@@ -113,7 +114,7 @@ public class ConfirmerService {
 
     // "수락 요청 다시 보내기" - 이미 수락/거절한 확인자에게는 재전송하지 않는다
     @Transactional
-    public ConfirmerResendResponse resendAcceptanceEmail(Long userId, Long confirmId) {
+    public ConfirmerResendResponse resendAcceptanceEmail(UUID userId, UUID confirmId) {
         Confirmer confirmer = confirmerRepository.findById(confirmId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CONFIRMER_NOT_FOUND));
         if (!confirmer.getPlan().getUser().getUserId().equals(userId)) {
@@ -132,7 +133,7 @@ public class ConfirmerService {
 
     // "확인자 수정하기" - 이름/이메일 수정. 이메일이 바뀌면 재검증이 필요하므로 수락 이메일을 다시 보낸다
     @Transactional
-    public ConfirmerUpdateResponse updateConfirmer(Long userId, Long planId, Long confirmId, ConfirmerUpdateRequest request) {
+    public ConfirmerUpdateResponse updateConfirmer(UUID userId, UUID planId, UUID confirmId, ConfirmerUpdateRequest request) {
         planOwnershipReader.findOwnedPlan(userId, planId);
         Confirmer confirmer = findOwnedConfirmer(planId, confirmId);
 
@@ -144,7 +145,7 @@ public class ConfirmerService {
         return ConfirmerUpdateResponse.of(confirmer, emailChanged, null);
     }
 
-    private Confirmer findOwnedConfirmer(Long planId, Long confirmId) {
+    private Confirmer findOwnedConfirmer(UUID planId, UUID confirmId) {
         Confirmer confirmer = confirmerRepository.findById(confirmId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CONFIRMER_NOT_FOUND));
         if (!confirmer.getPlan().getPlanId().equals(planId)) {

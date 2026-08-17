@@ -1,7 +1,7 @@
 package com.mamoki.ieojuda.domain.releasecase.service;
 
-import com.mamoki.ieojuda.domain.plan.entity.Plan;
-import com.mamoki.ieojuda.domain.plan.service.PlanOwnershipReader;
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.releasecase.dto.ReleaseStatusResponse;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
@@ -17,23 +17,27 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class ReleaseStatusService {
 
-    private final PlanOwnershipReader planOwnershipReader;
     private final ReleaseCaseRepository releaseCaseRepository;
 
-    public ReleaseStatusResponse getStatus(Long userId, Long planId) {
-        Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
-        ReleaseCase releaseCase = releaseCaseRepository.findFirstByPlan_PlanIdOrderByCaseIdDesc(plan.getPlanId()).orElse(null);
+    public ReleaseStatusResponse getStatus(UUID userId, UUID caseId) {
+        ReleaseCase releaseCase = findOwnedCase(userId, caseId);
         return ReleaseStatusResponse.of(releaseCase);
     }
 
     // "살아계신가요? 지금 멈출 수 있어요" - 본인 확인 후 절차 전체를 즉시 취소
     @Transactional
-    public ReleaseStatusResponse cancel(Long userId, Long planId) {
-        Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
-        ReleaseCase releaseCase = releaseCaseRepository.findFirstByPlan_PlanIdOrderByCaseIdDesc(plan.getPlanId())
-                .orElseThrow(() -> new CustomException(ErrorCode.RELEASE_CASE_NOT_FOUND));
-
+    public ReleaseStatusResponse cancel(UUID userId, UUID caseId) {
+        ReleaseCase releaseCase = findOwnedCase(userId, caseId);
         releaseCase.cancel();
         return ReleaseStatusResponse.of(releaseCase);
+    }
+
+    private ReleaseCase findOwnedCase(UUID userId, UUID caseId) {
+        ReleaseCase releaseCase = releaseCaseRepository.findById(caseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RELEASE_CASE_NOT_FOUND));
+        if (!releaseCase.getPlan().getUser().getUserId().equals(userId)) {
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+        return releaseCase;
     }
 }

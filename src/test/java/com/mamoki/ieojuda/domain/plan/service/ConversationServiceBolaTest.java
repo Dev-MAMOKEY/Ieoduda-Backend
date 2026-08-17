@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.plan.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.plan.repository.ConversationRepository;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
 import com.mamoki.ieojuda.domain.plan.repository.LifeAreaMessageRepository;
@@ -25,10 +27,10 @@ import static org.mockito.Mockito.when;
 // 특히 sendMessage는 성공 시 OpenAI 호출 + 항목 삭제/생성이라는 부수효과가 크므로, 거부됐을 때 그 부수효과가 전혀 없어야 한다.
 class ConversationServiceBolaTest {
 
-    private static final Long OWNER_ID = 1L;
-    private static final Long ATTACKER_ID = 2L;
-    private static final Long PLAN_ID = 10L;
-    private static final Long CONVERSATION_ID = 100L;
+    private static final UUID OWNER_ID = UUID.randomUUID();
+    private static final UUID ATTACKER_ID = UUID.randomUUID();
+    private static final UUID PLAN_ID = UUID.randomUUID();
+    private static final UUID CONVERSATION_ID = UUID.randomUUID();
 
     private PlanRepository planRepository;
     private ConversationRepository conversationRepository;

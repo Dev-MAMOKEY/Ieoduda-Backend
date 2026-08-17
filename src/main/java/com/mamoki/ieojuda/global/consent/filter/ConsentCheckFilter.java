@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.global.consent.filter;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.account.entity.UserRole;
 import com.mamoki.ieojuda.domain.account.repository.UserRepository;
@@ -49,7 +51,7 @@ public class ConsentCheckFilter extends OncePerRequestFilter {
         }
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof Long userId)) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof UUID userId)) {
             // 토큰이 없거나 유효하지 않은 요청은 이 필터의 관심사가 아님 - SecurityConfig의 인가 규칙이 처리
             filterChain.doFilter(request, response);
             return;

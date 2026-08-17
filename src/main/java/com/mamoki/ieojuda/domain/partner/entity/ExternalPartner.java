@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 @Entity
 @Table(name = "external_partners")
 @Getter
@@ -13,9 +15,9 @@ import lombok.NoArgsConstructor;
 public class ExternalPartner {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "partner_id")
-    private Long partnerId;
+    private UUID partnerId;
 
     @Column(name = "name", length = 100)
     private String name;

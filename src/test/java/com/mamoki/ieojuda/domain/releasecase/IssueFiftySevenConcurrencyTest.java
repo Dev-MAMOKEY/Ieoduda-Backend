@@ -210,7 +210,7 @@ class IssueFiftySevenConcurrencyTest {
                                     "file", "proof-" + i + ".pdf", "application/pdf",
                                     "%PDF-1.4".getBytes(StandardCharsets.US_ASCII));
                             try {
-                                evidenceSubmitService.submit(plainToken, file, EvidenceType.DEATH_CERTIFICATE, null);
+                                evidenceSubmitService.submit(releaseCase.getCaseId(), plainToken, file, EvidenceType.DEATH_CERTIFICATE, null);
                                 return true;
                             } catch (CustomException e) {
                                 assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_SUBMISSION_INVALID);
@@ -268,8 +268,8 @@ class IssueFiftySevenConcurrencyTest {
         CountDownLatch release = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(1);
         try {
-            Future<List<Long>> holderFuture = pool.submit(() -> txTemplate.execute(status -> {
-                List<Long> heldIds = releaseCaseRepository.findDueCasesForUpdateSkipLocked(LocalDateTime.now())
+            Future<List<UUID>> holderFuture = pool.submit(() -> txTemplate.execute(status -> {
+                List<UUID> heldIds = releaseCaseRepository.findDueCasesForUpdateSkipLocked(LocalDateTime.now())
                         .stream().map(ReleaseCase::getCaseId).toList();
                 locked.countDown();
                 try {
@@ -282,13 +282,13 @@ class IssueFiftySevenConcurrencyTest {
 
             locked.await(5, TimeUnit.SECONDS);
             long startedAt = System.currentTimeMillis();
-            List<Long> secondAttemptIds = txTemplate.execute(status ->
+            List<UUID> secondAttemptIds = txTemplate.execute(status ->
                     releaseCaseRepository.findDueCasesForUpdateSkipLocked(LocalDateTime.now())
                             .stream().map(ReleaseCase::getCaseId).toList());
             long elapsedMs = System.currentTimeMillis() - startedAt;
             release.countDown();
 
-            List<Long> firstAttemptIds = holderFuture.get(10, TimeUnit.SECONDS);
+            List<UUID> firstAttemptIds = holderFuture.get(10, TimeUnit.SECONDS);
 
             // 첫 번째 트랜잭션이 이 사건을 잠근 상태에서, 두 번째("다른 인스턴스")는 SKIP LOCKED 덕분에
             // 그 사건을 건너뛰고 즉시 반환한다(블로킹 없음) - 같은 사건이 중복으로 처리되지 않는다.

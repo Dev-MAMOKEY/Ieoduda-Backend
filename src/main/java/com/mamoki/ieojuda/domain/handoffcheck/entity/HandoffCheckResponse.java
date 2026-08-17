@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
 import java.time.LocalDateTime;
 
 @Entity
@@ -16,9 +17,9 @@ import java.time.LocalDateTime;
 public class HandoffCheckResponse {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "response_id")
-    private Long responseId;
+    private UUID responseId;
 
     @Column(name = "email_reached")
     private Boolean emailReached;

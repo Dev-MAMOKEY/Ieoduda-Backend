@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.releasecase.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.releasecase.dto.ReleaseStatusResponse;
 import com.mamoki.ieojuda.domain.releasecase.service.ReleaseStatusService;
 import com.mamoki.ieojuda.global.rsdata.RsData;
@@ -19,26 +21,26 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "ReleaseStatus", description = "사후 인계 - 작성자 본인 대기 상태 조회 / 취소")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/plans/{planId}/release-status")
+@RequestMapping("/api/release-cases/{caseId}")
 public class ReleaseStatusController {
 
     private final ReleaseStatusService releaseStatusService;
 
-    @Operation(summary = "대기 상태 조회", description = "진행 중인 사후 인계 사건의 상태, 예정 발송일, 남은 기간을 조회합니다. 진행 중인 사건이 없으면 hasActiveCase가 false로 옵니다.")
-    @GetMapping
+    @Operation(summary = "대기 상태 조회", description = "진행 중인 사후 인계 사건의 상태, 예정 발송일, 남은 기간을 조회합니다.")
+    @GetMapping("/waiting")
     public ResponseEntity<RsData<ReleaseStatusResponse>> getStatus(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "계획 ID") @PathVariable Long planId
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "사건 ID") @PathVariable UUID caseId
     ) {
-        return ResponseEntity.ok(RsData.success(releaseStatusService.getStatus(userId, planId)));
+        return ResponseEntity.ok(RsData.success(releaseStatusService.getStatus(userId, caseId)));
     }
 
     @Operation(summary = "본인 확인 후 취소하기", description = "진행 중인 절차 전체를 즉시 취소합니다.")
     @PostMapping("/cancel")
     public ResponseEntity<RsData<ReleaseStatusResponse>> cancel(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "계획 ID") @PathVariable Long planId
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "사건 ID") @PathVariable UUID caseId
     ) {
-        return ResponseEntity.ok(RsData.success(releaseStatusService.cancel(userId, planId)));
+        return ResponseEntity.ok(RsData.success(releaseStatusService.cancel(userId, caseId)));
     }
 }

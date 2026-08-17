@@ -13,6 +13,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.lang.reflect.Field;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -24,6 +25,8 @@ import static org.mockito.Mockito.when;
 // issue #56 회귀 테스트 - 필터가 서명 검증만으로 끝내지 않고, 매 요청마다 DB의 현재 사용자 상태
 // (존재 여부/정지 여부/tokenVersion)를 대조하며, 권한(role)도 토큰의 claim이 아니라 DB 값을 신뢰함을 검증한다.
 class JwtAuthenticationFilterTest {
+
+    private static final UUID USER_ID = UUID.randomUUID();
 
     private JwtTokenProvider jwtTokenProvider;
     private UserRepository userRepository;
@@ -37,12 +40,12 @@ class JwtAuthenticationFilterTest {
         SecurityContextHolder.clearContext();
 
         when(jwtTokenProvider.isAccessToken("valid-token")).thenReturn(true);
-        when(jwtTokenProvider.getUserId("valid-token")).thenReturn(1L);
+        when(jwtTokenProvider.getUserId("valid-token")).thenReturn(USER_ID);
     }
 
     private User userWithRole(UserRole role) {
         User user = User.builder().email("u@test.com").password("hash").name("A").build();
-        setField(user, "userId", 1L);
+        setField(user, "userId", USER_ID);
         setField(user, "role", role);
         return user;
     }
@@ -66,7 +69,7 @@ class JwtAuthenticationFilterTest {
     @Test
     void matchingTokenVersion_authenticatesWithDbRole_notJwtRoleClaim() throws Exception {
         User user = userWithRole(UserRole.ADMIN); // DB는 ADMIN
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(jwtTokenProvider.getTokenVersion("valid-token")).thenReturn(0);
         // 토큰 자체의 role claim은 USER로 낡아있다고 가정 - 그래도 DB(ADMIN)를 신뢰해야 한다
         when(jwtTokenProvider.getRole("valid-token")).thenReturn("USER");
@@ -83,7 +86,7 @@ class JwtAuthenticationFilterTest {
     @Test
     void tokenVersionMismatch_isRejectedAsSessionRevoked() throws Exception {
         User user = userWithRole(UserRole.USER); // DB tokenVersion 기본값 0
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(jwtTokenProvider.getTokenVersion("valid-token")).thenReturn(99); // 옛날에 발급된 토큰(버전 낮음/다름)
 
         FilterChain chain = mock(FilterChain.class);
@@ -100,7 +103,7 @@ class JwtAuthenticationFilterTest {
     void suspendedUser_isRejectedEvenWithValidUnexpiredToken() throws Exception {
         User user = userWithRole(UserRole.USER);
         user.suspend();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(jwtTokenProvider.getTokenVersion("valid-token")).thenReturn(0);
 
         FilterChain chain = mock(FilterChain.class);
@@ -114,7 +117,7 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void deletedUser_isRejected() throws Exception {
-        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
         when(jwtTokenProvider.getTokenVersion("valid-token")).thenReturn(0);
 
         FilterChain chain = mock(FilterChain.class);

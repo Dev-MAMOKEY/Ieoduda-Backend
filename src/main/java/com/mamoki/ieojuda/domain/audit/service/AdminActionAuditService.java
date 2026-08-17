@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.audit.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.audit.dto.AdminActionAuditLogResponse;
 import com.mamoki.ieojuda.domain.audit.entity.AdminActionAuditLog;
@@ -23,7 +25,7 @@ public class AdminActionAuditService {
     private final AdminActionAuditLogRepository adminActionAuditLogRepository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void record(User actor, AdminActionType actionType, Long targetId, boolean success, String detail) {
+    public void record(User actor, AdminActionType actionType, UUID targetId, boolean success, String detail) {
         adminActionAuditLogRepository.save(AdminActionAuditLog.builder()
                 .actorUserId(actor.getUserId())
                 .actorEmail(actor.getEmail())
@@ -37,7 +39,7 @@ public class AdminActionAuditService {
     // 스케줄러 등 사람 행위자가 없는 자동화된 고위험 조작(증빙 자동 삭제 실패 등) 기록용.
     // actor_user_id/actor_email 컬럼은 원래 nullable이라 스키마 변경 없이 사용 가능하다.
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordSystem(AdminActionType actionType, Long targetId, boolean success, String detail) {
+    public void recordSystem(AdminActionType actionType, UUID targetId, boolean success, String detail) {
         adminActionAuditLogRepository.save(AdminActionAuditLog.builder()
                 .actionType(actionType)
                 .targetId(targetId)

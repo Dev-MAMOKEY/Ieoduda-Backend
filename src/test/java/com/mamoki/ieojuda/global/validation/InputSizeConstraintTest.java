@@ -137,8 +137,8 @@ class InputSizeConstraintTest {
 
         assertThat(validator.validate(validItem)).isEmpty();
         assertThat(validator.validate(oversizedItem)).hasSize(6);
-        assertThat(validator.validate(new ObjectionRequest("x".repeat(1000)))).isEmpty();
-        assertThat(validator.validate(new ObjectionRequest("x".repeat(1001)))).hasSize(1);
+        assertThat(validator.validate(new ObjectionRequest("token", "x".repeat(1000)))).isEmpty();
+        assertThat(validator.validate(new ObjectionRequest("token", "x".repeat(1001)))).hasSize(1);
     }
 
     @Test
