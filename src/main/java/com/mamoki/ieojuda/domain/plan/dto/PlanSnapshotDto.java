@@ -7,7 +7,6 @@ import com.mamoki.ieojuda.domain.plan.entity.ItemStatus;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.entity.RoleType;
-import com.mamoki.ieojuda.domain.stage.entity.Dependency;
 
 import java.util.List;
 
@@ -17,8 +16,7 @@ public record PlanSnapshotDto(
         Long planId,
         Integer waitingDays,
         List<ItemSnapshot> items,
-        List<RecipientSnapshot> recipients,
-        List<DependencySnapshot> dependencies
+        List<RecipientSnapshot> recipients
 ) {
 
     public record ItemSnapshot(
@@ -79,22 +77,12 @@ public record PlanSnapshotDto(
         }
     }
 
-    public record DependencySnapshot(
-            Long itemId,
-            Long dependsOnItemId
-    ) {
-        public static DependencySnapshot from(Dependency dependency) {
-            return new DependencySnapshot(dependency.getItem().getItemId(), dependency.getDependsOnItem().getItemId());
-        }
-    }
-
-    public static PlanSnapshotDto of(Plan plan, List<Item> items, List<Recipient> recipients, List<Dependency> dependencies) {
+    public static PlanSnapshotDto of(Plan plan, List<Item> items, List<Recipient> recipients) {
         return new PlanSnapshotDto(
                 plan.getPlanId(),
                 plan.getWaitingDays(),
                 items.stream().map(ItemSnapshot::from).toList(),
-                recipients.stream().map(RecipientSnapshot::from).toList(),
-                dependencies.stream().map(DependencySnapshot::from).toList()
+                recipients.stream().map(RecipientSnapshot::from).toList()
         );
     }
 }

@@ -51,7 +51,7 @@ class ReleaseCaseSchedulerTest {
         PlanSnapshotDto.ItemSnapshot itemSnapshot = new PlanSnapshotDto.ItemSnapshot(
                 1L, 100L, "target", "loc", "action", "title", "content", "precond",
                 DisclosureScope.FAMILY, "excerpt", ItemStatus.APPROVED, 0, ItemActionType.TRANSFER);
-        PlanSnapshotDto snapshot = new PlanSnapshotDto(1L, 7, List.of(itemSnapshot), List.of(), List.of());
+        PlanSnapshotDto snapshot = new PlanSnapshotDto(1L, 7, List.of(itemSnapshot), List.of());
 
         Plan plan = mock(Plan.class);
         when(plan.getOrderConfirmedAt()).thenReturn(LocalDateTime.now());

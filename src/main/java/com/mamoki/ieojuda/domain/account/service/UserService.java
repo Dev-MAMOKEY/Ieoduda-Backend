@@ -29,7 +29,6 @@ import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
 import com.mamoki.ieojuda.domain.releasecase.repository.ObjectionRepository;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.domain.releasecase.service.ReleaseCaseGuardService;
-import com.mamoki.ieojuda.domain.stage.repository.DependencyRepository;
 import com.mamoki.ieojuda.domain.stage.repository.HandoverStageRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
@@ -63,7 +62,6 @@ public class UserService {
     private final HandoffCheckRepository handoffCheckRepository;
     private final HandoffCheckResponseRepository handoffCheckResponseRepository;
     private final PackageIssueRepository packageIssueRepository;
-    private final DependencyRepository dependencyRepository;
     private final EvidenceStorageClient evidenceStorageClient;
     private final ReleaseCaseGuardService releaseCaseGuardService;
     private final SessionRevocationService sessionRevocationService;
@@ -168,7 +166,6 @@ public class UserService {
         handoffCheckResponseRepository.deleteAll(handoffCheckResponseRepository.findByHandoffCheck_Plan_PlanId(planId));
         handoffCheckRepository.deleteAll(handoffCheckRepository.findByPlan_PlanId(planId));
         packageIssueRepository.deleteAll(packageIssueRepository.findByRecipient_Plan_PlanId(planId));
-        dependencyRepository.deleteAll(dependencyRepository.findByPlan_PlanId(planId));
         lifeAreaMessageRepository.deleteAll(lifeAreaMessageRepository.findByConversation_Plan_PlanId(planId));
         itemRepository.deleteAll(itemRepository.findByLifeArea_Plan_PlanIdOrderByItemIdAsc(planId));
         handoverStageRepository.deleteAll(handoverStageRepository.findByPlan_PlanId(planId));

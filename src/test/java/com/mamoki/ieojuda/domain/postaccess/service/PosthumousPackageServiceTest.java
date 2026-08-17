@@ -124,7 +124,7 @@ class PosthumousPackageServiceTest {
         PlanSnapshotDto.ItemSnapshot otherItem = new PlanSnapshotDto.ItemSnapshot(
                 200L, OTHER_RECIPIENT_ID, "다른사람", "이메일", "정리", "업무 메일 정리", "내용",
                 "", DisclosureScope.WORK, "근거", ItemStatus.APPROVED, 0, ItemActionType.TRANSFER);
-        PlanSnapshotDto snapshot = new PlanSnapshotDto(1L, 7, List.of(myItem, otherItem), List.of(), List.of());
+        PlanSnapshotDto snapshot = new PlanSnapshotDto(1L, 7, List.of(myItem, otherItem), List.of());
         when(planSnapshotService.deserialize("{\"frozen\":true}")).thenReturn(snapshot);
     }
 

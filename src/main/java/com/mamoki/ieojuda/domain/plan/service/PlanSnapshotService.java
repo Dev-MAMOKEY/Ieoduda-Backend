@@ -7,8 +7,6 @@ import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
-import com.mamoki.ieojuda.domain.stage.entity.Dependency;
-import com.mamoki.ieojuda.domain.stage.repository.DependencyRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.storage.IntegrityHasher;
@@ -28,14 +26,12 @@ public class PlanSnapshotService {
 
     private final ItemRepository itemRepository;
     private final RecipientRepository recipientRepository;
-    private final DependencyRepository dependencyRepository;
     private final ObjectMapper objectMapper;
 
     public PlanSnapshotDto buildSnapshot(Plan plan) {
         List<Item> items = itemRepository.findByLifeArea_Plan_PlanIdOrderByItemIdAsc(plan.getPlanId());
         List<Recipient> recipients = recipientRepository.findByPlan_PlanId(plan.getPlanId());
-        List<Dependency> dependencies = dependencyRepository.findByPlan_PlanId(plan.getPlanId());
-        return PlanSnapshotDto.of(plan, items, recipients, dependencies);
+        return PlanSnapshotDto.of(plan, items, recipients);
     }
 
     public String serialize(PlanSnapshotDto snapshot) {

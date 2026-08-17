@@ -29,7 +29,6 @@ import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
 import com.mamoki.ieojuda.domain.releasecase.repository.ObjectionRepository;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.domain.releasecase.service.ReleaseCaseGuardService;
-import com.mamoki.ieojuda.domain.stage.repository.DependencyRepository;
 import com.mamoki.ieojuda.domain.stage.repository.HandoverStageRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
@@ -69,7 +68,6 @@ class UserServiceTest {
     private HandoffCheckRepository handoffCheckRepository;
     private HandoffCheckResponseRepository handoffCheckResponseRepository;
     private PackageIssueRepository packageIssueRepository;
-    private DependencyRepository dependencyRepository;
     private EvidenceStorageClient evidenceStorageClient;
     private ReleaseCaseGuardService releaseCaseGuardService;
     private SessionRevocationService sessionRevocationService;
@@ -97,7 +95,6 @@ class UserServiceTest {
         handoffCheckRepository = mock(HandoffCheckRepository.class);
         handoffCheckResponseRepository = mock(HandoffCheckResponseRepository.class);
         packageIssueRepository = mock(PackageIssueRepository.class);
-        dependencyRepository = mock(DependencyRepository.class);
         evidenceStorageClient = mock(EvidenceStorageClient.class);
         releaseCaseGuardService = mock(ReleaseCaseGuardService.class);
         sessionRevocationService = mock(SessionRevocationService.class);
@@ -109,7 +106,7 @@ class UserServiceTest {
                 itemRepository, recipientRepository, disputeContactRepository, confirmerRepository,
                 releaseCaseRepository, planVersionRepository, evidenceRepository, emailLogRepository,
                 handoverStageRepository, objectionRepository, handoffCheckRepository, handoffCheckResponseRepository,
-                packageIssueRepository, dependencyRepository, evidenceStorageClient, releaseCaseGuardService,
+                packageIssueRepository, evidenceStorageClient, releaseCaseGuardService,
                 sessionRevocationService, refreshSessionRepository, partnerReviewerRepository);
     }
 

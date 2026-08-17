@@ -86,7 +86,7 @@ class DeathReportServiceTest {
         when(releaseCaseRepository.findFirstByPlan_PlanIdOrderByCaseIdDesc(1L)).thenReturn(Optional.empty());
         when(planVersionRepository.countByPlan_PlanId(1L)).thenReturn(2L);
 
-        PlanSnapshotDto snapshot = new PlanSnapshotDto(1L, 7, List.of(), List.of(), List.of());
+        PlanSnapshotDto snapshot = new PlanSnapshotDto(1L, 7, List.of(), List.of());
         when(planSnapshotService.buildSnapshot(plan)).thenReturn(snapshot);
         when(planSnapshotService.serialize(snapshot)).thenReturn("{\"planId\":1}");
         when(planSnapshotService.hash("{\"planId\":1}")).thenReturn("deadbeef");
