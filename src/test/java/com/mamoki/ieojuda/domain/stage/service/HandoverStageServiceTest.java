@@ -1,12 +1,17 @@
 package com.mamoki.ieojuda.domain.stage.service;
 
 import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
+import com.mamoki.ieojuda.domain.account.entity.User;
+import com.mamoki.ieojuda.domain.audit.entity.AdminActionType;
 import com.mamoki.ieojuda.domain.audit.entity.EmailType;
+import com.mamoki.ieojuda.domain.audit.service.AdminActionAuditService;
+import com.mamoki.ieojuda.domain.plan.entity.DisclosureScope;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.entity.PlanVersion;
 import com.mamoki.ieojuda.domain.postaccess.entity.AccessToken;
 import com.mamoki.ieojuda.domain.postaccess.repository.AccessTokenRepository;
 import com.mamoki.ieojuda.domain.postaccess.repository.PackageActionCompletionRepository;
+import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.entity.RoleType;
 import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
@@ -23,6 +28,8 @@ import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.email.contract.EmailSendResult;
 import com.mamoki.ieojuda.global.email.sender.EmailSender;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
+import com.mamoki.ieojuda.global.exception.CustomException;
+import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.security.PermissionGuard;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +42,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -61,10 +69,12 @@ class HandoverStageServiceTest {
     private PackageActionCompletionRepository packageActionCompletionRepository;
     private AccessTokenRepository accessTokenRepository;
     private SecurityTokenService securityTokenService;
+    private AdminActionAuditService adminActionAuditService;
     private HandoverStageService handoverStageService;
 
     private ReleaseCase releaseCase;
     private HandoverStage currentStage;
+    private Recipient currentRecipient;
 
     @BeforeEach
     void setUp() {
@@ -77,10 +87,12 @@ class HandoverStageServiceTest {
         packageActionCompletionRepository = mock(PackageActionCompletionRepository.class);
         accessTokenRepository = mock(AccessTokenRepository.class);
         securityTokenService = mock(SecurityTokenService.class);
+        adminActionAuditService = mock(AdminActionAuditService.class);
         handoverStageService = new HandoverStageService(
                 releaseCaseRepository, handoverStageRepository, recipientRepository, emailOutboxService,
                 appProperties, permissionGuard, packageActionCompletionRepository, accessTokenRepository,
-                securityTokenService);
+                securityTokenService, adminActionAuditService);
+        when(permissionGuard.require(any(), eq(AdminPermission.CASE_SUPERVISE))).thenReturn(mock(User.class));
 
         when(appProperties.getContactEmail()).thenReturn("support@ieoduda.example");
         when(appProperties.getInviteTokenTtlHours()).thenReturn(72L);
@@ -100,9 +112,10 @@ class HandoverStageServiceTest {
         releaseCase.approveEvidenceAndStartWaiting(7);
         releaseCase.startReleasing();
 
-        Recipient recipient = mock(Recipient.class);
-        when(recipient.getEmail()).thenReturn("target@test.com");
-        currentStage = HandoverStage.builder().plan(plan).recipient(recipient).stageOrder(0).build();
+        currentRecipient = mock(Recipient.class);
+        when(currentRecipient.getEmail()).thenReturn("target@test.com");
+        when(currentRecipient.getDisclosureScope()).thenReturn(DisclosureScope.FAMILY);
+        currentStage = HandoverStage.builder().plan(plan).recipient(currentRecipient).stageOrder(0).build();
         currentStage.assignToCase(releaseCase);
         currentStage.send(); // 활성 발송 상태(SENT)에서 시작
 
@@ -261,13 +274,13 @@ class HandoverStageServiceTest {
     @Test
     void fallback_sendsFallbackWordingUnchangedButWithPosthumousAccessLink() {
         UUID userId = UUID.randomUUID(), caseId = UUID.randomUUID(), stageId = UUID.randomUUID();
-        when(permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE)).thenReturn(null);
+        User actor = mock(User.class);
+        when(permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE)).thenReturn(actor);
         when(releaseCaseRepository.findById(caseId)).thenReturn(Optional.of(releaseCase));
         currentStage.assignToCase(releaseCase);
         when(handoverStageRepository.findById(stageId)).thenReturn(Optional.of(currentStage));
 
-        Recipient backup = mock(Recipient.class);
-        when(backup.getEmail()).thenReturn("backup@test.com");
+        Recipient backup = acceptedBackup();
         when(recipientRepository.findByBackupFor_AssigneeId(any())).thenReturn(Optional.of(backup));
 
         handoverStageService.fallback(userId, caseId, stageId);
@@ -280,5 +293,92 @@ class HandoverStageServiceTest {
         assertThat(content.body()).contains("/posthumous-access/");
         assertThat(content.body()).doesNotContain("/recipient-acceptances/");
         assertLinkTokenWasIssuedAsAccessToken(content);
+        // issue #47 완료 조건 - "전환 대상과 사유를 감사 로그에서 확인할 수 있다"
+        verify(adminActionAuditService).record(eq(actor), eq(AdminActionType.STAGE_FALLBACK), eq(stageId), eq(true), anyString());
+    }
+
+    // 미리 ACCEPTED + 주 담당자와 같은 disclosureScope로 세팅된 "정상적으로 전환 가능한" 대체 담당자 mock.
+    // 개별 테스트에서 이 상태 중 하나만 어긋나게 덮어써서 각 차단 조건을 검증한다.
+    private Recipient acceptedBackup() {
+        Recipient backup = mock(Recipient.class);
+        when(backup.getAssigneeId()).thenReturn(UUID.randomUUID());
+        when(backup.getEmail()).thenReturn("backup@test.com");
+        when(backup.getAcceptanceStatus()).thenReturn(AcceptanceStatus.ACCEPTED);
+        when(backup.getDisclosureScope()).thenReturn(DisclosureScope.FAMILY);
+        return backup;
+    }
+
+    // issue #47 완료 조건 - "ACCEPTED 상태의 대체 담당자만 전환 대상이 된다"
+    @Test
+    void fallback_whenBackupNotAccepted_isBlockedAndBlocksStage() {
+        UUID userId = UUID.randomUUID(), caseId = UUID.randomUUID(), stageId = UUID.randomUUID();
+        when(releaseCaseRepository.findById(caseId)).thenReturn(Optional.of(releaseCase));
+        currentStage.assignToCase(releaseCase);
+        when(handoverStageRepository.findById(stageId)).thenReturn(Optional.of(currentStage));
+
+        Recipient backup = acceptedBackup();
+        when(backup.getAcceptanceStatus()).thenReturn(AcceptanceStatus.DECLINED);
+        when(recipientRepository.findByBackupFor_AssigneeId(any())).thenReturn(Optional.of(backup));
+
+        assertThatThrownBy(() -> handoverStageService.fallback(userId, caseId, stageId))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.RECIPIENT_NOT_ACCEPTED));
+
+        assertThat(currentStage.getStatus()).isEqualTo(HandoverStageStatus.BLOCKED);
+        verify(emailOutboxService, never()).enqueue(any(), any(), any(), anyString(), any());
+        verify(adminActionAuditService).record(any(), eq(AdminActionType.STAGE_FALLBACK), eq(stageId), eq(false), anyString());
+    }
+
+    // 대기 중(PENDING)·만료(EXPIRED) 상태도 같은 이유로 차단돼야 한다 (issue #47 - "거절·만료·대기 상태 담당자 전환 차단")
+    @Test
+    void fallback_whenBackupPendingOrExpired_isBlocked() {
+        UUID userId = UUID.randomUUID(), caseId = UUID.randomUUID(), stageId = UUID.randomUUID();
+        when(releaseCaseRepository.findById(caseId)).thenReturn(Optional.of(releaseCase));
+        currentStage.assignToCase(releaseCase);
+        when(handoverStageRepository.findById(stageId)).thenReturn(Optional.of(currentStage));
+
+        Recipient backup = acceptedBackup();
+        when(backup.getAcceptanceStatus()).thenReturn(AcceptanceStatus.PENDING);
+        when(recipientRepository.findByBackupFor_AssigneeId(any())).thenReturn(Optional.of(backup));
+
+        assertThatThrownBy(() -> handoverStageService.fallback(userId, caseId, stageId))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.RECIPIENT_NOT_ACCEPTED));
+    }
+
+    // issue #47 완료 조건 - "유효한 대체 담당자가 없으면 사건은 발송되지 않고 차단 상태를 유지한다"
+    @Test
+    void fallback_whenNoBackupRegistered_isBlockedWithMissingError() {
+        UUID userId = UUID.randomUUID(), caseId = UUID.randomUUID(), stageId = UUID.randomUUID();
+        when(releaseCaseRepository.findById(caseId)).thenReturn(Optional.of(releaseCase));
+        currentStage.assignToCase(releaseCase);
+        when(handoverStageRepository.findById(stageId)).thenReturn(Optional.of(currentStage));
+        when(recipientRepository.findByBackupFor_AssigneeId(any())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> handoverStageService.fallback(userId, caseId, stageId))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FALLBACK_RECIPIENT_MISSING));
+
+        assertThat(currentStage.getStatus()).isEqualTo(HandoverStageStatus.BLOCKED);
+        verify(adminActionAuditService).record(any(), eq(AdminActionType.STAGE_FALLBACK), eq(stageId), eq(false), anyString());
+    }
+
+    // 방어선 - 대체 담당자 등록 경로(RecipientService)는 항상 주 담당자와 같은 disclosureScope로만
+    // 만들지만, 다른 경로로 어긋난 데이터가 들어오는 상황까지 대비해 전환 직전에 한 번 더 막는다.
+    @Test
+    void fallback_whenBackupDisclosureScopeDiffersFromCurrent_isBlocked() {
+        UUID userId = UUID.randomUUID(), caseId = UUID.randomUUID(), stageId = UUID.randomUUID();
+        when(releaseCaseRepository.findById(caseId)).thenReturn(Optional.of(releaseCase));
+        currentStage.assignToCase(releaseCase);
+        when(handoverStageRepository.findById(stageId)).thenReturn(Optional.of(currentStage));
+
+        Recipient backup = acceptedBackup();
+        when(backup.getDisclosureScope()).thenReturn(DisclosureScope.WORK); // currentRecipient는 FAMILY
+        when(recipientRepository.findByBackupFor_AssigneeId(any())).thenReturn(Optional.of(backup));
+
+        assertThatThrownBy(() -> handoverStageService.fallback(userId, caseId, stageId))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FALLBACK_RECIPIENT_MISSING));
+        assertThat(currentStage.getStatus()).isEqualTo(HandoverStageStatus.BLOCKED);
     }
 }
