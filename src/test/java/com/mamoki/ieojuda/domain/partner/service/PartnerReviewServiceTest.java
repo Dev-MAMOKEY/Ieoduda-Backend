@@ -14,7 +14,7 @@ import com.mamoki.ieojuda.domain.evidence.repository.EvidenceDownloadTokenReposi
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
 import com.mamoki.ieojuda.domain.partner.dto.EvidenceDownloadLinkResponse;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewDecisionRequest;
-import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewListItemResponse;
+import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewListResponse;
 import com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer;
 import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
@@ -354,10 +354,10 @@ class PartnerReviewServiceTest {
         when(evidenceRepository.findAllByReviewStatus(EvidenceReviewStatus.PENDING))
                 .thenReturn(List.of(evidence));
 
-        List<PartnerReviewListItemResponse> result = partnerReviewService.getReviews(USER_ID, EvidenceReviewStatus.PENDING);
+        PartnerReviewListResponse result = partnerReviewService.getReviews(USER_ID, EvidenceReviewStatus.PENDING);
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).reviewId()).isEqualTo(REVIEW_ID);
+        assertThat(result.reviews()).hasSize(1);
+        assertThat(result.reviews().get(0).reviewId()).isEqualTo(REVIEW_ID);
     }
 
     @Test
