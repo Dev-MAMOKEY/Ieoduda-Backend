@@ -82,9 +82,11 @@ class PlanSummaryServiceTest {
         ));
 
         HandoffCheckAssigneeResponse acceptedAssignee =
-                new HandoffCheckAssigneeResponse(1L, "A", "FAMILY_MANAGER", true, true, "backup", true, null, true);
+                new HandoffCheckAssigneeResponse(1L, "A", "FAMILY_MANAGER", true, true, "backup", true, null, true,
+                        null, null, null, null, null, null);
         HandoffCheckAssigneeResponse pendingAssignee =
-                new HandoffCheckAssigneeResponse(2L, "B", "WORK_MANAGER", true, false, null, false, null, false);
+                new HandoffCheckAssigneeResponse(2L, "B", "WORK_MANAGER", true, false, null, false, null, false,
+                        null, null, null, null, null, null);
         HandoffCheckConfirmerResponse acceptedConfirmer =
                 new HandoffCheckConfirmerResponse(1L, "C", true, true, null, true);
         HandoffCheckConfirmerResponse pendingConfirmer =
