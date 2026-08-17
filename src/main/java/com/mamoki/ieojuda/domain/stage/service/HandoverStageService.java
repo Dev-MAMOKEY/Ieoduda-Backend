@@ -1,11 +1,15 @@
 package com.mamoki.ieojuda.domain.stage.service;
 
 import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
+import com.mamoki.ieojuda.domain.account.entity.User;
+import com.mamoki.ieojuda.domain.audit.entity.AdminActionType;
 import com.mamoki.ieojuda.domain.audit.entity.EmailType;
 import com.mamoki.ieojuda.domain.audit.repository.EmailLogRepository;
+import com.mamoki.ieojuda.domain.audit.service.AdminActionAuditService;
 import com.mamoki.ieojuda.domain.postaccess.entity.AccessToken;
 import com.mamoki.ieojuda.domain.postaccess.repository.AccessTokenRepository;
 import com.mamoki.ieojuda.domain.postaccess.repository.PackageActionCompletionRepository;
+import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
@@ -50,6 +54,7 @@ public class HandoverStageService {
     private final PackageActionCompletionRepository packageActionCompletionRepository;
     private final AccessTokenRepository accessTokenRepository;
     private final SecurityTokenService securityTokenService;
+    private final AdminActionAuditService adminActionAuditService;
 
     public HandoverStageResponse getStage(UUID userId, UUID caseId, UUID stageId) {
         permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
@@ -59,9 +64,12 @@ public class HandoverStageService {
     }
 
     // 무응답·영구반송·문제신고로 대체 담당자에게 전환. 대체 담당자가 없으면 사건을 차단 상태로 유지한다.
+    // issue #47 - "대체 담당자가 있다"는 backupFor 관계가 존재한다는 뜻일 뿐, 그 사람이 생전에 역할을
+    // 수락했다는 보장은 아니다. 거절·대기·만료 상태인 대체 담당자에게 민감한 사후 링크를 보내면 안 되므로,
+    // 관계 존재 여부가 아니라 "지금 전환해도 되는 대체 담당자인지"를 별도로 판정한다.
     @Transactional
     public HandoverStageResponse fallback(UUID userId, UUID caseId, UUID stageId) {
-        permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
+        User actor = permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
         ReleaseCase releaseCase = releaseCaseRepository.findById(caseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RELEASE_CASE_NOT_FOUND));
         if (Boolean.TRUE.equals(releaseCase.getFrozen())) {
@@ -70,18 +78,62 @@ public class HandoverStageService {
 
         HandoverStage stage = findStage(releaseCase, stageId);
         Recipient current = stage.getRecipient();
+        HandoverStageStatus stageStatusBeforeFallback = stage.getStatus();
 
         Recipient backup = recipientRepository.findByBackupFor_AssigneeId(current.getAssigneeId())
                 .orElse(null);
-        if (backup == null) {
+        ErrorCode rejectionReason = resolveFallbackRejection(backup, current);
+        if (rejectionReason != null) {
             stage.block();
-            throw new CustomException(ErrorCode.FALLBACK_RECIPIENT_MISSING);
+            adminActionAuditService.record(actor, AdminActionType.STAGE_FALLBACK, stageId, false,
+                    describeFallbackFailure(current, backup, stageStatusBeforeFallback, rejectionReason));
+            throw new CustomException(rejectionReason);
         }
 
         stage.fallbackTo(backup);
         sendHandoffInvite(stage, backup, InviteKind.FALLBACK);
+        adminActionAuditService.record(actor, AdminActionType.STAGE_FALLBACK, stageId, true,
+                describeFallbackSuccess(current, backup, stageStatusBeforeFallback));
 
         return HandoverStageResponse.from(stage);
+    }
+
+    // issue #47 완료 조건 - "ACCEPTED 상태의 대체 담당자만 전환 대상이 된다".
+    // 대체 담당자가 없거나 수락하지 않았으면 FALLBACK_RECIPIENT_MISSING/RECIPIENT_NOT_ACCEPTED를 반환하고,
+    // 문제가 없으면 null을 반환한다(정상 전환 가능).
+    // 공개 범주(disclosureScope) 일치는 대체 담당자 등록 시점(RecipientService.registerBackup)에 이미
+    // 주 담당자와 같은 값으로만 생성되도록 구조적으로 보장되지만, 다른 경로로 어긋난 데이터가 들어오는 상황까지
+    // 대비해 전환 직전에 한 번 더 확인한다(issue #45와 같은 이중 방어 원칙) - 이 경우도 "쓸 수 있는 대체
+    // 담당자가 없다"와 동일하게 취급해 FALLBACK_RECIPIENT_MISSING으로 응답한다.
+    private ErrorCode resolveFallbackRejection(Recipient backup, Recipient current) {
+        if (backup == null) {
+            return ErrorCode.FALLBACK_RECIPIENT_MISSING;
+        }
+        if (backup.getAcceptanceStatus() != AcceptanceStatus.ACCEPTED) {
+            return ErrorCode.RECIPIENT_NOT_ACCEPTED;
+        }
+        if (backup.getDisclosureScope() != current.getDisclosureScope()) {
+            return ErrorCode.FALLBACK_RECIPIENT_MISSING;
+        }
+        return null;
+    }
+
+    private String describeFallbackSuccess(Recipient current, Recipient backup, HandoverStageStatus stageStatusBeforeFallback) {
+        return "%s 상태로 인해 %s에서 %s로 전환됨".formatted(
+                stageStatusBeforeFallback, current.getAssigneeId(), backup.getAssigneeId());
+    }
+
+    private String describeFallbackFailure(Recipient current, Recipient backup, HandoverStageStatus stageStatusBeforeFallback,
+                                            ErrorCode rejectionReason) {
+        if (rejectionReason == ErrorCode.FALLBACK_RECIPIENT_MISSING && backup == null) {
+            return "%s 상태에서 %s의 대체 담당자가 등록되어 있지 않아 차단됨".formatted(stageStatusBeforeFallback, current.getAssigneeId());
+        }
+        if (rejectionReason == ErrorCode.RECIPIENT_NOT_ACCEPTED) {
+            return "%s 상태에서 대체 담당자 %s가 역할을 수락하지 않아(%s) 차단됨".formatted(
+                    stageStatusBeforeFallback, backup.getAssigneeId(), backup.getAcceptanceStatus());
+        }
+        return "%s 상태에서 대체 담당자 %s의 공개 범주가 주 담당자와 달라 차단됨".formatted(
+                stageStatusBeforeFallback, backup.getAssigneeId());
     }
 
     // 스케줄러 - 대기 기간 만료 시, 확정된 실행 순서대로 담당자 한 명당 단계 하나씩 만들고 1단계 담당자에게만 발송한다
