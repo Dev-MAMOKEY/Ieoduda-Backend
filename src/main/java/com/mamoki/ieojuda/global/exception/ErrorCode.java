@@ -22,6 +22,7 @@ public enum ErrorCode {
     PROHIBITED_ACTION_DETECTED(HttpStatus.BAD_REQUEST, "PROHIBITED_ACTION_DETECTED", "AI가 처리할 수 없는 금지 행동이 포함되어 있습니다."),
     PACKAGE_SEAL_BLOCKED(HttpStatus.BAD_REQUEST, "PACKAGE_SEAL_BLOCKED", "금지 정보나 근거 없는 항목이 있어 패키지를 봉인할 수 없습니다."),
     CIRCULAR_DEPENDENCY_DETECTED(HttpStatus.BAD_REQUEST, "CIRCULAR_DEPENDENCY_DETECTED", "발송 단계에 순환 의존 관계가 존재합니다."),
+    PLAN_NOT_SEALED(HttpStatus.BAD_REQUEST, "PLAN_NOT_SEALED", "봉인된 계획만 인계 점검을 보낼 수 있습니다."),
 
     // 담당자 / 확인자 / 이의 제기 연락처 관련 예외 (400)
     INSUFFICIENT_CONFIRMERS(HttpStatus.BAD_REQUEST, "INSUFFICIENT_CONFIRMERS", "수락을 완료한 지정 확인자가 2명 미만이라 계획을 봉인할 수 없습니다."),
