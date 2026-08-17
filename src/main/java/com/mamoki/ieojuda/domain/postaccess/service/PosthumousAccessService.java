@@ -42,7 +42,6 @@ public class PosthumousAccessService {
     private static final int OTP_TTL_MINUTES = 10;
     private static final int OTP_RESEND_COOLDOWN_SECONDS = 60;
     private static final int MAX_OTP_ATTEMPTS = 5;
-    private static final int SESSION_TTL_MINUTES = 60;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final AccessTokenRepository accessTokenRepository;
@@ -116,7 +115,7 @@ public class PosthumousAccessService {
         // 새 컬럼을 두지 않고 같은 원본 토큰을 그대로 열람 세션 식별자로 쓴다 -
         // 이후 조회는 verifiedAt(세션 시작 시각) 기준으로 60분 이내인지만 확인하면 된다.
         accessToken.verify();
-        LocalDateTime sessionExpiresAt = accessToken.getVerifiedAt().plusMinutes(SESSION_TTL_MINUTES);
+        LocalDateTime sessionExpiresAt = accessToken.getVerifiedAt().plusMinutes(AccessToken.SESSION_TTL_MINUTES);
 
         return new OtpVerifyResponse(plainToken, sessionExpiresAt);
     }
