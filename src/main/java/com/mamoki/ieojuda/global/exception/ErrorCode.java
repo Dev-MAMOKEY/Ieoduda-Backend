@@ -17,6 +17,7 @@ public enum ErrorCode {
     INVALID_WAITING_PERIOD(HttpStatus.BAD_REQUEST, "INVALID_WAITING_PERIOD", "대기 기간은 7일 이상 30일 이하여야 합니다."),
     CONSENT_REQUIRED(HttpStatus.BAD_REQUEST, "CONSENT_REQUIRED", "사후 인계 조건과 안전 범위를 확인해 주세요."),
     SUSPECTED_CREDENTIAL_INPUT(HttpStatus.BAD_REQUEST, "SUSPECTED_CREDENTIAL_INPUT", "비밀번호·PIN·OTP·복구 코드로 보이는 내용은 저장할 수 없습니다. 위치 유형만 적어 주세요."),
+    CONVERSATION_HISTORY_TOO_LONG(HttpStatus.BAD_REQUEST, "CONVERSATION_HISTORY_TOO_LONG", "대화 이력이 너무 깁니다. 새 대화 세션을 시작해 주세요."),
     UNGROUNDED_ITEM_NOT_APPROVABLE(HttpStatus.BAD_REQUEST, "UNGROUNDED_ITEM_NOT_APPROVABLE", "원문 근거가 없는 항목은 승인할 수 없습니다."),
     ITEM_NOT_APPROVED(HttpStatus.BAD_REQUEST, "ITEM_NOT_APPROVED", "승인되지 않은 항목에는 담당자를 등록할 수 없습니다."),
     PROHIBITED_ACTION_DETECTED(HttpStatus.BAD_REQUEST, "PROHIBITED_ACTION_DETECTED", "AI가 처리할 수 없는 금지 행동이 포함되어 있습니다."),
@@ -40,6 +41,10 @@ public enum ErrorCode {
 
     // 암호화 증빙 저장소 관련 예외 (500)
     EVIDENCE_STORAGE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EVIDENCE_STORAGE_FAILED", "증빙 저장소 처리 중 오류가 발생했습니다."),
+
+    // OpenAI 연동 관련 예외 (502/503) - issue #52
+    AI_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY, "AI_RESPONSE_INVALID", "AI 응답을 처리할 수 없습니다. 다시 시도해 주세요."),
+    AI_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI_SERVICE_UNAVAILABLE", "AI 서비스 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요."),
 
     // 공통 이메일 발송 모듈 관련 예외 (500)
     EMAIL_CONTENT_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EMAIL_CONTENT_GENERATION_FAILED", "이메일 본문 생성에 실패했습니다."),

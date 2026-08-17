@@ -130,4 +130,75 @@ class ConversationServiceTest {
         verify(lifeAreaMessageRepository, times(2)).save(any());
         verify(openAIClient).getChatCompletion(any());
     }
+
+    // issue #52 완료 조건 - "입력 상한 초과는 명확한 400... 으로 처리된다" (전체 이력 12,000자 상한)
+    @Test
+    void sendMessage_whenHistoryPlusNewMessageExceedsTwelveThousandChars_throwsWithoutSavingOrCallingOpenAI() {
+        LifeAreaMessage longPastMessage = LifeAreaMessage.builder()
+                .conversation(conversation).role(MessageRole.USER).content("x".repeat(11_990)).build();
+        when(lifeAreaMessageRepository.findByConversation_ConversationIdOrderByMessageIdAsc(CONVERSATION_ID))
+                .thenReturn(List.of(longPastMessage));
+
+        assertThatThrownBy(() -> conversationService.sendMessage(
+                USER_ID, PLAN_ID, CONVERSATION_ID, "x".repeat(11)))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CONVERSATION_HISTORY_TOO_LONG));
+
+        verify(lifeAreaMessageRepository, never()).save(any());
+        verify(openAIClient, never()).getChatCompletion(any());
+    }
+
+    @Test
+    void sendMessage_whenHistoryPlusNewMessageIsExactlyTwelveThousandChars_proceeds() {
+        LifeAreaMessage longPastMessage = LifeAreaMessage.builder()
+                .conversation(conversation).role(MessageRole.USER).content("x".repeat(11_990)).build();
+        when(lifeAreaMessageRepository.findByConversation_ConversationIdOrderByMessageIdAsc(CONVERSATION_ID))
+                .thenReturn(List.of(longPastMessage));
+        OpenAIResponse response = new OpenAIResponse(List.of(
+                new OpenAIResponse.Choice(new OpenAIMessageDto("assistant",
+                        "{\"type\":\"QUESTION\",\"question\":\"어떤 계정인가요?\"}"))));
+        when(openAIClient.getChatCompletion(any())).thenReturn(response);
+
+        conversationService.sendMessage(USER_ID, PLAN_ID, CONVERSATION_ID, "x".repeat(10));
+
+        verify(openAIClient).getChatCompletion(any());
+    }
+
+    // issue #52 - "응답 JSON 구조를 서버에서 엄격히 검증". type이 QUESTION/RESULT가 아니면
+    // 예전처럼 question=null인 애매한 응답으로 통과시키지 않고 명확히 실패해야 한다.
+    @Test
+    void sendMessage_whenAiResponseTypeIsUnrecognized_throwsAiResponseInvalid() {
+        OpenAIResponse response = new OpenAIResponse(List.of(
+                new OpenAIResponse.Choice(new OpenAIMessageDto("assistant", "{\"type\":\"UNKNOWN\"}"))));
+        when(openAIClient.getChatCompletion(any())).thenReturn(response);
+
+        assertThatThrownBy(() -> conversationService.sendMessage(
+                USER_ID, PLAN_ID, CONVERSATION_ID, "인스타그램 계정을 정리해줘"))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
+    }
+
+    @Test
+    void sendMessage_whenAiResponseTypeResultHasNoItems_throwsAiResponseInvalid() {
+        OpenAIResponse response = new OpenAIResponse(List.of(
+                new OpenAIResponse.Choice(new OpenAIMessageDto("assistant", "{\"type\":\"RESULT\",\"items\":[]}"))));
+        when(openAIClient.getChatCompletion(any())).thenReturn(response);
+
+        assertThatThrownBy(() -> conversationService.sendMessage(
+                USER_ID, PLAN_ID, CONVERSATION_ID, "인스타그램 계정을 정리해줘"))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
+    }
+
+    @Test
+    void sendMessage_whenAiResponseIsNotValidJson_throwsAiResponseInvalid() {
+        OpenAIResponse response = new OpenAIResponse(List.of(
+                new OpenAIResponse.Choice(new OpenAIMessageDto("assistant", "이건 JSON이 아닙니다"))));
+        when(openAIClient.getChatCompletion(any())).thenReturn(response);
+
+        assertThatThrownBy(() -> conversationService.sendMessage(
+                USER_ID, PLAN_ID, CONVERSATION_ID, "인스타그램 계정을 정리해줘"))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
+    }
 }

@@ -13,6 +13,7 @@ import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import com.mamoki.ieojuda.domain.evidence.service.EvidenceSubmitService;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewDecisionRequest;
 import com.mamoki.ieojuda.domain.plan.dto.ItemUpdateRequest;
+import com.mamoki.ieojuda.domain.plan.dto.LifeAreaMessageRequest;
 import com.mamoki.ieojuda.domain.plan.dto.SelfWarningEmailRequest;
 import com.mamoki.ieojuda.domain.plan.entity.Item;
 import com.mamoki.ieojuda.domain.recipient.dto.BackupRegisterRequest;
@@ -160,6 +161,16 @@ class InputSizeConstraintTest {
         assertThat(validator.validate(upperBound)).isEmpty();
         assertThat(validator.validate(belowRange)).hasSize(1);
         assertThat(validator.validate(aboveRange)).hasSize(1);
+    }
+
+    // issue #52 - 대화 1회 발화 4,000자 제한. LifeAreaMessage.content는 TEXT 컬럼(길이 제약 없음)이라
+    // EXPECTED_COLUMN_LENGTHS 방식(DTO ↔ DB length 대조)이 아니라 DTO 상한 자체를 직접 검증한다.
+    @Test
+    void lifeAreaMessageRequestAcceptsUpToFourThousandCharsAndRejectsOverflow() {
+        Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+
+        assertThat(validator.validate(new LifeAreaMessageRequest("x".repeat(4000)))).isEmpty();
+        assertThat(validator.validate(new LifeAreaMessageRequest("x".repeat(4001)))).hasSize(1);
     }
 
     // issue #93 - 피그마 회원가입 화면은 이메일/비밀번호/비밀번호 확인 3개만 입력받으므로 이름 없이도 가입이 성공해야 한다
