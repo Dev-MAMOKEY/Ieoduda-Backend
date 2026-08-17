@@ -15,6 +15,7 @@ import com.mamoki.ieojuda.domain.plan.service.PlanSnapshotService;
 import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
+import com.mamoki.ieojuda.domain.releasecase.service.ReleaseCaseWarningService;
 import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityToken;
 import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
 import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
@@ -55,6 +56,7 @@ public class DeathReportService {
     private final EmailOutboxService emailOutboxService;
     private final AppProperties appProperties;
     private final PlanReadinessValidator planReadinessValidator;
+    private final ReleaseCaseWarningService releaseCaseWarningService;
 
     @Transactional
     public DeathReportResponse report(String plainToken, DeathReportRequest request, String idempotencyKey) {
@@ -147,6 +149,9 @@ public class DeathReportService {
         }
         releaseCase.confirmReport();
         releaseCase.awaitEvidence();
+        // 사건이 대기 없이 바로 증빙 단계로 넘어가기 전에, 작성자에게 취소 링크를 반드시 먼저 보낸다.
+        // 발송이 실패하면 사건은 이미 만들어졌으므로 되돌리지 않고 동결해 운영 검토로 넘긴다.
+        releaseCaseWarningService.sendAuthorCancelWarningOrFreeze(releaseCase);
         return releaseCase;
     }
 }

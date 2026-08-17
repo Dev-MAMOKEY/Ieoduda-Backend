@@ -6,7 +6,6 @@ import com.mamoki.ieojuda.domain.audit.entity.AdminActionType;
 import com.mamoki.ieojuda.domain.audit.service.AdminActionAuditService;
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
 import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
-import com.mamoki.ieojuda.domain.confirmer.service.DisputeContactService;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceDownloadToken;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceReviewStatus;
@@ -20,6 +19,7 @@ import com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer;
 import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
+import com.mamoki.ieojuda.domain.releasecase.service.ReleaseCaseWarningService;
 import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
@@ -63,7 +63,7 @@ class PartnerReviewServiceTest {
     private AdminActionAuditService adminActionAuditService;
     private IdempotencyGuard idempotencyGuard;
     private SecurityTokenService securityTokenService;
-    private DisputeContactService disputeContactService;
+    private ReleaseCaseWarningService releaseCaseWarningService;
     private PartnerReviewService partnerReviewService;
 
     private User actor;
@@ -83,11 +83,11 @@ class PartnerReviewServiceTest {
         adminActionAuditService = mock(AdminActionAuditService.class);
         idempotencyGuard = mock(IdempotencyGuard.class);
         securityTokenService = mock(SecurityTokenService.class);
-        disputeContactService = mock(DisputeContactService.class);
+        releaseCaseWarningService = mock(ReleaseCaseWarningService.class);
         partnerReviewService = new PartnerReviewService(
                 evidenceRepository, confirmerRepository, partnerReviewerRepository, evidenceDownloadTokenRepository,
                 evidenceStorageClient, permissionGuard, reauthGuard, adminActionAuditService, idempotencyGuard,
-                securityTokenService, disputeContactService);
+                securityTokenService, releaseCaseWarningService);
 
         actor = mock(User.class);
         when(permissionGuard.require(USER_ID, AdminPermission.EVIDENCE_REVIEW)).thenReturn(actor);
@@ -133,7 +133,8 @@ class PartnerReviewServiceTest {
         partnerReviewService.decide(REVIEW_ID, USER_ID, request, null);
 
         verify(evidence).approve();
-        verify(releaseCase).approveEvidenceAndStartWaiting(any());
+        // WAITING 전이는 이제 ReleaseCaseWarningService가 경고 발송 성공을 확인한 뒤에만 수행한다
+        verify(releaseCaseWarningService).sendDisputeWarningsAndStartWaiting(releaseCase, 7);
         verify(adminActionAuditService).record(actor, AdminActionType.EVIDENCE_DECISION, REVIEW_ID, true, "APPROVE");
         // issue #43 - 개별 사전 배정은 없지만, 실제로 판정한 사람은 표시·감사용으로 기록해둔다
         verify(evidence).assignReviewer(reviewer);
@@ -153,7 +154,7 @@ class PartnerReviewServiceTest {
 
         verify(evidence).approve();
         verify(releaseCase).markEvidencePartiallyApproved();
-        verify(releaseCase, never()).approveEvidenceAndStartWaiting(any());
+        verify(releaseCaseWarningService, never()).sendDisputeWarningsAndStartWaiting(any(), any());
     }
 
     // 매칭된 두 확인자 중 이미 한 명이 승인된 상태에서 나머지 한 명의 증빙까지 승인되면
@@ -169,7 +170,7 @@ class PartnerReviewServiceTest {
         partnerReviewService.decide(REVIEW_ID, USER_ID, request, null);
 
         verify(evidence).approve();
-        verify(releaseCase).approveEvidenceAndStartWaiting(any());
+        verify(releaseCaseWarningService).sendDisputeWarningsAndStartWaiting(releaseCase, 7);
         verify(releaseCase, never()).markEvidencePartiallyApproved();
     }
 

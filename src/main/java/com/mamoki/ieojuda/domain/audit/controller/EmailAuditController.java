@@ -61,4 +61,26 @@ public class EmailAuditController {
         emailAuditService.freeze(userId, caseId, request.password());
         return ResponseEntity.ok(RsData.success(null));
     }
+
+    @Operation(summary = "사건 동결 해제하기", description = "동결을 해제합니다. 막혀 있던 경고 발송·상태 전이를 다시 시도하려면 '경고 발송 재시도'를 별도로 호출해야 합니다.")
+    @PostMapping("/unfreeze")
+    public ResponseEntity<RsData<Void>> unfreeze(
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "사건 ID") @PathVariable UUID caseId,
+            @Valid @RequestBody ReauthRequest request
+    ) {
+        emailAuditService.unfreeze(userId, caseId, request.password());
+        return ResponseEntity.ok(RsData.success(null));
+    }
+
+    @Operation(summary = "경고 발송 재시도", description = "취소·이의 제기 경고 메일 발송 실패로 동결된 사건에서, 막혀 있던 발송과 그 발송이 게이트하던 상태 전이를 다시 시도합니다.")
+    @PostMapping("/retry-warning")
+    public ResponseEntity<RsData<Void>> retryWarning(
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "사건 ID") @PathVariable UUID caseId,
+            @Valid @RequestBody ReauthRequest request
+    ) {
+        emailAuditService.retryWarning(userId, caseId, request.password());
+        return ResponseEntity.ok(RsData.success(null));
+    }
 }

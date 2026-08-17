@@ -6,9 +6,15 @@ import com.mamoki.ieojuda.domain.audit.dto.EmailDeliveryResponse;
 import com.mamoki.ieojuda.domain.audit.entity.AdminActionType;
 import com.mamoki.ieojuda.domain.audit.entity.EmailLog;
 import com.mamoki.ieojuda.domain.audit.repository.EmailLogRepository;
+import com.mamoki.ieojuda.domain.confirmer.entity.ReportStatus;
+import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
+import com.mamoki.ieojuda.domain.evidence.entity.EvidenceReviewStatus;
+import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
+import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCaseStatus;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
+import com.mamoki.ieojuda.domain.releasecase.service.ReleaseCaseWarningService;
 import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
 import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStage;
@@ -44,6 +50,9 @@ public class EmailAuditService {
     private final ReauthGuard reauthGuard;
     private final AdminActionAuditService adminActionAuditService;
     private final SecurityTokenService securityTokenService;
+    private final ReleaseCaseWarningService releaseCaseWarningService;
+    private final EvidenceRepository evidenceRepository;
+    private final ConfirmerRepository confirmerRepository;
 
     public List<EmailDeliveryResponse> getDeliveries(UUID userId, UUID caseId) {
         permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
@@ -101,6 +110,61 @@ public class EmailAuditService {
 
         findCase(caseId).freeze();
         adminActionAuditService.record(actor, AdminActionType.CASE_FREEZE, caseId, true, null);
+    }
+
+    // "사건 동결 해제하기" - freeze()와 대칭되는 순수 플래그 해제. 동결 사유(발송 실패로 인한 자동 동결이든,
+    // 운영자가 임의로 건 동결이든)와 무관하게 항상 사용할 수 있다 - 막혀 있던 경고 발송·상태 전이를 실제로
+    // 재개하려면 retryWarning()을 따로 호출해야 한다(이 메서드는 그 재시도를 하지 않는다).
+    @Transactional
+    public void unfreeze(UUID userId, UUID caseId, String password) {
+        User actor = permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
+        try {
+            reauthGuard.verify(actor, password);
+        } catch (CustomException e) {
+            adminActionAuditService.record(actor, AdminActionType.CASE_UNFREEZE, caseId, false, "재인증 실패");
+            throw e;
+        }
+
+        findCase(caseId).unfreeze();
+        adminActionAuditService.record(actor, AdminActionType.CASE_UNFREEZE, caseId, true, null);
+    }
+
+    // "경고 발송 재시도" - 사건 생성/증빙 승인 시점에 경고 메일 발송이 실패해 동결된 사건을 대상으로,
+    // 막혀 있던 경고 발송과 그것이 게이트하던 상태 전이(WAITING 진입)를 다시 시도한다. 증빙이 전부
+    // 승인됐는지를 그때와 동일한 기준으로 재계산해 어느 경고가 막혀 있었는지 판단한다 - 이미 WAITING
+    // 이후 단계로 넘어간 사건은 재시도 대상이 아니다.
+    @Transactional
+    public void retryWarning(UUID userId, UUID caseId, String password) {
+        User actor = permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
+        try {
+            reauthGuard.verify(actor, password);
+        } catch (CustomException e) {
+            adminActionAuditService.record(actor, AdminActionType.CASE_WARNING_RETRY, caseId, false, "재인증 실패");
+            throw e;
+        }
+
+        ReleaseCase releaseCase = findCase(caseId);
+        if (releaseCase.getStatus() == ReleaseCaseStatus.WAITING
+                || releaseCase.getStatus() == ReleaseCaseStatus.RELEASING
+                || releaseCase.getStatus() == ReleaseCaseStatus.COMPLETED
+                || releaseCase.getStatus() == ReleaseCaseStatus.CANCELED
+                || releaseCase.getStatus() == ReleaseCaseStatus.DISPUTED) {
+            adminActionAuditService.record(actor, AdminActionType.CASE_WARNING_RETRY, caseId, false, "재시도 대상 아님");
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
+        long approvedCount = evidenceRepository.countByReleaseCase_CaseIdAndReviewStatus(caseId, EvidenceReviewStatus.APPROVED);
+        long requiredCount = confirmerRepository.findByPlan_PlanIdAndReportStatus(
+                releaseCase.getPlan().getPlanId(), ReportStatus.MATCHED).size();
+
+        boolean sent = (requiredCount > 0 && approvedCount >= requiredCount)
+                ? releaseCaseWarningService.sendDisputeWarningsAndStartWaiting(releaseCase, releaseCase.getPlan().getWaitingDays())
+                : releaseCaseWarningService.sendAuthorCancelWarningOrFreeze(releaseCase);
+
+        if (sent) {
+            releaseCase.unfreeze();
+        }
+        adminActionAuditService.record(actor, AdminActionType.CASE_WARNING_RETRY, caseId, sent, sent ? null : "발송 재시도 실패");
     }
 
     private ReleaseCase findCase(UUID caseId) {
