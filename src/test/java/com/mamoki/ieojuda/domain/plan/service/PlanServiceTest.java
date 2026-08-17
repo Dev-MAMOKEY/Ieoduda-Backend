@@ -5,7 +5,7 @@ import com.mamoki.ieojuda.domain.plan.dto.ReleasePolicyRequest;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.global.config.AppProperties;
-import com.mamoki.ieojuda.global.email.sender.EmailSender;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import jakarta.validation.Validation;
@@ -45,7 +45,7 @@ class PlanServiceTest {
                 planRepository,
                 new PlanOwnershipReader(planRepository),
                 mock(DisputeContactRepository.class),
-                mock(EmailSender.class),
+                mock(EmailOutboxService.class),
                 mock(AppProperties.class)
         );
         validator = Validation.buildDefaultValidatorFactory().getValidator();

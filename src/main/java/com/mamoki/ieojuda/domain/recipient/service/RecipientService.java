@@ -5,6 +5,7 @@ import com.mamoki.ieojuda.domain.plan.entity.DisclosureScope;
 import com.mamoki.ieojuda.domain.plan.entity.Item;
 import com.mamoki.ieojuda.domain.plan.entity.ItemStatus;
 import com.mamoki.ieojuda.domain.plan.entity.LifeArea;
+import com.mamoki.ieojuda.domain.audit.entity.EmailType;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
 import com.mamoki.ieojuda.domain.plan.service.PlanOwnershipReader;
@@ -24,8 +25,7 @@ import com.mamoki.ieojuda.domain.recipient.entity.RoleType;
 import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
-import com.mamoki.ieojuda.global.email.contract.EmailSendResult;
-import com.mamoki.ieojuda.global.email.sender.EmailSender;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.email.template.EmailBuilder;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.exception.CustomException;
@@ -53,7 +53,7 @@ public class RecipientService {
     private final ItemRepository itemRepository;
     private final RecipientRepository recipientRepository;
     private final PlanOwnershipReader planOwnershipReader;
-    private final EmailSender emailSender;
+    private final EmailOutboxService emailOutboxService;
     private final AppProperties appProperties;
 
     @Transactional
@@ -123,19 +123,13 @@ public class RecipientService {
 
         item.assignRecipient(recipient);
 
-        EmailSendResult sendResult = issueInviteAndSend(recipient, toRoleName(disclosureScope));
+        issueInviteAndSend(recipient, toRoleName(disclosureScope));
 
         BackupRegisterResponse backupResponse = request.backup() == null
                 ? null
                 : registerBackup(plan, lifeArea, disclosureScope, recipient, request.backup());
 
-        return RecipientRegisterResponse.of(
-                recipient,
-                item.getItemId(),
-                sendResult.success(),
-                sendResult.bounceType() == null ? null : sendResult.bounceType().name(),
-                backupResponse
-        );
+        return RecipientRegisterResponse.of(recipient, item.getItemId(), true, null, backupResponse);
     }
 
     // 대체 담당자 저장 + 초대 토큰 발급 + 수락 이메일 발송
@@ -154,24 +148,20 @@ public class RecipientService {
                 .backupFor(primary)
                 .build());
 
-        EmailSendResult sendResult = issueInviteAndSend(backup, toRoleName(disclosureScope) + " (대체 담당자)");
+        issueInviteAndSend(backup, toRoleName(disclosureScope) + " (대체 담당자)");
 
-        return BackupRegisterResponse.of(
-                backup,
-                sendResult.success(),
-                sendResult.bounceType() == null ? null : sendResult.bounceType().name()
-        );
+        return BackupRegisterResponse.of(backup, true, null);
     }
 
-    private EmailSendResult issueInviteAndSend(Recipient recipient, String roleName) {
+    private void issueInviteAndSend(Recipient recipient, String roleName) {
         String plainToken = TokenProvider.generatePlainToken();
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
         recipient.issueInviteToken(TokenProvider.hashToken(plainToken), expiresAt);
-        return sendAcceptanceEmail(recipient, roleName, plainToken, expiresAt);
+        sendAcceptanceEmail(recipient, roleName, plainToken, expiresAt);
     }
 
-    private EmailSendResult sendAcceptanceEmail(Recipient recipient, String roleName,
-                                                 String plainToken, LocalDateTime expiresAt) {
+    private void sendAcceptanceEmail(Recipient recipient, String roleName,
+                                      String plainToken, LocalDateTime expiresAt) {
         String secureLink = appProperties.getBaseUrl() + "/recipient-acceptances/" + plainToken;
         EmailContent content = EmailBuilder.build(
                 roleName,
@@ -180,7 +170,7 @@ public class RecipientService {
                 secureLink,
                 appProperties.getContactEmail()
         );
-        return emailSender.send(recipient.getEmail(), content);
+        emailOutboxService.enqueue(recipient.getPlan(), null, EmailType.ROLE_ACCEPTANCE_INVITE, recipient.getEmail(), content);
     }
 
     private RoleType toRoleType(DisclosureScope disclosureScope) {
@@ -234,13 +224,9 @@ public class RecipientService {
         }
 
         recipient.resetAcceptance();
-        EmailSendResult sendResult = issueInviteAndSend(recipient, toRoleName(recipient.getDisclosureScope()));
+        issueInviteAndSend(recipient, toRoleName(recipient.getDisclosureScope()));
 
-        return RecipientAcceptanceEmailResponse.of(
-                recipient,
-                sendResult.success(),
-                sendResult.bounceType() == null ? null : sendResult.bounceType().name()
-        );
+        return RecipientAcceptanceEmailResponse.of(recipient, true, null);
     }
 
     // "담당자 수정하기" - 이름/이메일 수정. 이메일이 바뀌면 재검증이 필요하므로 수락 이메일을 다시 보낸다
@@ -250,16 +236,11 @@ public class RecipientService {
         Recipient recipient = findOwnedRecipient(planId, assigneeId);
 
         boolean emailChanged = recipient.updateContact(request.name(), request.email());
+        if (emailChanged) {
+            issueInviteAndSend(recipient, toRoleName(recipient.getDisclosureScope()));
+        }
 
-        EmailSendResult sendResult = emailChanged
-                ? issueInviteAndSend(recipient, toRoleName(recipient.getDisclosureScope()))
-                : null;
-
-        return RecipientUpdateResponse.of(
-                recipient,
-                sendResult != null && sendResult.success(),
-                sendResult == null || sendResult.bounceType() == null ? null : sendResult.bounceType().name()
-        );
+        return RecipientUpdateResponse.of(recipient, emailChanged, null);
     }
 
     private Recipient findOwnedRecipient(Long planId, Long assigneeId) {

@@ -2,14 +2,14 @@ package com.mamoki.ieojuda.domain.confirmer.service;
 
 import com.mamoki.ieojuda.domain.confirmer.dto.DisputeContactRegisterRequest;
 import com.mamoki.ieojuda.domain.confirmer.dto.DisputeContactResponse;
+import com.mamoki.ieojuda.domain.audit.entity.EmailType;
 import com.mamoki.ieojuda.domain.confirmer.entity.DisputeContact;
 import com.mamoki.ieojuda.domain.confirmer.repository.DisputeContactRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.service.PlanOwnershipReader;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
-import com.mamoki.ieojuda.global.email.contract.EmailSendResult;
-import com.mamoki.ieojuda.global.email.sender.EmailSender;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.email.template.EmailBuilder;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.email.token.TokenValidator;
@@ -33,7 +33,7 @@ public class DisputeContactService {
 
     private final PlanOwnershipReader planOwnershipReader;
     private final DisputeContactRepository disputeContactRepository;
-    private final EmailSender emailSender;
+    private final EmailOutboxService emailOutboxService;
     private final AppProperties appProperties;
     private final TokenLookupGuard tokenLookupGuard;
     private final PublicLinkAuditor publicLinkAuditor;
@@ -70,6 +70,8 @@ public class DisputeContactService {
         return DisputeContactResponse.of(contact, emailSent);
     }
 
+    // 발송은 EmailOutboxScheduler가 비동기로 처리하므로, 여기서는 큐 등록 자체만 하고 항상 true를 반환한다
+    // (실제 발송 결과는 "이메일 발송 감사" 화면에서 확인)
     private boolean issueTokenAndSendVerificationEmail(DisputeContact contact) {
         String plainToken = TokenProvider.generatePlainToken();
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
@@ -83,7 +85,8 @@ public class DisputeContactService {
                 secureLink,
                 appProperties.getContactEmail()
         );
-        return emailSender.send(contact.getEmail(), content).success();
+        emailOutboxService.enqueue(contact.getPlan(), null, EmailType.DISPUTE_CONTACT_VERIFICATION, contact.getEmail(), content);
+        return true;
     }
 
     private DisputeContact findContact(Long planId, Long contactId) {
