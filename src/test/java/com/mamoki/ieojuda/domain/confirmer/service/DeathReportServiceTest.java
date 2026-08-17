@@ -2,13 +2,18 @@ package com.mamoki.ieojuda.domain.confirmer.service;
 
 import com.mamoki.ieojuda.domain.confirmer.dto.DeathReportRequest;
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
+import com.mamoki.ieojuda.domain.confirmer.entity.DisputeContact;
 import com.mamoki.ieojuda.domain.confirmer.entity.Relationship;
 import com.mamoki.ieojuda.domain.confirmer.entity.ReportStatus;
 import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
+import com.mamoki.ieojuda.domain.confirmer.repository.DisputeContactRepository;
 import com.mamoki.ieojuda.domain.plan.dto.PlanSnapshotDto;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
+import com.mamoki.ieojuda.domain.plan.entity.PlanStatus;
 import com.mamoki.ieojuda.domain.plan.entity.PlanVersion;
+import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
 import com.mamoki.ieojuda.domain.plan.repository.PlanVersionRepository;
+import com.mamoki.ieojuda.domain.plan.service.PlanReadinessValidator;
 import com.mamoki.ieojuda.domain.plan.service.PlanSnapshotService;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityToken;
@@ -16,20 +21,26 @@ import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
 import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
+import com.mamoki.ieojuda.global.exception.CustomException;
+import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.idempotency.service.IdempotencyGuard;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,6 +58,7 @@ class DeathReportServiceTest {
     private SecurityTokenService securityTokenService;
     private EmailOutboxService emailOutboxService;
     private AppProperties appProperties;
+    private PlanReadinessValidator planReadinessValidator;
     private DeathReportService deathReportService;
 
     @BeforeEach
@@ -59,12 +71,20 @@ class DeathReportServiceTest {
         securityTokenService = mock(SecurityTokenService.class);
         emailOutboxService = mock(EmailOutboxService.class);
         appProperties = mock(AppProperties.class);
+        planReadinessValidator = mock(PlanReadinessValidator.class);
         deathReportService = new DeathReportService(
                 confirmerRepository, releaseCaseRepository, planVersionRepository,
-                planSnapshotService, idempotencyGuard, securityTokenService, emailOutboxService, appProperties);
+                planSnapshotService, idempotencyGuard, securityTokenService, emailOutboxService, appProperties,
+                planReadinessValidator);
 
         when(appProperties.getBaseUrl()).thenReturn("https://ieoduda.example.com");
         when(appProperties.getContactEmail()).thenReturn("support@ieoduda.example.com");
+    }
+
+    private Confirmer confirmerAcceptedOn(Plan plan, String name, String email) {
+        Confirmer confirmer = Confirmer.builder().plan(plan).name(name).relationship(Relationship.FRIEND).email(email).build();
+        confirmer.accept(null);
+        return confirmer;
     }
 
     @Test
@@ -72,16 +92,14 @@ class DeathReportServiceTest {
         Plan plan = mock(Plan.class);
         when(plan.getPlanId()).thenReturn(PLAN_ID);
 
-        Confirmer reporting = Confirmer.builder().plan(plan).name("A").relationship(Relationship.FRIEND).email("a@test.com").build();
-        reporting.accept(null);
+        Confirmer reporting = confirmerAcceptedOn(plan, "A", "a@test.com");
         SecurityToken reportDeathToken = mock(SecurityToken.class);
         when(reportDeathToken.getConfirmer()).thenReturn(reporting);
         when(securityTokenService.resolve(eq("token-a"), eq(SecurityTokenPurpose.REPORT_DEATH))).thenReturn(reportDeathToken);
         when(securityTokenService.issueForConfirmer(eq(SecurityTokenPurpose.UPLOAD_EVIDENCE), any(), any(), any()))
                 .thenReturn("evidence-token");
 
-        Confirmer sibling = Confirmer.builder().plan(plan).name("B").relationship(Relationship.FRIEND).email("b@test.com").build();
-        sibling.accept(null);
+        Confirmer sibling = confirmerAcceptedOn(plan, "B", "b@test.com");
         sibling.report(LocalDate.of(2026, 8, 15)); // 이미 먼저 신고해서 REPORTED 상태
         when(confirmerRepository.findByPlan_PlanIdAndConfirmIdNotAndReportStatus(PLAN_ID, null, ReportStatus.REPORTED))
                 .thenReturn(List.of(sibling));
@@ -112,5 +130,150 @@ class DeathReportServiceTest {
 
         assertThat(reporting.getReportStatus()).isEqualTo(ReportStatus.MATCHED);
         assertThat(sibling.getReportStatus()).isEqualTo(ReportStatus.MATCHED);
+    }
+
+    // 정책 변경 회귀 테스트 - 한쪽만 사망일을 모르는 경우 더 이상 자동 일치로 처리하지 않는다
+    @Test
+    void report_whenOnlyOneConfirmerKnowsDeathDate_marksBothMismatchedWithoutCreatingCase() {
+        Plan plan = mock(Plan.class);
+        when(plan.getPlanId()).thenReturn(PLAN_ID);
+
+        Confirmer reporting = confirmerAcceptedOn(plan, "A", "a@test.com");
+        SecurityToken reportDeathToken = mock(SecurityToken.class);
+        when(reportDeathToken.getConfirmer()).thenReturn(reporting);
+        when(securityTokenService.resolve(eq("token-a"), eq(SecurityTokenPurpose.REPORT_DEATH))).thenReturn(reportDeathToken);
+
+        Confirmer sibling = confirmerAcceptedOn(plan, "B", "b@test.com");
+        sibling.report(LocalDate.of(2026, 8, 15)); // 날짜를 알고 먼저 신고
+        when(confirmerRepository.findByPlan_PlanIdAndConfirmIdNotAndReportStatus(PLAN_ID, null, ReportStatus.REPORTED))
+                .thenReturn(List.of(sibling));
+
+        deathReportService.report("token-a", new DeathReportRequest(null), null); // 사망일을 모른 채 신고
+
+        assertThat(reporting.getReportStatus()).isEqualTo(ReportStatus.MISMATCHED);
+        assertThat(sibling.getReportStatus()).isEqualTo(ReportStatus.MISMATCHED);
+        verify(releaseCaseRepository, never()).saveAndFlush(any());
+    }
+
+    // 정책 변경 회귀 테스트 - 둘 다 사망일을 모르는 경우도 더 이상 자동 일치로 처리하지 않는다
+    @Test
+    void report_whenBothConfirmersDoNotKnowDeathDate_marksBothMismatchedWithoutCreatingCase() {
+        Plan plan = mock(Plan.class);
+        when(plan.getPlanId()).thenReturn(PLAN_ID);
+
+        Confirmer reporting = confirmerAcceptedOn(plan, "A", "a@test.com");
+        SecurityToken reportDeathToken = mock(SecurityToken.class);
+        when(reportDeathToken.getConfirmer()).thenReturn(reporting);
+        when(securityTokenService.resolve(eq("token-a"), eq(SecurityTokenPurpose.REPORT_DEATH))).thenReturn(reportDeathToken);
+
+        Confirmer sibling = confirmerAcceptedOn(plan, "B", "b@test.com");
+        sibling.report(null); // 사망일을 모른 채 먼저 신고
+        when(confirmerRepository.findByPlan_PlanIdAndConfirmIdNotAndReportStatus(PLAN_ID, null, ReportStatus.REPORTED))
+                .thenReturn(List.of(sibling));
+
+        deathReportService.report("token-a", new DeathReportRequest(null), null);
+
+        assertThat(reporting.getReportStatus()).isEqualTo(ReportStatus.MISMATCHED);
+        assertThat(sibling.getReportStatus()).isEqualTo(ReportStatus.MISMATCHED);
+        verify(releaseCaseRepository, never()).saveAndFlush(any());
+    }
+
+    // 둘 다 사망일을 명시했지만 서로 다른 고전적 불일치 케이스
+    @Test
+    void report_whenConfirmersReportDifferentDeathDates_marksBothMismatchedWithoutCreatingCase() {
+        Plan plan = mock(Plan.class);
+        when(plan.getPlanId()).thenReturn(PLAN_ID);
+
+        Confirmer reporting = confirmerAcceptedOn(plan, "A", "a@test.com");
+        SecurityToken reportDeathToken = mock(SecurityToken.class);
+        when(reportDeathToken.getConfirmer()).thenReturn(reporting);
+        when(securityTokenService.resolve(eq("token-a"), eq(SecurityTokenPurpose.REPORT_DEATH))).thenReturn(reportDeathToken);
+
+        Confirmer sibling = confirmerAcceptedOn(plan, "B", "b@test.com");
+        sibling.report(LocalDate.of(2026, 8, 15));
+        when(confirmerRepository.findByPlan_PlanIdAndConfirmIdNotAndReportStatus(PLAN_ID, null, ReportStatus.REPORTED))
+                .thenReturn(List.of(sibling));
+
+        deathReportService.report("token-a", new DeathReportRequest(LocalDate.of(2026, 8, 16)), null);
+
+        assertThat(reporting.getReportStatus()).isEqualTo(ReportStatus.MISMATCHED);
+        assertThat(sibling.getReportStatus()).isEqualTo(ReportStatus.MISMATCHED);
+        verify(releaseCaseRepository, never()).saveAndFlush(any());
+    }
+
+    // 준비도 검증 실패 시 두 신고가 일치하더라도 사건이 생성되지 않아야 한다
+    @Test
+    void report_whenPlanNotReady_propagatesExceptionWithoutCreatingCase() {
+        Plan plan = mock(Plan.class);
+        when(plan.getPlanId()).thenReturn(PLAN_ID);
+
+        Confirmer reporting = confirmerAcceptedOn(plan, "A", "a@test.com");
+        SecurityToken reportDeathToken = mock(SecurityToken.class);
+        when(reportDeathToken.getConfirmer()).thenReturn(reporting);
+        when(securityTokenService.resolve(eq("token-a"), eq(SecurityTokenPurpose.REPORT_DEATH))).thenReturn(reportDeathToken);
+
+        Confirmer sibling = confirmerAcceptedOn(plan, "B", "b@test.com");
+        sibling.report(LocalDate.of(2026, 8, 15));
+        when(confirmerRepository.findByPlan_PlanIdAndConfirmIdNotAndReportStatus(PLAN_ID, null, ReportStatus.REPORTED))
+                .thenReturn(List.of(sibling));
+
+        when(releaseCaseRepository.findFirstByPlan_PlanIdOrderByCaseIdDesc(PLAN_ID)).thenReturn(Optional.empty());
+        doThrow(new CustomException(ErrorCode.PLAN_NOT_READY)).when(planReadinessValidator).validate(plan);
+
+        assertThatThrownBy(() ->
+                deathReportService.report("token-a", new DeathReportRequest(LocalDate.of(2026, 8, 15)), null))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.PLAN_NOT_READY);
+
+        verify(releaseCaseRepository, never()).saveAndFlush(any());
+    }
+
+    // 검증기를 목이 아닌 실제 구현으로 붙여, "정규화 이메일 기준 서로 다른 확인자 2명 미만"이라는
+    // INSUFFICIENT_CONFIRMERS 경로가 report() 레벨에서 실제로 사건 생성을 막는지 직접 재현한다.
+    @Test
+    void report_whenFewerThanTwoDistinctAcceptedConfirmers_throwsInsufficientConfirmersWithoutCreatingCase() {
+        ConfirmerRepository readinessConfirmerRepository = mock(ConfirmerRepository.class);
+        ItemRepository itemRepository = mock(ItemRepository.class);
+        DisputeContactRepository disputeContactRepository = mock(DisputeContactRepository.class);
+        PlanReadinessValidator realValidator =
+                new PlanReadinessValidator(readinessConfirmerRepository, itemRepository, disputeContactRepository);
+        deathReportService = new DeathReportService(
+                confirmerRepository, releaseCaseRepository, planVersionRepository,
+                planSnapshotService, idempotencyGuard, securityTokenService, emailOutboxService, appProperties,
+                realValidator);
+
+        Plan plan = mock(Plan.class);
+        when(plan.getPlanId()).thenReturn(PLAN_ID);
+        when(plan.getStatus()).thenReturn(PlanStatus.SEALED);
+        when(plan.getWaitingDays()).thenReturn(14);
+        when(plan.getSelfWarningEmailVerified()).thenReturn(true);
+        when(plan.getOrderConfirmedAt()).thenReturn(LocalDateTime.now());
+
+        Confirmer reporting = confirmerAcceptedOn(plan, "A", "same@test.com");
+        SecurityToken reportDeathToken = mock(SecurityToken.class);
+        when(reportDeathToken.getConfirmer()).thenReturn(reporting);
+        when(securityTokenService.resolve(eq("token-a"), eq(SecurityTokenPurpose.REPORT_DEATH))).thenReturn(reportDeathToken);
+
+        Confirmer sibling = confirmerAcceptedOn(plan, "B", "SAME@test.com"); // 정규화하면 reporting과 같은 이메일
+        sibling.report(LocalDate.of(2026, 8, 15));
+        when(confirmerRepository.findByPlan_PlanIdAndConfirmIdNotAndReportStatus(PLAN_ID, null, ReportStatus.REPORTED))
+                .thenReturn(List.of(sibling));
+
+        when(releaseCaseRepository.findFirstByPlan_PlanIdOrderByCaseIdDesc(PLAN_ID)).thenReturn(Optional.empty());
+        DisputeContact verifiedContact = DisputeContact.builder().plan(mock(Plan.class)).email("dispute@test.com").name("이의").build();
+        verifiedContact.verify();
+        when(disputeContactRepository.findFirstByPlan_PlanIdOrderByContactIdDesc(PLAN_ID)).thenReturn(Optional.of(verifiedContact));
+        when(itemRepository.findByLifeArea_Plan_PlanIdOrderBySortOrderAscItemIdAsc(PLAN_ID)).thenReturn(List.of());
+        // "정규화하면 같은 이메일"인 두 확인자만 존재 - distinct 기준으로는 1명뿐이라 INSUFFICIENT_CONFIRMERS여야 한다
+        when(readinessConfirmerRepository.findByPlan_PlanIdOrderByConfirmIdAsc(PLAN_ID)).thenReturn(List.of(reporting, sibling));
+
+        assertThatThrownBy(() ->
+                deathReportService.report("token-a", new DeathReportRequest(LocalDate.of(2026, 8, 15)), null))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INSUFFICIENT_CONFIRMERS);
+
+        verify(releaseCaseRepository, never()).saveAndFlush(any());
     }
 }

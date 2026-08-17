@@ -8,9 +8,9 @@ import com.mamoki.ieojuda.domain.confirmer.entity.ReportStatus;
 import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
 import com.mamoki.ieojuda.domain.plan.dto.PlanSnapshotDto;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
-import com.mamoki.ieojuda.domain.plan.entity.PlanStatus;
 import com.mamoki.ieojuda.domain.plan.entity.PlanVersion;
 import com.mamoki.ieojuda.domain.plan.repository.PlanVersionRepository;
+import com.mamoki.ieojuda.domain.plan.service.PlanReadinessValidator;
 import com.mamoki.ieojuda.domain.plan.service.PlanSnapshotService;
 import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
@@ -26,7 +26,6 @@ import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.idempotency.service.IdempotencyGuard;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,12 +34,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Objects;
 
 // 명세서 "사망 신고 이메일" 화면 - 지정 확인자가 사망 사실을 신고한다 (로그인 불필요, REPORT_DEATH 토큰이 곧 인증).
 // issue #41 - 수락 시 발급된 ACCEPT_ROLE 토큰과는 별개인 REPORT_DEATH 전용 토큰만 여기서 받는다
 // (역할 수락 토큰이 사망 신고의 영구 접근키로 재사용되지 않도록).
-@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -57,6 +54,7 @@ public class DeathReportService {
     private final SecurityTokenService securityTokenService;
     private final EmailOutboxService emailOutboxService;
     private final AppProperties appProperties;
+    private final PlanReadinessValidator planReadinessValidator;
 
     @Transactional
     public DeathReportResponse report(String plainToken, DeathReportRequest request, String idempotencyKey) {
@@ -112,12 +110,10 @@ public class DeathReportService {
         emailOutboxService.enqueue(confirmer.getPlan(), null, EmailType.EVIDENCE_SUBMISSION_REQUEST, confirmer.getEmail(), content);
     }
 
-    // 둘 다 모르는 경우, 둘 다 같은 날짜인 경우, 한쪽만 모르는 경우는 모두 일치로 본다 - 날짜가 서로 다를 때만 불일치
+    // 둘 다 사망일을 명시했고 그 값이 같을 때만 일치로 본다.
+    // 하나라도 모르면(null)이거나 날짜가 다르면 불일치 처리 - 재확인/운영 검토로 전환한다.
     private boolean datesAgree(LocalDate a, LocalDate b) {
-        if (a == null || b == null) {
-            return true;
-        }
-        return Objects.equals(a, b);
+        return a != null && b != null && a.equals(b);
     }
 
     private ReleaseCase createReleaseCase(Plan plan) {
@@ -127,12 +123,9 @@ public class DeathReportService {
             throw new CustomException(ErrorCode.ACTIVE_RELEASE_CASE_EXISTS);
         }
 
-        // issue #81 - 작성자 봉인(Plan.status)과 사망 신고 시점 스냅샷 봉인(PlanVersion)은 독립적으로
-        // 유지한다(부록 결정 (a)). 작성자가 미리 검토·봉인하지 않았어도 발송 절차 자체는 막지 않되,
-        // 운영 가시성을 위해 남긴다.
-        if (plan.getStatus() != PlanStatus.SEALED) {
-            log.warn("[Plan Not Sealed] 작성자가 패키지를 봉인하지 않은 상태로 사후 사건이 열립니다. planId={}", plan.getPlanId());
-        }
+        // 준비되지 않았거나 비활성인 계획에서 사건이 시작되지 않도록, 사건 생성 직전 계획 준비도를
+        // 재검증한다 (봉인 이후에도 확인자 거절·항목 추가 등으로 상태가 바뀔 수 있어 독립적으로 확인).
+        planReadinessValidator.validate(plan);
 
         int nextVersionNum = (int) planVersionRepository.countByPlan_PlanId(plan.getPlanId()) + 1;
         PlanSnapshotDto snapshot = planSnapshotService.buildSnapshot(plan);
