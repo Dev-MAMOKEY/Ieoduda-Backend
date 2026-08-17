@@ -2,7 +2,6 @@ package com.mamoki.ieojuda.domain.postaccess.dto;
 
 import com.mamoki.ieojuda.domain.postaccess.entity.AccessToken;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
-import com.mamoki.ieojuda.domain.recipient.entity.RoleType;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -23,18 +22,10 @@ public record PosthumousAccessResponse(
                 recipient.getName(),
                 recipient.getPlan().getUser().getName(),
                 recipient.getRoleType().name(),
-                roleLabel(recipient.getRoleType()),
+                recipient.getRoleType().label(),
                 accessToken.getExpiresAt(),
                 accessToken.getOtpSentAt() != null,
                 contactEmail
         );
-    }
-
-    private static String roleLabel(RoleType roleType) {
-        return switch (roleType) {
-            case FAMILY_MANAGER -> "가족 담당자";
-            case WORK_MANAGER -> "업무 담당자";
-            case RELATIONSHIP_MANAGER -> "관계 정리 담당자";
-        };
     }
 }

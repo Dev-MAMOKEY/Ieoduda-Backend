@@ -15,6 +15,10 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class AccessToken {
 
+    // OTP 인증 성공 후 열람 세션이 유효한 시간(분) - PosthumousAccessService(#76)와
+    // PosthumousPackageService(#77)가 세션 만료 판단 기준으로 함께 참조한다.
+    public static final int SESSION_TTL_MINUTES = 60;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "token_id")
@@ -71,5 +75,11 @@ public class AccessToken {
     public void verify() {
         this.verifiedAt = LocalDateTime.now();
         this.used = true;
+    }
+
+    // 역할별 사후 패키지 조회(#77)에서 쓰는 세션 유효성 판단 - OTP 인증을 통과했고(verifiedAt 존재)
+    // 세션 유효 시간(60분) 이내인지 확인한다.
+    public boolean isSessionValid(LocalDateTime now) {
+        return verifiedAt != null && verifiedAt.plusMinutes(SESSION_TTL_MINUTES).isAfter(now);
     }
 }
