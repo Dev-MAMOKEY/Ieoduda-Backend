@@ -2,6 +2,7 @@ package com.mamoki.ieojuda.domain.partner.controller;
 
 import java.util.UUID;
 
+import com.mamoki.ieojuda.domain.partner.dto.EvidenceDownloadLinkResponse;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewDecisionRequest;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewResponse;
 import com.mamoki.ieojuda.domain.partner.service.PartnerReviewService;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 // 명세서 "외부 파트너 증빙 검토" 화면 - 외부 법무·장례 파트너 전용
@@ -40,13 +42,25 @@ public class PartnerReviewController {
         return ResponseEntity.ok(RsData.success(partnerReviewService.getReview(userId, reviewId)));
     }
 
-    @Operation(summary = "증빙 원본 다운로드")
-    @GetMapping("/file")
-    public ResponseEntity<byte[]> getFile(
+    // issue #43 - 원본은 로그인 세션만으로 계속 내려받을 수 없다. 먼저 짧은 수명의 1회성 다운로드
+    // 토큰을 발급받고, 그 토큰으로 한 번만 실제 원본을 요청할 수 있다.
+    @Operation(summary = "증빙 원본 다운로드 링크 발급", description = "짧은 수명(5분)의 1회성 다운로드 토큰을 발급합니다. 이 토큰으로 /file 엔드포인트를 한 번만 호출할 수 있습니다.")
+    @PostMapping("/file")
+    public ResponseEntity<RsData<EvidenceDownloadLinkResponse>> requestDownloadLink(
             @AuthenticationPrincipal UUID userId,
             @Parameter(description = "검토 ID (증빙 ID)") @PathVariable UUID reviewId
     ) {
-        byte[] file = partnerReviewService.getFile(userId, reviewId);
+        return ResponseEntity.ok(RsData.success(partnerReviewService.requestDownloadLink(userId, reviewId)));
+    }
+
+    @Operation(summary = "증빙 원본 다운로드", description = "발급받은 1회성 다운로드 토큰을 소비해 원본을 내려받습니다. 같은 토큰으로 두 번 호출할 수 없습니다.")
+    @GetMapping("/file")
+    public ResponseEntity<byte[]> getFile(
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "검토 ID (증빙 ID)") @PathVariable UUID reviewId,
+            @Parameter(description = "1회성 다운로드 토큰") @RequestParam String token
+    ) {
+        byte[] file = partnerReviewService.downloadFile(userId, reviewId, token);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(file);
