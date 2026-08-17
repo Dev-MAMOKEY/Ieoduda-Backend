@@ -164,15 +164,15 @@ class InputSizeConstraintTest {
 
     @Test
     void evidenceFilenameMatchesTheDatabaseColumnLimit() {
-        EvidenceSubmitService service = new EvidenceSubmitService(null, null, null, null, null, null, null);
+        EvidenceSubmitService service = new EvidenceSubmitService(null, null, null, null, null, null, null, null);
         MockMultipartFile valid = new MockMultipartFile(
                 "file", "x".repeat(255), "application/pdf", new byte[]{1});
         MockMultipartFile oversized = new MockMultipartFile(
                 "file", "x".repeat(256), "application/pdf", new byte[]{1});
 
-        assertThatCode(() -> ReflectionTestUtils.invokeMethod(service, "validateFile", valid))
+        assertThatCode(() -> ReflectionTestUtils.invokeMethod(service, "validateBasics", valid))
                 .doesNotThrowAnyException();
-        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "validateFile", oversized))
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "validateBasics", oversized))
                 .isInstanceOfSatisfying(CustomException.class,
                         exception -> assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.EVIDENCE_SUBMISSION_INVALID));

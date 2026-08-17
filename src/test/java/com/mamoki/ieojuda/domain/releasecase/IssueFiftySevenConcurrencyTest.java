@@ -32,6 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -170,7 +171,7 @@ class IssueFiftySevenConcurrencyTest {
     @Test
     void evidenceSubmit_whenFiveRequestsRaceForTheSameCase_onlyMaxFileCountSucceed() throws Exception {
         when(evidenceStorageClient.store(any(), any()))
-                .thenReturn(new StoredEvidence("evidence/race/test", "hash", 3));
+                .thenReturn(new StoredEvidence("evidence/race/test", 3));
 
         User user = userRepository.saveAndFlush(User.builder()
                 .email("evidence-race-" + UUID.randomUUID() + "@test.com").password("hash").name("A").build());
@@ -203,8 +204,10 @@ class IssueFiftySevenConcurrencyTest {
                         try {
                             ready.countDown();
                             start.await();
+                            // 매직바이트 검사를 통과해야 하므로 실제 PDF 헤더 바이트를 사용한다.
                             MockMultipartFile file = new MockMultipartFile(
-                                    "file", "proof-" + i + ".pdf", "application/pdf", new byte[]{1, 2, 3});
+                                    "file", "proof-" + i + ".pdf", "application/pdf",
+                                    "%PDF-1.4".getBytes(StandardCharsets.US_ASCII));
                             try {
                                 evidenceSubmitService.submit(plainToken, file, null);
                                 return true;

@@ -110,9 +110,16 @@ public class PartnerReviewService {
         }
     }
 
+    // getReview/getFile/decide 세 경로가 모두 이 메서드를 거치므로, 원본이 이미 삭제된 증빙을
+    // 여기서 한 번에 막는다. 원본 삭제 후 승인/반려를 허용하면 존재하지 않는 파일을 판정하는
+    // 정합성 결함이 생기고, 다운로드는 지금까지 S3까지 갔다가 404로 새고 있었다.
     private Evidence findEvidence(Long reviewId) {
-        return evidenceRepository.findById(reviewId)
+        Evidence evidence = evidenceRepository.findById(reviewId)
                 .orElseThrow(() -> new CustomException(ErrorCode.EVIDENCE_NOT_FOUND));
+        if (evidence.getDeletedAt() != null) {
+            throw new CustomException(ErrorCode.EVIDENCE_ALREADY_DELETED);
+        }
+        return evidence;
     }
 
     private PartnerReviewer findReviewerByUser(Long userId) {
