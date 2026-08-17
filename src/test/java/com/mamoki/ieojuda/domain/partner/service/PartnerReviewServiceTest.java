@@ -5,6 +5,7 @@ import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.audit.entity.AdminActionType;
 import com.mamoki.ieojuda.domain.audit.service.AdminActionAuditService;
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
+import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
 import com.mamoki.ieojuda.domain.confirmer.service.DisputeContactService;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceDownloadToken;
@@ -53,6 +54,7 @@ class PartnerReviewServiceTest {
     private static final UUID REVIEW_ID = UUID.randomUUID();
 
     private EvidenceRepository evidenceRepository;
+    private ConfirmerRepository confirmerRepository;
     private PartnerReviewerRepository partnerReviewerRepository;
     private EvidenceDownloadTokenRepository evidenceDownloadTokenRepository;
     private EvidenceStorageClient evidenceStorageClient;
@@ -72,6 +74,7 @@ class PartnerReviewServiceTest {
     @BeforeEach
     void setUp() {
         evidenceRepository = mock(EvidenceRepository.class);
+        confirmerRepository = mock(ConfirmerRepository.class);
         partnerReviewerRepository = mock(PartnerReviewerRepository.class);
         evidenceDownloadTokenRepository = mock(EvidenceDownloadTokenRepository.class);
         evidenceStorageClient = mock(EvidenceStorageClient.class);
@@ -82,8 +85,8 @@ class PartnerReviewServiceTest {
         securityTokenService = mock(SecurityTokenService.class);
         disputeContactService = mock(DisputeContactService.class);
         partnerReviewService = new PartnerReviewService(
-                evidenceRepository, partnerReviewerRepository, evidenceDownloadTokenRepository, evidenceStorageClient,
-                permissionGuard, reauthGuard, adminActionAuditService, idempotencyGuard,
+                evidenceRepository, confirmerRepository, partnerReviewerRepository, evidenceDownloadTokenRepository,
+                evidenceStorageClient, permissionGuard, reauthGuard, adminActionAuditService, idempotencyGuard,
                 securityTokenService, disputeContactService);
 
         actor = mock(User.class);
@@ -95,10 +98,15 @@ class PartnerReviewServiceTest {
         when(partnerReviewerRepository.findByUser_UserId(USER_ID)).thenReturn(Optional.of(reviewer));
 
         releaseCase = mock(ReleaseCase.class);
+        // issue #45 - 다중 증빙 승인 정책이 사건별로 승인 건수를 집계하는 데 필요하다
+        when(releaseCase.getCaseId()).thenReturn(UUID.randomUUID());
         Plan plan = mock(Plan.class);
+        when(plan.getPlanId()).thenReturn(UUID.randomUUID());
+        when(plan.getWaitingDays()).thenReturn(7);
         User planOwner = mock(User.class);
         when(planOwner.getName()).thenReturn("작성자");
         when(plan.getUser()).thenReturn(planOwner);
+        when(releaseCase.getPlan()).thenReturn(plan);
         Confirmer confirmer = mock(Confirmer.class);
         when(confirmer.getName()).thenReturn("확인자");
         evidence = mock(Evidence.class);
@@ -109,6 +117,11 @@ class PartnerReviewServiceTest {
         when(evidence.getReviewStatus()).thenReturn(EvidenceReviewStatus.PENDING);
         when(evidence.getEvidenceType()).thenReturn(EvidenceType.DEATH_CERTIFICATE);
         when(evidenceRepository.findById(REVIEW_ID)).thenReturn(Optional.of(evidence));
+        // 기본값: 매칭된 확인자가 1명뿐인 사건 - 승인 1건만으로 정족수를 채워 바로 WAITING까지 진행된다
+        // (다중 확인자 정족수 시나리오는 별도 테스트에서 개별적으로 재정의한다)
+        when(confirmerRepository.findByPlan_PlanIdAndReportStatus(any(), any()))
+                .thenReturn(List.of(mock(Confirmer.class)));
+        when(evidenceRepository.countByReleaseCase_CaseIdAndReviewStatus(any(), any())).thenReturn(0L);
     }
 
     @Test
@@ -124,6 +137,40 @@ class PartnerReviewServiceTest {
         verify(adminActionAuditService).record(actor, AdminActionType.EVIDENCE_DECISION, REVIEW_ID, true, "APPROVE");
         // issue #43 - 개별 사전 배정은 없지만, 실제로 판정한 사람은 표시·감사용으로 기록해둔다
         verify(evidence).assignReviewer(reviewer);
+    }
+
+    // issue #45 - "여러 증빙의 승인 정책": 매칭된 확인자가 2명인 사건에서 아직 1건만 승인됐다면
+    // WAITING으로 넘기지 않고 부분 승인(EVIDENCE_APPROVED) 상태로만 남겨야 한다.
+    @Test
+    void decide_whenOnlyOneOfTwoMatchedConfirmersApproved_leavesCasePartiallyApproved() {
+        when(confirmerRepository.findByPlan_PlanIdAndReportStatus(any(), any()))
+                .thenReturn(List.of(mock(Confirmer.class), mock(Confirmer.class)));
+        when(evidenceRepository.countByReleaseCase_CaseIdAndReviewStatus(any(), any())).thenReturn(0L);
+        PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
+                PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "correct-pw");
+
+        partnerReviewService.decide(REVIEW_ID, USER_ID, request, null);
+
+        verify(evidence).approve();
+        verify(releaseCase).markEvidencePartiallyApproved();
+        verify(releaseCase, never()).approveEvidenceAndStartWaiting(any());
+    }
+
+    // 매칭된 두 확인자 중 이미 한 명이 승인된 상태에서 나머지 한 명의 증빙까지 승인되면
+    // 그때 비로소 WAITING으로 전환돼야 한다.
+    @Test
+    void decide_whenSecondOfTwoMatchedConfirmersApproved_startsWaiting() {
+        when(confirmerRepository.findByPlan_PlanIdAndReportStatus(any(), any()))
+                .thenReturn(List.of(mock(Confirmer.class), mock(Confirmer.class)));
+        when(evidenceRepository.countByReleaseCase_CaseIdAndReviewStatus(any(), any())).thenReturn(1L);
+        PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
+                PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "correct-pw");
+
+        partnerReviewService.decide(REVIEW_ID, USER_ID, request, null);
+
+        verify(evidence).approve();
+        verify(releaseCase).approveEvidenceAndStartWaiting(any());
+        verify(releaseCase, never()).markEvidencePartiallyApproved();
     }
 
     @Test

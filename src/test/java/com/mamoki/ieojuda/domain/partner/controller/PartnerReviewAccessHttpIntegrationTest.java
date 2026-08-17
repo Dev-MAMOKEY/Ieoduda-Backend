@@ -106,6 +106,15 @@ class PartnerReviewAccessHttpIntegrationTest {
                 PlanVersion.builder().plan(plan).versionNum(1).snapshotData("{}").build());
         releaseCase = releaseCaseRepository.saveAndFlush(ReleaseCase.builder().plan(plan).planVersion(planVersion).build());
 
+        // issue #45 - approveEvidenceAndStartWaiting()이 EVIDENCE_REVIEWING/EVIDENCE_APPROVED에서만
+        // 허용되므로, 판정 API를 호출하기 전에 사건을 그 상태까지 진행시켜둬야 한다.
+        releaseCase.confirmReport();
+        releaseCase.awaitEvidence();
+        releaseCase.startEvidenceReview();
+        // saveAndFlush(detached entity)는 merge()라서 새 관리 인스턴스를 반환한다 - 반드시 재할당해야
+        // 이후 delete에서 최신 version을 참조해 낙관적 잠금 충돌이 나지 않는다.
+        releaseCase = releaseCaseRepository.saveAndFlush(releaseCase);
+
         confirmer = confirmerRepository.saveAndFlush(Confirmer.builder()
                 .plan(plan).name("확인자").relationship(Relationship.FRIEND)
                 .email("confirmer-access-" + UUID.randomUUID() + "@test.com").build());

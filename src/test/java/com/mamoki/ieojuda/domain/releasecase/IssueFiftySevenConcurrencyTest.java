@@ -176,7 +176,7 @@ class IssueFiftySevenConcurrencyTest {
     }
 
     @Test
-    void evidenceSubmit_whenFiveRequestsRaceForTheSameCase_onlyMaxFileCountSucceed() throws Exception {
+    void evidenceSubmit_whenFiveRequestsRaceForTheSameConfirmer_onlyOneSucceeds() throws Exception {
         when(evidenceStorageClient.store(any(), any()))
                 .thenReturn(new StoredEvidence("evidence/race/test", 3));
 
@@ -219,7 +219,7 @@ class IssueFiftySevenConcurrencyTest {
                                 evidenceSubmitService.submit(releaseCase.getCaseId(), plainToken, file, EvidenceType.DEATH_CERTIFICATE, null);
                                 return true;
                             } catch (CustomException e) {
-                                assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_SUBMISSION_INVALID);
+                                assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_ALREADY_SUBMITTED);
                                 return false;
                             }
                         } finally {
@@ -237,10 +237,10 @@ class IssueFiftySevenConcurrencyTest {
                 }
             }
 
-            // 사건당 최대 3개(MAX_FILE_COUNT) - 동시에 5건이 들어와도 "개수 확인 후 저장" 경쟁 조건 없이
-            // 정확히 3건만 성공해야 한다 (사건 행 비관적 잠금으로 직렬화됨).
-            assertThat(successCount).isEqualTo(3);
-            assertThat(evidenceRepository.countByReleaseCase_CaseId(releaseCase.getCaseId())).isEqualTo(3);
+            // issue #45 - 확인자당 증빙 1건 제한: 같은 확인자(같은 토큰)로 5건이 동시에 들어와도
+            // "이미 냈는지 확인 후 저장" 경쟁 조건 없이 정확히 1건만 성공해야 한다 (사건 행 비관적 잠금으로 직렬화됨).
+            assertThat(successCount).isEqualTo(1);
+            assertThat(evidenceRepository.countByReleaseCase_CaseId(releaseCase.getCaseId())).isEqualTo(1);
         } finally {
             pool.shutdown();
             evidenceRepository.findByPlan_PlanId(plan.getPlanId()).forEach(evidenceRepository::delete);

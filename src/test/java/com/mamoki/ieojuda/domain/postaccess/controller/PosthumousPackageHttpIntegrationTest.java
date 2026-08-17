@@ -121,6 +121,14 @@ class PosthumousPackageHttpIntegrationTest {
         planVersion = planVersionRepository.saveAndFlush(planVersion);
 
         releaseCase = releaseCaseRepository.saveAndFlush(ReleaseCase.builder().plan(plan).planVersion(planVersion).build());
+        // issue #45 - ReleaseCase.complete()는 RELEASING에서만 허용되므로, 마지막 단계 행동 완료가
+        // 사건 전체를 완료 처리하는 경로를 검증하려면 사건을 실제로 그 상태까지 진행시켜둬야 한다.
+        releaseCase.confirmReport();
+        releaseCase.awaitEvidence();
+        releaseCase.startEvidenceReview();
+        releaseCase.approveEvidenceAndStartWaiting(7);
+        releaseCase.startReleasing();
+        releaseCase = releaseCaseRepository.saveAndFlush(releaseCase);
 
         stage = handoverStageRepository.saveAndFlush(HandoverStage.builder().plan(plan).recipient(recipient).stageOrder(0).build());
         stage.assignToCase(releaseCase);

@@ -48,7 +48,6 @@ public class EvidenceSubmitService {
 
     private static final Set<String> ALLOWED_MIME_TYPES = Set.of("application/pdf", "image/jpeg", "image/png");
     private static final long MAX_FILE_SIZE = 50L * 1024 * 1024; // 50MB
-    private static final long MAX_FILE_COUNT = 3;
     private static final int HEADER_LENGTH = 16;
 
     private final ReleaseCaseRepository releaseCaseRepository;
@@ -94,8 +93,10 @@ public class EvidenceSubmitService {
             throw new CustomException(ErrorCode.EVIDENCE_SUBMISSION_INVALID);
         }
 
-        if (evidenceRepository.countByReleaseCase_CaseId(releaseCase.getCaseId()) >= MAX_FILE_COUNT) {
-            throw new CustomException(ErrorCode.EVIDENCE_SUBMISSION_INVALID);
+        // issue #45 - "여러 증빙의 승인 정책"은 사건에 매칭된 확인자 각각이 정확히 1건씩 낸다는 전제로
+        // 동작한다("중복 제출 방지"). 그래서 개수 상한이 아니라, 이 확인자가 이 사건에 이미 냈는지로 막는다.
+        if (evidenceRepository.existsByReleaseCase_CaseIdAndConfirmer_ConfirmId(releaseCase.getCaseId(), confirmer.getConfirmId())) {
+            throw new CustomException(ErrorCode.EVIDENCE_ALREADY_SUBMITTED);
         }
 
         EvidenceUpload upload = new EvidenceUpload(

@@ -7,6 +7,8 @@ import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
 import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.audit.entity.AdminActionType;
 import com.mamoki.ieojuda.domain.audit.service.AdminActionAuditService;
+import com.mamoki.ieojuda.domain.confirmer.entity.ReportStatus;
+import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
 import com.mamoki.ieojuda.domain.confirmer.service.DisputeContactService;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceDownloadToken;
@@ -48,6 +50,7 @@ public class PartnerReviewService {
     private static final long DOWNLOAD_TOKEN_TTL_MINUTES = 5;
 
     private final EvidenceRepository evidenceRepository;
+    private final ConfirmerRepository confirmerRepository;
     private final PartnerReviewerRepository partnerReviewerRepository;
     private final EvidenceDownloadTokenRepository evidenceDownloadTokenRepository;
     private final EvidenceStorageClient evidenceStorageClient;
@@ -148,14 +151,24 @@ public class PartnerReviewService {
         evidence.assignReviewer(reviewer);
 
         switch (request.decision()) {
-            // 승인되면 계획에 설정된 대기 기간만큼 발송을 미루는 대기 상태로 사건을 전이시킨다
+            // issue #45 - "여러 증빙의 승인 정책" - 사건에 매칭된 확인자 각각이 낸 증빙이 전부 승인돼야
+            // 대기(WAITING)로 넘어간다. 아직 다 안 됐으면 EVIDENCE_APPROVED(부분 승인) 상태로만 남겨둔다.
             case APPROVE -> {
-                evidence.approve();
                 ReleaseCase releaseCase = evidence.getReleaseCase();
-                releaseCase.approveEvidenceAndStartWaiting(evidence.getPlan().getWaitingDays());
-                // issue #41 - 증빙 제출 단계가 끝났으므로 UPLOAD_EVIDENCE 토큰은 더 이상 필요 없다
-                securityTokenService.revokeAllForCase(releaseCase, SecurityTokenPurpose.UPLOAD_EVIDENCE);
-                disputeContactService.notifyVerifiedContactsOfObjectionWindow(releaseCase);
+                long alreadyApprovedCount = evidenceRepository.countByReleaseCase_CaseIdAndReviewStatus(
+                        releaseCase.getCaseId(), EvidenceReviewStatus.APPROVED);
+                evidence.approve();
+                long requiredCount = confirmerRepository.findByPlan_PlanIdAndReportStatus(
+                        releaseCase.getPlan().getPlanId(), ReportStatus.MATCHED).size();
+
+                if (alreadyApprovedCount + 1 >= requiredCount) {
+                    releaseCase.approveEvidenceAndStartWaiting(evidence.getPlan().getWaitingDays());
+                    // issue #41 - 증빙 제출 단계가 끝났으므로 UPLOAD_EVIDENCE 토큰은 더 이상 필요 없다
+                    securityTokenService.revokeAllForCase(releaseCase, SecurityTokenPurpose.UPLOAD_EVIDENCE);
+                    disputeContactService.notifyVerifiedContactsOfObjectionWindow(releaseCase);
+                } else {
+                    releaseCase.markEvidencePartiallyApproved();
+                }
             }
             case REJECT -> {
                 if (request.failureReason() == null || request.failureReason().isBlank()) {

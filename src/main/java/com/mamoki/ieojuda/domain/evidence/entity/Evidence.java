@@ -4,12 +4,16 @@ import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
 import com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
+import com.mamoki.ieojuda.global.exception.CustomException;
+import com.mamoki.ieojuda.global.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.UUID;
 import java.time.LocalDateTime;
 
@@ -104,8 +108,15 @@ public class Evidence {
         this.reviewer = reviewer;
     }
 
+    // issue #45 - 판정(승인/반려)은 PENDING 또는 ADDITIONAL_INFO_REQUESTED에서만 가능하다. APPROVED/REJECTED는
+    // 종결 상태라 다시 판정할 수 없다 - 서비스 계층(PartnerReviewService)에도 같은 검사가 있지만(빠른 실패로
+    // 재인증 전에 막기 위함), 다른 경로로 호출되더라도 엔티티 스스로 재판정을 거부하도록 이중으로 막는다.
+    private static final Set<EvidenceReviewStatus> DECIDABLE_STATUSES =
+            EnumSet.of(EvidenceReviewStatus.PENDING, EvidenceReviewStatus.ADDITIONAL_INFO_REQUESTED);
+
     // 승인. 검토 완료일 기준 30일 이내 삭제 규정에 따라 삭제 예정일 자동 계산 - 명세서상 30일로 임의 지정
     public void approve() {
+        ensureDecidable();
         this.reviewStatus = EvidenceReviewStatus.APPROVED;
         this.reviewedAt = LocalDateTime.now();
         this.deleteScheduledAt = this.reviewedAt.plusDays(30);
@@ -113,6 +124,7 @@ public class Evidence {
 
     // 반려. 검토 완료 시점 기준 삭제 일정 부여  - 명세서 상 30일로 임의 지정
     public void reject(String failureReason) {
+        ensureDecidable();
         this.reviewStatus = EvidenceReviewStatus.REJECTED;
         this.reviewedAt = LocalDateTime.now();
         this.failureReason = failureReason;
@@ -120,7 +132,14 @@ public class Evidence {
     }
 
     public void reAdditionalInfo() {
+        ensureDecidable();
         this.reviewStatus = EvidenceReviewStatus.ADDITIONAL_INFO_REQUESTED;
+    }
+
+    private void ensureDecidable() {
+        if (!DECIDABLE_STATUSES.contains(this.reviewStatus)) {
+            throw new CustomException(ErrorCode.EVIDENCE_ALREADY_DECIDED);
+        }
     }
 
     public void markDeleted() {
