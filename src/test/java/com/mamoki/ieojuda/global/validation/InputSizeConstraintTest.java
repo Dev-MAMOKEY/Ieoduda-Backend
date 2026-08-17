@@ -67,7 +67,8 @@ class InputSizeConstraintTest {
                     "content", 2000,
                     "precondition", 2000,
                     "disclosureScope", 30,
-                    "actionType", 30
+                    "actionType", 30,
+                    "semanticType", 30
             )),
             Map.entry(SelfWarningEmailRequest.class, Map.of("email", 255)),
             Map.entry(BackupRegisterRequest.class, Map.of("name", 100, "email", 255)),
@@ -128,15 +129,15 @@ class InputSizeConstraintTest {
         Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
         ItemUpdateRequest validItem = new ItemUpdateRequest(
                 "x".repeat(100), "x".repeat(100), "x".repeat(2000),
-                "x".repeat(200), "x".repeat(2000), "x".repeat(2000), "PRIVATE", "OTHER"
+                "x".repeat(200), "x".repeat(2000), "x".repeat(2000), "PRIVATE", "OTHER", "x".repeat(30)
         );
         ItemUpdateRequest oversizedItem = new ItemUpdateRequest(
                 "x".repeat(101), "x".repeat(101), "x".repeat(2001),
-                "x".repeat(201), "x".repeat(2001), "x".repeat(2001), "PRIVATE", "OTHER"
+                "x".repeat(201), "x".repeat(2001), "x".repeat(2001), "PRIVATE", "OTHER", "x".repeat(31)
         );
 
         assertThat(validator.validate(validItem)).isEmpty();
-        assertThat(validator.validate(oversizedItem)).hasSize(6);
+        assertThat(validator.validate(oversizedItem)).hasSize(7);
         assertThat(validator.validate(new ObjectionRequest("token", "x".repeat(1000)))).isEmpty();
         assertThat(validator.validate(new ObjectionRequest("token", "x".repeat(1001)))).hasSize(1);
     }

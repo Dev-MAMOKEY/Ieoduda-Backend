@@ -54,6 +54,14 @@ public class OpenAIClient {
                     "순서를 지킬 필요가 없는 항목들끼리는 모두 0을 매기세요. " +
                     "각 항목마다 actionType도 판단하세요: 계정·자료를 삭제·탈퇴·정리·초기화하는 항목이면 DELETE, " +
                     "자료·정보·접근권한을 누군가에게 전달·인계·공개하는 항목이면 TRANSFER, 둘 다 아니면(예: 단순 알림) OTHER로 표시하세요. " +
+                    "각 항목마다 semanticType도 다음 6가지 중 하나에 해당하면 표시하고, 해당하지 않으면 null로 두세요: " +
+                    "클라우드·SNS 등 계정 자체를 삭제·탈퇴하는 항목은 CLOUD_DELETE, 그 계정에 있던 사진·문서 등 자료를 보존·전달하는 " +
+                    "항목은 FILE_PRESERVE, 거래처와 연락하던 채널(이메일·전화 등)을 해지·폐쇄하는 항목은 CHANNEL_CLOSE, 그 채널로 " +
+                    "거래처에 상황을 알리는 항목은 CLIENT_NOTIFY, 회사 PC·노트북 등 기기를 초기화·반납하는 항목은 DEVICE_RESET, " +
+                    "그 기기에 있던 업무 기록을 반출·인계하는 항목은 RECORD_EXPORT로 표시하세요. " +
+                    "같은 계정·채널·기기를 다루는 두 항목이 CLOUD_DELETE/FILE_PRESERVE, CHANNEL_CLOSE/CLIENT_NOTIFY, " +
+                    "DEVICE_RESET/RECORD_EXPORT 쌍을 이루면 반드시 locationType을 서로 동일하게 맞춰서, 삭제·폐쇄·초기화 쪽이 " +
+                    "보존·통지·반출 쪽보다 나중 sortOrder를 갖도록 하세요. " +
                     "절대로 사망 여부 판정, 증빙 진위 판단, 상속 권리 판단을 하지 마세요. " +
                     "비밀번호·PIN·OTP 등 자격증명을 묻거나 추론하지 마세요. " +
                     "실제 계정 작업을 대신 수행하지 말고, 사용자 승인 없이 계획을 확정하지 마세요. " +
@@ -66,7 +74,8 @@ public class OpenAIClient {
                     "\"disclosureScope\":\"FAMILY 또는 WORK 또는 RELATIONSHIP 중 하나\"," +
                     "\"sourceExcerpt\":\"이 항목의 근거가 되는 원문 문장\"," +
                     "\"sortOrder\":실행 순서를 나타내는 정수(낮을수록 먼저)," +
-                    "\"actionType\":\"DELETE 또는 TRANSFER 또는 OTHER 중 하나\"}]}";
+                    "\"actionType\":\"DELETE 또는 TRANSFER 또는 OTHER 중 하나\"," +
+                    "\"semanticType\":\"CLOUD_DELETE 또는 FILE_PRESERVE 또는 CHANNEL_CLOSE 또는 CLIENT_NOTIFY 또는 DEVICE_RESET 또는 RECORD_EXPORT 중 하나, 해당 없으면 null\"}]}";
 
     private static final String JSON_RESPONSE_FORMAT_TYPE = "json_object";
     // 창의성이 필요 없는 구조화 작업이라 낮게 고정해서 같은 입력에 최대한 일관된 결과(특히 sortOrder)가 나오게 함

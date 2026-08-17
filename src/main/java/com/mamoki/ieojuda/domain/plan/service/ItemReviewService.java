@@ -8,6 +8,7 @@ import com.mamoki.ieojuda.domain.plan.dto.ItemUpdateRequest;
 import com.mamoki.ieojuda.domain.plan.entity.DisclosureScope;
 import com.mamoki.ieojuda.domain.plan.entity.Item;
 import com.mamoki.ieojuda.domain.plan.entity.ItemActionType;
+import com.mamoki.ieojuda.domain.plan.entity.ItemSemanticType;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
 import com.mamoki.ieojuda.domain.plan.entity.ItemStatus;
 import com.mamoki.ieojuda.global.exception.CustomException;
@@ -86,8 +87,16 @@ public class ItemReviewService {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
 
+        // issue #90 - actionType과 달리 6종 중 어디에도 해당하지 않는 게 정상 케이스이므로 값이 없으면 null
+        ItemSemanticType semanticType;
+        try {
+            semanticType = request.semanticType() == null ? null : ItemSemanticType.valueOf(request.semanticType());
+        } catch (IllegalArgumentException e) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
         item.updateContent(request.targetName(), request.locationType(), request.action(), request.title(), request.content(),
-                request.precondition(), disclosureScope, actionType);
+                request.precondition(), disclosureScope, actionType, semanticType);
 
         return ItemResponse.from(item);
     }

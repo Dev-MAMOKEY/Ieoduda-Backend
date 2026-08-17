@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.UUID;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 // 명세서 "역할별 패키지 미리보기" - 작성자가 생전에 역할별 공개 내용을 검토하고 직접 승인(봉인)한다.
 // issue #81: 봉인 주체를 작성자로 옮기되, 사망 신고 시점의 PlanVersion 스냅샷 봉인(DeathReportService)은
@@ -54,8 +55,12 @@ public class PlanPackageService {
         return new PackagePreviewResponse(packages);
     }
 
-    // 봉인 차단 검사(이슈 #81 명시 범위 3가지, 순서대로) - 과도한 권한 집중 판정은 기준 비율이 아직
-    // 정해지지 않아 #90에서 다룬다.
+    // issue #90 (제안) - 한 담당자가 전체 항목의 과반(50% 초과)을 맡으면 권한 집중으로 판정.
+    // ItemOrderService의 화면 표시용 판정과 같은 기준값을 쓴다.
+    private static final double AUTHORITY_CONCENTRATION_THRESHOLD = 0.5;
+
+    // 봉인 차단 검사(md 스펙 2-2절 5단계, 순서대로) - 권한 집중·실행순서확정 판정은 #81 당시
+    // 기준이 없어 #90으로 미뤄졌고, 이번에 함께 반영한다.
     @Transactional
     public PlanResponse seal(UUID userId, UUID planId) {
         Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
@@ -78,8 +83,26 @@ public class PlanPackageService {
             }
         }
 
+        if (hasAuthorityConcentration(items)) {
+            throw new CustomException(ErrorCode.PACKAGE_SEAL_BLOCKED);
+        }
+
+        if (plan.getOrderConfirmedAt() == null) {
+            throw new CustomException(ErrorCode.ORDER_NOT_CONFIRMED);
+        }
+
         plan.seal();
         return PlanResponse.from(plan);
+    }
+
+    private boolean hasAuthorityConcentration(List<Item> items) {
+        Map<UUID, Long> countByRecipientId = items.stream()
+                .collect(Collectors.groupingBy(item -> item.getRecipient().getAssigneeId(), Collectors.counting()));
+        // 담당자가 한 명뿐이면 "몰림"을 비교할 대상 자체가 없다 - 재분배할 다른 담당자가 있을 때만 의미 있는 경고
+        if (countByRecipientId.size() < 2) {
+            return false;
+        }
+        return countByRecipientId.values().stream().anyMatch(count -> (double) count / items.size() > AUTHORITY_CONCENTRATION_THRESHOLD);
     }
 
     private boolean containsCredential(Item item) {

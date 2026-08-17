@@ -17,6 +17,7 @@ public record ItemUpdateRequest(
         @jakarta.validation.constraints.Size(max = 2000, message = "선행 조건은 2,000자 이하여야 합니다.") String precondition,
         @NotBlank(message = "공개 범위를 선택해 주세요.")
         @jakarta.validation.constraints.Size(max = 30, message = "공개 범위 값은 30자 이하여야 합니다.") String disclosureScope,
-        @jakarta.validation.constraints.Size(max = 30, message = "행동 유형 값은 30자 이하여야 합니다.") String actionType
+        @jakarta.validation.constraints.Size(max = 30, message = "행동 유형 값은 30자 이하여야 합니다.") String actionType,
+        @jakarta.validation.constraints.Size(max = 30, message = "세부 분류 값은 30자 이하여야 합니다.") String semanticType
 ) {
 }

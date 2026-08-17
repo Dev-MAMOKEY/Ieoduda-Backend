@@ -18,7 +18,9 @@ public record ItemResponse(
         @Schema(description = "이 항목의 근거가 되는 원문 문장") String sourceExcerpt,
         @Schema(description = "검토 상태", example = "PROPOSED", allowableValues = {"PROPOSED", "APPROVED"}) String status,
         @Schema(description = "같은 대화 턴에서 만들어진 항목들끼리의 실행 순서 (낮을수록 먼저)") Integer sortOrder,
-        @Schema(description = "실행 순서 충돌 판정용 분류", example = "DELETE", allowableValues = {"DELETE", "TRANSFER", "OTHER"}) String actionType
+        @Schema(description = "실행 순서 충돌 판정용 분류", example = "DELETE", allowableValues = {"DELETE", "TRANSFER", "OTHER"}) String actionType,
+        @Schema(description = "순서 쌍 충돌 판정용 세부 분류(해당 없으면 null)", example = "CLOUD_DELETE",
+                allowableValues = {"CLOUD_DELETE", "FILE_PRESERVE", "CHANNEL_CLOSE", "CLIENT_NOTIFY", "DEVICE_RESET", "RECORD_EXPORT"}) String semanticType
 ) {
     public static ItemResponse from(Item item) {
         return new ItemResponse(
@@ -33,7 +35,8 @@ public record ItemResponse(
                 item.getSourceExcerpt(),
                 item.getStatus().name(),
                 item.getSortOrder(),
-                item.getActionType() == null ? null : item.getActionType().name()
+                item.getActionType() == null ? null : item.getActionType().name(),
+                item.getSemanticType() == null ? null : item.getSemanticType().name()
         );
     }
 }
