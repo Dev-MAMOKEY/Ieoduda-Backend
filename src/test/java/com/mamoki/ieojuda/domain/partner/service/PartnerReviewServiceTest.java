@@ -15,7 +15,6 @@ import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
 import com.mamoki.ieojuda.domain.partner.dto.EvidenceDownloadLinkResponse;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewDecisionRequest;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewListItemResponse;
-import com.mamoki.ieojuda.domain.partner.entity.ExternalPartner;
 import com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer;
 import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
@@ -45,16 +44,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-// issue #59 회귀 테스트 - 역할(EXTERNAL) 하나만으로는 소속 파트너사에 배정되지 않은 사건·증빙을 조작할 수
-// 없어야 하고(조직 경계), 증빙 판정은 재인증 없이는 실행되지 않아야 한다.
-// issue #43 - 접근 경계는 조직(소속 파트너사) 단위까지다(개별 검토자 사전 지정은 별도 브랜치 소관).
-// 다만 판정은 한 번 완료되면 다시 바꿀 수 없고, 원본은 1회성 토큰으로만 내려받을 수 있어야 한다.
+// issue #59 회귀 테스트 - 증빙 판정은 재인증 없이는 실행되지 않아야 한다.
+// 배정/소속(조직 경계) 개념은 폐지되어 EVIDENCE_REVIEW 권한만 있으면 모든 사건·증빙을 조작할 수 있다.
+// issue #43 - 판정은 한 번 완료되면 다시 바꿀 수 없고, 원본은 1회성 토큰으로만 내려받을 수 있어야 한다.
 class PartnerReviewServiceTest {
 
     private static final UUID USER_ID = UUID.randomUUID();
     private static final UUID REVIEW_ID = UUID.randomUUID();
-    private static final UUID REVIEWER_PARTNER_ID = UUID.randomUUID();
-    private static final UUID OTHER_PARTNER_ID = UUID.randomUUID();
 
     private EvidenceRepository evidenceRepository;
     private PartnerReviewerRepository partnerReviewerRepository;
@@ -72,7 +68,6 @@ class PartnerReviewServiceTest {
     private Evidence evidence;
     private ReleaseCase releaseCase;
     private PartnerReviewer reviewer;
-    private ExternalPartner reviewerPartner;
 
     @BeforeEach
     void setUp() {
@@ -94,16 +89,12 @@ class PartnerReviewServiceTest {
         actor = mock(User.class);
         when(permissionGuard.require(USER_ID, AdminPermission.EVIDENCE_REVIEW)).thenReturn(actor);
 
-        reviewerPartner = mock(ExternalPartner.class);
-        when(reviewerPartner.getPartnerId()).thenReturn(REVIEWER_PARTNER_ID);
         reviewer = mock(PartnerReviewer.class);
         when(reviewer.getReviewerId()).thenReturn(UUID.randomUUID());
         when(reviewer.getIsActive()).thenReturn(true);
-        when(reviewer.getPartner()).thenReturn(reviewerPartner);
         when(partnerReviewerRepository.findByUser_UserId(USER_ID)).thenReturn(Optional.of(reviewer));
 
         releaseCase = mock(ReleaseCase.class);
-        when(releaseCase.getAssignedPartner()).thenReturn(reviewerPartner); // 기본값: 같은 조직에 배정됨
         Plan plan = mock(Plan.class);
         User planOwner = mock(User.class);
         when(planOwner.getName()).thenReturn("작성자");
@@ -121,33 +112,8 @@ class PartnerReviewServiceTest {
     }
 
     @Test
-    void decide_whenCaseHasNoAssignedPartner_isBlocked() {
-        when(releaseCase.getAssignedPartner()).thenReturn(null);
-        PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
-                PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "pw");
-
-        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request, null))
-                .isInstanceOfSatisfying(CustomException.class,
-                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PARTNER_NOT_ASSIGNED));
-        verify(evidence, never()).approve();
-    }
-
-    @Test
-    void decide_whenCaseAssignedToAnotherPartner_isBlockedByOrgBoundary() {
-        ExternalPartner otherPartner = mock(ExternalPartner.class);
-        when(otherPartner.getPartnerId()).thenReturn(OTHER_PARTNER_ID); // reviewerPartner와 다른 조직
-        when(releaseCase.getAssignedPartner()).thenReturn(otherPartner);
-        PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
-                PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "pw");
-
-        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request, null))
-                .isInstanceOfSatisfying(CustomException.class,
-                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PARTNER_SCOPE_DENIED));
-        verify(evidence, never()).approve();
-    }
-
-    @Test
-    void decide_whenCaseAssignedToReviewersOwnPartner_proceedsAndRecordsReviewer() {
+    void decide_proceedsWithoutAnyPartnerAssignment() {
+        // 배정/소속 개념이 없으므로 releaseCase에 아무 배정 정보가 없어도 정상 처리되어야 한다.
         PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
                 PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "correct-pw");
 
@@ -271,24 +237,12 @@ class PartnerReviewServiceTest {
 
     // issue #43 - 원본은 발급받은 1회성 토큰으로만 내려받을 수 있고, 같은 토큰을 두 번 쓸 수 없다
     @Test
-    void requestDownloadLink_issuesTokenForOrgMemberReviewer() {
+    void requestDownloadLink_issuesDownloadToken() {
         EvidenceDownloadLinkResponse response = partnerReviewService.requestDownloadLink(USER_ID, REVIEW_ID);
 
         assertThat(response.downloadToken()).isNotBlank();
         assertThat(response.expiresAt()).isAfter(LocalDateTime.now());
         verify(evidenceDownloadTokenRepository).save(any(EvidenceDownloadToken.class));
-    }
-
-    @Test
-    void requestDownloadLink_whenDifferentOrg_isBlocked() {
-        ExternalPartner otherPartner = mock(ExternalPartner.class);
-        when(otherPartner.getPartnerId()).thenReturn(OTHER_PARTNER_ID);
-        when(releaseCase.getAssignedPartner()).thenReturn(otherPartner);
-
-        assertThatThrownBy(() -> partnerReviewService.requestDownloadLink(USER_ID, REVIEW_ID))
-                .isInstanceOfSatisfying(CustomException.class,
-                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PARTNER_SCOPE_DENIED));
-        verify(evidenceDownloadTokenRepository, never()).save(any());
     }
 
     @Test
@@ -345,10 +299,9 @@ class PartnerReviewServiceTest {
         verify(adminActionAuditService).record(actor, AdminActionType.EVIDENCE_DOWNLOAD, REVIEW_ID, true, null);
     }
 
-    // issue #87 - 목록 조회는 getReview/downloadFile/decide와 달리 배정된 파트너 조직 경계를 검사하지 않는다.
-    // (다른 파트너 소속 검토자여도 EVIDENCE_REVIEW 권한만 있으면 전체가 조회되어야 한다는 요구사항)
+    // issue #87 - EVIDENCE_REVIEW 권한만 있으면 전체가 조회되어야 한다는 요구사항
     @Test
-    void getReviews_returnsAllEvidencesRegardlessOfAssignedPartner() {
+    void getReviews_returnsAllEvidences() {
         when(evidence.getEvidenceId()).thenReturn(REVIEW_ID);
         when(evidenceRepository.findAllByReviewStatus(EvidenceReviewStatus.PENDING))
                 .thenReturn(List.of(evidence));
@@ -357,7 +310,6 @@ class PartnerReviewServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).reviewId()).isEqualTo(REVIEW_ID);
-        verify(releaseCase, never()).getAssignedPartner();
     }
 
     @Test

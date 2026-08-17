@@ -2,7 +2,6 @@ package com.mamoki.ieojuda.domain.audit.controller;
 
 import java.util.UUID;
 
-import com.mamoki.ieojuda.domain.audit.dto.AssignPartnerRequest;
 import com.mamoki.ieojuda.domain.audit.dto.EmailDeliveryResponse;
 import com.mamoki.ieojuda.domain.audit.dto.ReauthRequest;
 import com.mamoki.ieojuda.domain.audit.service.EmailAuditService;
@@ -24,8 +23,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 // 명세서 "이메일 발송 감사" 화면 - 운영관리자 전용
-// issue #59 - CASE_SUPERVISE 세부 권한 검사, 사건 동결은 비밀번호 재인증 필요, 파트너사 배정 API 추가
-@Tag(name = "Admin - Email Audit", description = "운영관리자 - 이메일 발송 감사 / 재시도 / 사건 동결 / 파트너사 배정")
+// issue #59 - CASE_SUPERVISE 세부 권한 검사, 사건 동결은 비밀번호 재인증 필요
+@Tag(name = "Admin - Email Audit", description = "운영관리자 - 이메일 발송 감사 / 재시도 / 사건 동결")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/admin/release-cases/{caseId}")
@@ -60,17 +59,6 @@ public class EmailAuditController {
             @Valid @RequestBody ReauthRequest request
     ) {
         emailAuditService.freeze(userId, caseId, request.password());
-        return ResponseEntity.ok(RsData.success(null));
-    }
-
-    @Operation(summary = "파트너사 배정", description = "이 사건의 증빙 검토를 담당할 외부 파트너사를 배정합니다. 배정 전까지는 어떤 파트너 검토자도 이 사건의 증빙을 조작할 수 없습니다.")
-    @PostMapping("/assign-partner")
-    public ResponseEntity<RsData<Void>> assignPartner(
-            @AuthenticationPrincipal UUID userId,
-            @Parameter(description = "사건 ID") @PathVariable UUID caseId,
-            @Valid @RequestBody AssignPartnerRequest request
-    ) {
-        emailAuditService.assignPartner(userId, caseId, request.partnerId());
         return ResponseEntity.ok(RsData.success(null));
     }
 }

@@ -1,6 +1,7 @@
 package com.mamoki.ieojuda.domain.partner.dto;
 
 import com.mamoki.ieojuda.domain.account.entity.User;
+import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceReviewStatus;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceType;
@@ -22,8 +23,10 @@ class PartnerReviewResponseTest {
         Plan plan = mock(Plan.class);
         when(plan.getUser()).thenReturn(planOwner);
 
+        Confirmer confirmer = mock(Confirmer.class);
         Evidence evidence = mock(Evidence.class);
         when(evidence.getPlan()).thenReturn(plan);
+        when(evidence.getConfirmer()).thenReturn(confirmer);
         when(evidence.getReviewStatus()).thenReturn(EvidenceReviewStatus.PENDING);
         when(evidence.getEvidenceType()).thenReturn(EvidenceType.DEATH_CERTIFICATE);
 
@@ -39,13 +42,35 @@ class PartnerReviewResponseTest {
         Plan plan = mock(Plan.class);
         when(plan.getUser()).thenReturn(planOwner);
 
+        Confirmer confirmer = mock(Confirmer.class);
         Evidence evidence = mock(Evidence.class);
         when(evidence.getPlan()).thenReturn(plan);
+        when(evidence.getConfirmer()).thenReturn(confirmer);
         when(evidence.getReviewStatus()).thenReturn(EvidenceReviewStatus.PENDING);
         when(evidence.getEvidenceType()).thenReturn(EvidenceType.POSTMORTEM_REPORT);
 
         PartnerReviewResponse response = PartnerReviewResponse.from(evidence);
 
         assertThat(response.evidenceType()).isEqualTo("POSTMORTEM_REPORT");
+    }
+
+    // 파트너 화면에서 "누가 신고했는지"(제출자)를 보여줘야 하므로 확인자 이름을 응답에 포함한다
+    @Test
+    void from_includesConfirmerName() {
+        User planOwner = mock(User.class);
+        Plan plan = mock(Plan.class);
+        when(plan.getUser()).thenReturn(planOwner);
+
+        Confirmer confirmer = mock(Confirmer.class);
+        when(confirmer.getName()).thenReturn("제출자 확인자");
+        Evidence evidence = mock(Evidence.class);
+        when(evidence.getPlan()).thenReturn(plan);
+        when(evidence.getConfirmer()).thenReturn(confirmer);
+        when(evidence.getReviewStatus()).thenReturn(EvidenceReviewStatus.PENDING);
+        when(evidence.getEvidenceType()).thenReturn(EvidenceType.DEATH_CERTIFICATE);
+
+        PartnerReviewResponse response = PartnerReviewResponse.from(evidence);
+
+        assertThat(response.confirmerName()).isEqualTo("제출자 확인자");
     }
 }
