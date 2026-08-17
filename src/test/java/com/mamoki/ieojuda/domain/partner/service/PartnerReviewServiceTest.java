@@ -7,6 +7,7 @@ import com.mamoki.ieojuda.domain.audit.service.AdminActionAuditService;
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceReviewStatus;
+import com.mamoki.ieojuda.domain.evidence.entity.EvidenceType;
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewDecisionRequest;
 import com.mamoki.ieojuda.domain.partner.entity.ExternalPartner;
@@ -92,6 +93,7 @@ class PartnerReviewServiceTest {
         when(evidence.getPlan()).thenReturn(plan);
         when(evidence.getConfirmer()).thenReturn(confirmer);
         when(evidence.getReviewStatus()).thenReturn(EvidenceReviewStatus.PENDING);
+        when(evidence.getEvidenceType()).thenReturn(EvidenceType.DEATH_CERTIFICATE);
         when(evidenceRepository.findById(REVIEW_ID)).thenReturn(Optional.of(evidence));
     }
 

@@ -12,6 +12,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -49,6 +50,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(ErrorCode.INVALID_INPUT.getHttpStatus())
                 .body(RsData.fail(ErrorCode.INVALID_INPUT, "요청 파라미터 '" + exception.getName() + "' 값이 올바르지 않습니다."));
+    }
+
+    // 필수 요청 파라미터 누락 (400) -> 증빙 종류(evidenceType) 등 필수 @RequestParam을 보내지 않은 경우
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<RsData<Void>> handle(MissingServletRequestParameterException exception) {
+        return ResponseEntity
+                .status(ErrorCode.INVALID_INPUT.getHttpStatus())
+                .body(RsData.fail(ErrorCode.INVALID_INPUT, "필수 파라미터 '" + exception.getParameterName() + "' 값이 없습니다."));
     }
 
     // multipart 파일 또는 요청 전체 크기 초과 (413)

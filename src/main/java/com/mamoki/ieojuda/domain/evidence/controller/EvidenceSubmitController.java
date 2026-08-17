@@ -1,6 +1,7 @@
 package com.mamoki.ieojuda.domain.evidence.controller;
 
 import com.mamoki.ieojuda.domain.evidence.dto.EvidenceSubmitResponse;
+import com.mamoki.ieojuda.domain.evidence.entity.EvidenceType;
 import com.mamoki.ieojuda.domain.evidence.service.EvidenceSubmitService;
 import com.mamoki.ieojuda.global.rsdata.RsData;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,13 +26,14 @@ public class EvidenceSubmitController {
 
     private final EvidenceSubmitService evidenceSubmitService;
 
-    @Operation(summary = "증빙 자료 제출", description = "PDF/JPG/PNG, 파일당 최대 25MB, 요청 전체 최대 30MB, 사건당 최대 3개까지 제출할 수 있습니다. Idempotency-Key 헤더를 보내면 같은 키의 재전송은 중복 요청(409)으로 응답합니다.")
+    @Operation(summary = "증빙 자료 제출", description = "PDF/JPG/PNG, 파일당 최대 25MB, 요청 전체 최대 30MB, 사건당 최대 3개까지 제출할 수 있습니다. 증빙 종류(evidenceType)는 필수이며 선택하지 않으면 거부됩니다. Idempotency-Key 헤더를 보내면 같은 키의 재전송은 중복 요청(409)으로 응답합니다.")
     @PostMapping(value = "/evidences", consumes = "multipart/form-data")
     public ResponseEntity<RsData<EvidenceSubmitResponse>> submit(
             @Parameter(description = "초대 토큰") @PathVariable String token,
             @RequestParam("file") MultipartFile file,
+            @Parameter(description = "증빙 종류") @RequestParam("evidenceType") EvidenceType evidenceType,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
     ) {
-        return ResponseEntity.ok(RsData.success(evidenceSubmitService.submit(token, file, idempotencyKey)));
+        return ResponseEntity.ok(RsData.success(evidenceSubmitService.submit(token, file, evidenceType, idempotencyKey)));
     }
 }

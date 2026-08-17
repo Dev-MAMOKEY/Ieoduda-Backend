@@ -70,6 +70,11 @@ public class Evidence {
     @Column(name = "mime_type", length = 100)
     private String mimeType;
 
+    // issue #88 - 증빙이 사망진단서/사망신고서/검안서 중 무엇인지. 파일명은 제출자가 임의로 정하므로 신뢰할 수 없어 별도 필드로 받는다.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "evidence_type", length = 30, nullable = false)
+    private EvidenceType evidenceType;
+
     // 파트너 검토 결정이 동시에 두 번 들어오는 경우를 막기 위한 낙관적 잠금
     @Version
     @Column(name = "version")
@@ -77,7 +82,8 @@ public class Evidence {
 
     @Builder
     public Evidence(Confirmer confirmer, Plan plan, ReleaseCase releaseCase,
-                    String storageKey, String fileName, String mimeType, String integrityHash) {
+                    String storageKey, String fileName, String mimeType, String integrityHash,
+                    EvidenceType evidenceType) {
         this.confirmer = confirmer;
         this.plan = plan;
         this.releaseCase = releaseCase;
@@ -85,6 +91,7 @@ public class Evidence {
         this.fileName = fileName;
         this.mimeType = mimeType;
         this.integrityHash = integrityHash;
+        this.evidenceType = evidenceType;
         this.submittedAt = LocalDateTime.now();
         this.reviewStatus = EvidenceReviewStatus.PENDING;
     }

@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 public record EvidenceDeletionStatusResponse(
         @Schema(description = "증빙 ID") Long evidenceId,
         @Schema(description = "파일명") String fileName,
+        @Schema(description = "증빙 종류", example = "DEATH_CERTIFICATE", allowableValues = {"DEATH_CERTIFICATE", "DEATH_REPORT", "POSTMORTEM_REPORT"}) String evidenceType,
         @Schema(description = "검토 완료일 (없으면 null)") LocalDateTime reviewedAt,
         @Schema(description = "삭제 예정일 (없으면 null)") LocalDateTime deleteScheduledAt,
         @Schema(description = "실제 삭제 시각 (없으면 null)") LocalDateTime deletedAt,
@@ -24,6 +25,7 @@ public record EvidenceDeletionStatusResponse(
         return new EvidenceDeletionStatusResponse(
                 evidence.getEvidenceId(),
                 evidence.getFileName(),
+                evidence.getEvidenceType().name(),
                 evidence.getReviewedAt(),
                 evidence.getDeleteScheduledAt(),
                 evidence.getDeletedAt(),
