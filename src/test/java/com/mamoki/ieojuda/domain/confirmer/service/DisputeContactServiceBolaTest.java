@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.confirmer.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.confirmer.dto.DisputeContactRegisterRequest;
 import com.mamoki.ieojuda.domain.confirmer.repository.DisputeContactRepository;
 import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
@@ -26,9 +28,9 @@ import static org.mockito.Mockito.when;
 // 전혀 손대지 않는지가 특히 중요하다.
 class DisputeContactServiceBolaTest {
 
-    private static final Long ATTACKER_ID = 2L;
-    private static final Long PLAN_ID = 10L;
-    private static final Long CONTACT_ID = 100L;
+    private static final UUID ATTACKER_ID = UUID.randomUUID();
+    private static final UUID PLAN_ID = UUID.randomUUID();
+    private static final UUID CONTACT_ID = UUID.randomUUID();
 
     private PlanRepository planRepository;
     private DisputeContactRepository disputeContactRepository;

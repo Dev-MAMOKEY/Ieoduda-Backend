@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.UUID;
 import java.util.List;
 
 // "역할 점검" 화면 상단 이름 목록 - 역할 담당자와 지정 확인자를 함께 조회
@@ -23,7 +24,7 @@ public class RoleCheckService {
     private final RecipientRepository recipientRepository;
     private final ConfirmerRepository confirmerRepository;
 
-    public List<RoleCheckSummaryResponse> getRoleChecks(Long userId, Long planId) {
+    public List<RoleCheckSummaryResponse> getRoleChecks(UUID userId, UUID planId) {
         planOwnershipReader.findOwnedPlan(userId, planId);
 
         List<RoleCheckSummaryResponse> results = new ArrayList<>();

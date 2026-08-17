@@ -18,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -37,8 +38,8 @@ class PlanPackageServiceTest {
     private PlanPackageService planPackageService;
 
     private Plan plan;
-    private static final Long PLAN_ID = 1L;
-    private static final Long USER_ID = 10L;
+    private static final UUID PLAN_ID = UUID.randomUUID();
+    private static final UUID USER_ID = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
@@ -51,7 +52,7 @@ class PlanPackageServiceTest {
         when(planOwnershipReader.findOwnedPlan(USER_ID, PLAN_ID)).thenReturn(plan);
     }
 
-    private Recipient buildRecipient(Long assigneeId, String name) {
+    private Recipient buildRecipient(UUID assigneeId, String name) {
         Recipient recipient = Recipient.builder()
                 .plan(plan).lifeArea(mock(LifeArea.class)).name(name).email(name + "@test.com")
                 .roleType(RoleType.RELATIONSHIP_MANAGER).isBackup(false)
@@ -74,7 +75,7 @@ class PlanPackageServiceTest {
         return item;
     }
 
-    private void setId(Object entity, Long id) {
+    private void setId(Object entity, UUID id) {
         try {
             var field = entity.getClass().getDeclaredField("assigneeId");
             field.setAccessible(true);
@@ -97,8 +98,8 @@ class PlanPackageServiceTest {
 
     @Test
     void getPreview_groupsActionsByRecipient_excludesOtherRolesImplicitly() {
-        Recipient r1 = buildRecipient(1L, "이지수");
-        Recipient r2 = buildRecipient(2L, "김민수");
+        Recipient r1 = buildRecipient(UUID.randomUUID(), "이지수");
+        Recipient r2 = buildRecipient(UUID.randomUUID(), "김민수");
         Item item1 = buildItem(r1, "SNS 정리", "비공개 전환", "", "근거1");
         Item item2 = buildItem(r2, "메일 정리", "이전", "", "근거2");
         when(itemRepository.findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(PLAN_ID))
@@ -119,7 +120,7 @@ class PlanPackageServiceTest {
     @Test
     void seal_whenActionFieldContainsCredentialValue_throwsPackageSealBlocked() {
         stubAcceptedConfirmers(2);
-        Recipient r1 = buildRecipient(1L, "이지수");
+        Recipient r1 = buildRecipient(UUID.randomUUID(), "이지수");
         // title/content는 정상이지만 action(수행해야 할 행동 전체 설명)에 자격증명이 섞인 경우도 잡아야 한다
         Item item = buildItem(r1, "인스타그램 비밀번호는 abcd1234야", "계정 정리", "비공개 전환", "", "근거");
         when(itemRepository.findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(PLAN_ID))
@@ -143,7 +144,7 @@ class PlanPackageServiceTest {
     @Test
     void seal_whenItemContainsCredentialValue_throwsPackageSealBlocked() {
         stubAcceptedConfirmers(2);
-        Recipient r1 = buildRecipient(1L, "이지수");
+        Recipient r1 = buildRecipient(UUID.randomUUID(), "이지수");
         Item item = buildItem(r1, "계정 정리", "비밀번호는 abcd1234", "", "근거");
         when(itemRepository.findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(PLAN_ID))
                 .thenReturn(List.of(item));
@@ -157,7 +158,7 @@ class PlanPackageServiceTest {
     @Test
     void seal_whenItemMissingSourceExcerpt_throwsPackageSealBlocked() {
         stubAcceptedConfirmers(2);
-        Recipient r1 = buildRecipient(1L, "이지수");
+        Recipient r1 = buildRecipient(UUID.randomUUID(), "이지수");
         Item item = buildItem(r1, "계정 정리", "비공개 전환", "", "");
         when(itemRepository.findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(PLAN_ID))
                 .thenReturn(List.of(item));
@@ -170,7 +171,7 @@ class PlanPackageServiceTest {
     @Test
     void seal_whenAllChecksPass_sealsThePlan() {
         stubAcceptedConfirmers(2);
-        Recipient r1 = buildRecipient(1L, "이지수");
+        Recipient r1 = buildRecipient(UUID.randomUUID(), "이지수");
         Item item = buildItem(r1, "계정 정리", "비공개 전환", "", "지수에게 SNS 정리를 부탁");
         when(itemRepository.findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(PLAN_ID))
                 .thenReturn(List.of(item));

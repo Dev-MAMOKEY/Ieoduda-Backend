@@ -139,18 +139,24 @@ class EvidenceSubmitHttpIntegrationTest {
         String fileHeader = "--" + BOUNDARY + "\r\n"
                 + "Content-Disposition: form-data; name=\"file\"; filename=\"proof.pdf\"\r\n"
                 + "Content-Type: application/pdf\r\n\r\n";
+        String tokenPart = "\r\n--" + BOUNDARY + "\r\n"
+                + "Content-Disposition: form-data; name=\"token\"\r\n\r\n" + plainToken;
         String closing = "\r\n--" + BOUNDARY + "--\r\n";
-        return concat(fileHeader.getBytes(StandardCharsets.UTF_8), PDF_BYTES, closing.getBytes(StandardCharsets.UTF_8));
+        return concat(fileHeader.getBytes(StandardCharsets.UTF_8), PDF_BYTES,
+                tokenPart.getBytes(StandardCharsets.UTF_8), closing.getBytes(StandardCharsets.UTF_8));
     }
 
     private byte[] fileAndFieldBody(String fieldName, String fieldValue) {
         String fileHeader = "--" + BOUNDARY + "\r\n"
                 + "Content-Disposition: form-data; name=\"file\"; filename=\"proof.pdf\"\r\n"
                 + "Content-Type: application/pdf\r\n\r\n";
+        String tokenPart = "\r\n--" + BOUNDARY + "\r\n"
+                + "Content-Disposition: form-data; name=\"token\"\r\n\r\n" + plainToken;
         String fieldPart = "\r\n--" + BOUNDARY + "\r\n"
                 + "Content-Disposition: form-data; name=\"" + fieldName + "\"\r\n\r\n" + fieldValue;
         String closing = "\r\n--" + BOUNDARY + "--\r\n";
         return concat(fileHeader.getBytes(StandardCharsets.UTF_8), PDF_BYTES,
+                tokenPart.getBytes(StandardCharsets.UTF_8),
                 fieldPart.getBytes(StandardCharsets.UTF_8), closing.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -169,7 +175,7 @@ class EvidenceSubmitHttpIntegrationTest {
     }
 
     private HttpResponse<String> postMultipart(byte[] body) throws Exception {
-        HttpRequest request = HttpRequest.newBuilder(uri("/api/confirmer-acceptances/" + plainToken + "/evidences"))
+        HttpRequest request = HttpRequest.newBuilder(uri("/api/release-cases/" + releaseCase.getCaseId() + "/evidence/submit"))
                 .timeout(Duration.ofSeconds(30))
                 .header("Content-Type", "multipart/form-data; boundary=" + BOUNDARY)
                 .POST(HttpRequest.BodyPublishers.ofByteArray(body))

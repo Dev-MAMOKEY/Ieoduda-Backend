@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.EnumMap;
+import java.util.UUID;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -27,7 +28,7 @@ public class LifeAreaService {
     private final ItemRepository itemRepository;
     private final PlanOwnershipReader planOwnershipReader;
 
-    public List<LifeAreaResponse> getLifeAreas(Long userId, Long planId) {
+    public List<LifeAreaResponse> getLifeAreas(UUID userId, UUID planId) {
         planOwnershipReader.findOwnedPlan(userId, planId);
         List<Item> items = itemRepository.findByLifeArea_Plan_PlanIdOrderByItemIdAsc(planId);
 

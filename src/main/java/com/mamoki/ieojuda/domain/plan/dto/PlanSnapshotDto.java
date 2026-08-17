@@ -7,23 +7,22 @@ import com.mamoki.ieojuda.domain.plan.entity.ItemStatus;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.entity.RoleType;
-import com.mamoki.ieojuda.domain.stage.entity.Dependency;
 
+import java.util.UUID;
 import java.util.List;
 
 // 사망 신고가 확정되어 사건(ReleaseCase)이 열리는 순간의 계획 상태를 그대로 얼려 둔 스냅샷.
 // 이 시점 이후 사용자가 계획을 수정하더라도, 이미 열린 사건의 검토·발송 로직은 이 스냅샷만 읽는다(issue #42).
 public record PlanSnapshotDto(
-        Long planId,
+        UUID planId,
         Integer waitingDays,
         List<ItemSnapshot> items,
-        List<RecipientSnapshot> recipients,
-        List<DependencySnapshot> dependencies
+        List<RecipientSnapshot> recipients
 ) {
 
     public record ItemSnapshot(
-            Long itemId,
-            Long recipientId,
+            UUID itemId,
+            UUID recipientId,
             String targetName,
             String locationType,
             String action,
@@ -56,14 +55,14 @@ public record PlanSnapshotDto(
     }
 
     public record RecipientSnapshot(
-            Long assigneeId,
+            UUID assigneeId,
             String name,
             String email,
             RoleType roleType,
             Boolean isBackup,
             DisclosureScope disclosureScope,
             Integer maxWaitHours,
-            Long backupForId
+            UUID backupForId
     ) {
         public static RecipientSnapshot from(Recipient recipient) {
             return new RecipientSnapshot(
@@ -79,22 +78,12 @@ public record PlanSnapshotDto(
         }
     }
 
-    public record DependencySnapshot(
-            Long itemId,
-            Long dependsOnItemId
-    ) {
-        public static DependencySnapshot from(Dependency dependency) {
-            return new DependencySnapshot(dependency.getItem().getItemId(), dependency.getDependsOnItem().getItemId());
-        }
-    }
-
-    public static PlanSnapshotDto of(Plan plan, List<Item> items, List<Recipient> recipients, List<Dependency> dependencies) {
+    public static PlanSnapshotDto of(Plan plan, List<Item> items, List<Recipient> recipients) {
         return new PlanSnapshotDto(
                 plan.getPlanId(),
                 plan.getWaitingDays(),
                 items.stream().map(ItemSnapshot::from).toList(),
-                recipients.stream().map(RecipientSnapshot::from).toList(),
-                dependencies.stream().map(DependencySnapshot::from).toList()
+                recipients.stream().map(RecipientSnapshot::from).toList()
         );
     }
 }

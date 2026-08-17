@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
 import java.time.LocalDateTime;
 
 // issue #51 - SMTP 호출을 DB 트랜잭션 밖으로 빼기 위한 아웃박스 작업 단위.
@@ -20,9 +21,9 @@ import java.time.LocalDateTime;
 public class EmailOutbox {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "outbox_id")
-    private Long outboxId;
+    private UUID outboxId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "log_id", nullable = false)

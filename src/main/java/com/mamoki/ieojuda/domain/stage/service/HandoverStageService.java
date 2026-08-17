@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.UUID;
 import java.util.List;
 
 // 명세서 "단계 완료 / 대체 담당자" 화면 - 역할 담당자·서비스 운영자 공용
@@ -47,7 +48,7 @@ public class HandoverStageService {
     private final PackageActionCompletionRepository packageActionCompletionRepository;
     private final AccessTokenRepository accessTokenRepository;
 
-    public HandoverStageResponse getStage(Long userId, Long caseId, Long stageId) {
+    public HandoverStageResponse getStage(UUID userId, UUID caseId, UUID stageId) {
         permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
         ReleaseCase releaseCase = releaseCaseRepository.findById(caseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RELEASE_CASE_NOT_FOUND));
@@ -56,7 +57,7 @@ public class HandoverStageService {
 
     // 무응답·영구반송·문제신고로 대체 담당자에게 전환. 대체 담당자가 없으면 사건을 차단 상태로 유지한다.
     @Transactional
-    public HandoverStageResponse fallback(Long userId, Long caseId, Long stageId) {
+    public HandoverStageResponse fallback(UUID userId, UUID caseId, UUID stageId) {
         permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
         ReleaseCase releaseCase = releaseCaseRepository.findById(caseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RELEASE_CASE_NOT_FOUND));
@@ -106,7 +107,7 @@ public class HandoverStageService {
     // 행동이 동시에 완료 요청되어도 "전부 완료 → 단계 완료 → 다음 단계 발송"이 한 번만 일어나도록,
     // 이 단계 행에 비관적 잠금을 걸고 그 안에서 완료 개수를 다시 센다(호출자가 넘긴 개수는 신뢰하지 않음).
     @Transactional
-    public void completeStageIfAllActionsDone(Long stageId, int totalActionCount) {
+    public void completeStageIfAllActionsDone(UUID stageId, int totalActionCount) {
         HandoverStage stage = handoverStageRepository.findByIdForUpdate(stageId)
                 .orElseThrow(() -> new CustomException(ErrorCode.HANDOVER_STAGE_NOT_FOUND));
         // SENT 상태에서만 완료로 전이한다 - 이미 완료됐다면(동시 요청) 중복 발송 방지, BLOCKED/BOUNCED/
@@ -174,7 +175,7 @@ public class HandoverStageService {
         emailOutboxService.enqueue(stage.getPlan(), stage, EmailType.POSTHUMOUS_HANDOFF_LINK, recipient.getEmail(), content);
     }
 
-    private HandoverStage findStage(ReleaseCase releaseCase, Long stageId) {
+    private HandoverStage findStage(ReleaseCase releaseCase, UUID stageId) {
         HandoverStage stage = handoverStageRepository.findById(stageId)
                 .orElseThrow(() -> new CustomException(ErrorCode.HANDOVER_STAGE_NOT_FOUND));
         if (stage.getReleaseCase() == null || !stage.getReleaseCase().getCaseId().equals(releaseCase.getCaseId())) {

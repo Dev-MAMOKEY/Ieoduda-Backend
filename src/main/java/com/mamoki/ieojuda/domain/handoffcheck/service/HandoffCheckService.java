@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.UUID;
 import java.util.List;
 import java.util.Map;
 
@@ -27,7 +28,7 @@ public class HandoffCheckService {
     private final RecipientRepository recipientRepository;
     private final ConfirmerRepository confirmerRepository;
 
-    public HandoffCheckStatusResponse getHandoffCheck(Long userId, Long planId) {
+    public HandoffCheckStatusResponse getHandoffCheck(UUID userId, UUID planId) {
         planOwnershipReader.findOwnedPlan(userId, planId);
 
         List<HandoffCheckAssigneeResponse> assignees = buildAssignees(planId);
@@ -39,10 +40,10 @@ public class HandoffCheckService {
     }
 
     // 대체 담당자는 별도 박스가 아니라 주 담당자 박스 안에 표시되므로, 대체 담당자를 주 담당자 ID로 매핑해 함께 조회한다 (N+1 방지)
-    private List<HandoffCheckAssigneeResponse> buildAssignees(Long planId) {
+    private List<HandoffCheckAssigneeResponse> buildAssignees(UUID planId) {
         List<Recipient> recipients = recipientRepository.findByPlan_PlanId(planId);
 
-        Map<Long, Recipient> backupByPrimaryId = new HashMap<>();
+        Map<UUID, Recipient> backupByPrimaryId = new HashMap<>();
         for (Recipient recipient : recipients) {
             if (Boolean.TRUE.equals(recipient.getIsBackup()) && recipient.getBackupFor() != null) {
                 backupByPrimaryId.put(recipient.getBackupFor().getAssigneeId(), recipient);

@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.releasecase.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCaseStatus;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
@@ -18,7 +20,7 @@ public class ReleaseCaseGuardService {
     private final ReleaseCaseRepository releaseCaseRepository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public boolean freezeIfActiveCaseExists(Long planId) {
+    public boolean freezeIfActiveCaseExists(UUID planId) {
         return releaseCaseRepository.findFirstByPlan_PlanIdOrderByCaseIdDesc(planId)
                 .filter(this::isActive)
                 .map(releaseCase -> {

@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
 import java.time.LocalDateTime;
 
 @Entity
@@ -16,9 +17,9 @@ import java.time.LocalDateTime;
 public class HandoffCheck {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "check_id")
-    private Long checkId;
+    private UUID checkId;
 
     @Column(name = "sent_at")
     private LocalDateTime sentAt;

@@ -38,7 +38,7 @@ public class JwtTokenProvider {
         this.key = Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateAccessToken(Long userId, String email, String role, Integer tokenVersion) {
+    public String generateAccessToken(UUID userId, String email, String role, Integer tokenVersion) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + jwtProperties.getAccessTokenExpirationMs());
 
@@ -53,7 +53,7 @@ public class JwtTokenProvider {
     }
 
     // sessionId를 그대로 이 토큰의 jti로 사용 - refresh() 시 jti만으로 대응하는 RefreshSession을 바로 조회한다
-    public String generateRefreshToken(Long userId, String sessionId, long expirationMs) {
+    public String generateRefreshToken(UUID userId, String sessionId, long expirationMs) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMs);
 
@@ -75,8 +75,8 @@ public class JwtTokenProvider {
     }
 
     //토큰 -> 사용자 ID 추출
-    public Long getUserId(String token) {
-        return Long.valueOf(parseClaims(token).getSubject());
+    public UUID getUserId(String token) {
+        return UUID.fromString(parseClaims(token).getSubject());
     }
 
     // 토큰 -> 권한(USER/ADMIN/EXTERNAL) 추출 - 참고용. 실제 인가는 필터가 DB의 현재 role을 신뢰한다(#56).

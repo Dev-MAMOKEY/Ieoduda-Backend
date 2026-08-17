@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.UUID;
 import java.util.List;
 
 // 명세서 "이메일 발송 감사" 화면 - 서비스 운영자가 발송·반송·열람 이력을 조회하고 재시도/동결만 수행 (본문·패키지 내용은 접근 불가)
@@ -45,7 +46,7 @@ public class EmailAuditService {
     private final ReauthGuard reauthGuard;
     private final AdminActionAuditService adminActionAuditService;
 
-    public List<EmailDeliveryResponse> getDeliveries(Long userId, Long caseId) {
+    public List<EmailDeliveryResponse> getDeliveries(UUID userId, UUID caseId) {
         permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
         ReleaseCase releaseCase = findCase(caseId);
         return emailLogRepository.findByPlan_PlanIdOrderByRequestedAtDesc(releaseCase.getPlan().getPlanId()).stream()
@@ -55,7 +56,7 @@ public class EmailAuditService {
 
     // "재시도 정책 실행하기" - 이 발송 건과 연결된 담당자에게 새 초대 링크를 발급해 재발송
     @Transactional
-    public EmailDeliveryResponse retry(Long userId, Long caseId, Long logId) {
+    public EmailDeliveryResponse retry(UUID userId, UUID caseId, UUID logId) {
         permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
         ReleaseCase releaseCase = findCase(caseId);
         if (Boolean.TRUE.equals(releaseCase.getFrozen())) {
@@ -90,7 +91,7 @@ public class EmailAuditService {
     // "사건 동결하기" - 이후 발송·단계 전환을 전부 막음. 되돌리기 까다로운 고위험 조작이라
     // 비밀번호 재확인(reauth) 없이는 실행하지 않고, 성공/실패 여부를 감사 로그에 남긴다.
     @Transactional
-    public void freeze(Long userId, Long caseId, String password) {
+    public void freeze(UUID userId, UUID caseId, String password) {
         User actor = permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
         try {
             reauthGuard.verify(actor, password);
@@ -105,7 +106,7 @@ public class EmailAuditService {
 
     // issue #59 - 사건의 증빙 검토를 담당할 외부 파트너사를 운영자가 수동으로 배정
     @Transactional
-    public void assignPartner(Long userId, Long caseId, Long partnerId) {
+    public void assignPartner(UUID userId, UUID caseId, UUID partnerId) {
         User actor = permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
         ReleaseCase releaseCase = findCase(caseId);
         ExternalPartner partner = externalPartnerRepository.findById(partnerId)
@@ -116,12 +117,12 @@ public class EmailAuditService {
                 "partnerId=" + partnerId);
     }
 
-    private ReleaseCase findCase(Long caseId) {
+    private ReleaseCase findCase(UUID caseId) {
         return releaseCaseRepository.findById(caseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RELEASE_CASE_NOT_FOUND));
     }
 
-    private EmailLog findLog(ReleaseCase releaseCase, Long logId) {
+    private EmailLog findLog(ReleaseCase releaseCase, UUID logId) {
         EmailLog log = emailLogRepository.findById(logId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
         if (!log.getPlan().getPlanId().equals(releaseCase.getPlan().getPlanId())) {

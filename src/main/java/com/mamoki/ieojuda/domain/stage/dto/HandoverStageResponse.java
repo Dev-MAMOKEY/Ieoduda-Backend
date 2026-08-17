@@ -5,11 +5,12 @@ import com.mamoki.ieojuda.domain.stage.entity.HandoverStageStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Duration;
+import java.util.UUID;
 import java.time.LocalDateTime;
 
 // "단계 완료 / 대체 담당자" 화면 - 현재 단계 상태
 public record HandoverStageResponse(
-        @Schema(description = "단계 ID") Long stageId,
+        @Schema(description = "단계 ID") UUID stageId,
         @Schema(description = "단계 순서") Integer stageOrder,
         @Schema(description = "단계 상태", example = "SENT", allowableValues = {"PENDING", "READY", "SENT", "COMPLETED", "BOUNCED", "FALLBACK", "BLOCKED"}) String status,
         @Schema(description = "현재 담당자 이름") String recipientName,

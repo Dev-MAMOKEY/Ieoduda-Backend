@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.audit.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
 import com.mamoki.ieojuda.domain.audit.dto.AdminActionAuditLogResponse;
 import com.mamoki.ieojuda.domain.audit.service.AdminActionAuditService;
@@ -30,7 +32,7 @@ public class AdminActionAuditController {
     @Operation(summary = "관리자 조작 감사 조회", description = "고위험 조작(사건 동결/파트너 배정/증빙 판정)의 호출자·성공 여부를 최신순으로 페이지 단위 조회합니다.")
     @GetMapping
     public ResponseEntity<RsData<Page<AdminActionAuditLogResponse>>> getLogs(
-            @AuthenticationPrincipal Long userId,
+            @AuthenticationPrincipal UUID userId,
             @PageableDefault(size = 50) Pageable pageable
     ) {
         permissionGuard.require(userId, AdminPermission.AUDIT_VIEW);

@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.UUID;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
@@ -39,7 +40,7 @@ public class DisputeContactService {
     private final PublicLinkAuditor publicLinkAuditor;
 
     @Transactional
-    public DisputeContactResponse register(Long userId, Long planId, DisputeContactRegisterRequest request) {
+    public DisputeContactResponse register(UUID userId, UUID planId, DisputeContactRegisterRequest request) {
         Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
 
         DisputeContact contact = disputeContactRepository.save(DisputeContact.builder()
@@ -54,7 +55,7 @@ public class DisputeContactService {
 
     // "대기 이의제기 수정" 화면 - 이미 등록된 연락처의 이름/이메일 수정. 이메일이 바뀌면 검증을 다시 받아야 하므로 재발송한다.
     @Transactional
-    public DisputeContactResponse update(Long userId, Long planId, Long contactId, DisputeContactRegisterRequest request) {
+    public DisputeContactResponse update(UUID userId, UUID planId, UUID contactId, DisputeContactRegisterRequest request) {
         planOwnershipReader.findOwnedPlan(userId, planId);
         DisputeContact contact = findContact(planId, contactId);
         boolean emailChanged = !contact.getEmail().equals(request.email());
@@ -89,7 +90,7 @@ public class DisputeContactService {
         return true;
     }
 
-    private DisputeContact findContact(Long planId, Long contactId) {
+    private DisputeContact findContact(UUID planId, UUID contactId) {
         DisputeContact contact = disputeContactRepository.findById(contactId)
                 .orElseThrow(() -> new CustomException(ErrorCode.DISPUTE_CONTACT_NOT_FOUND));
         if (!contact.getPlan().getPlanId().equals(planId)) {

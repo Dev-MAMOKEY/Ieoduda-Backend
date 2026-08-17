@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.postaccess.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.postaccess.repository.AccessTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,7 +19,7 @@ public class OtpAttemptRecorder {
     private final AccessTokenRepository accessTokenRepository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordFailure(Long accessTokenId) {
+    public void recordFailure(UUID accessTokenId) {
         accessTokenRepository.findById(accessTokenId).ifPresent(token -> token.incrementAttempt());
     }
 }

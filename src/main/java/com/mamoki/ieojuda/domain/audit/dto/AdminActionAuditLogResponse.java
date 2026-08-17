@@ -3,14 +3,15 @@ package com.mamoki.ieojuda.domain.audit.dto;
 import com.mamoki.ieojuda.domain.audit.entity.AdminActionAuditLog;
 import com.mamoki.ieojuda.domain.audit.entity.AdminActionType;
 
+import java.util.UUID;
 import java.time.LocalDateTime;
 
 public record AdminActionAuditLogResponse(
-        Long logId,
-        Long actorUserId,
+        UUID logId,
+        UUID actorUserId,
         String actorEmail,
         AdminActionType actionType,
-        Long targetId,
+        UUID targetId,
         Boolean success,
         String detail,
         LocalDateTime occurredAt

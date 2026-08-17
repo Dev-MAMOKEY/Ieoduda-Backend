@@ -18,11 +18,11 @@ public class StorageKeyGenerator {
     }
 
     // 원본 파일명은 키에 넣지 않는다 (경로 조작·개인 정보 노출 방지). 파일명은 DB 컬럼에만 보관한다.
-    public static String generate(Long caseId, String detectedMimeType) {
+    public static String generate(UUID caseId, String detectedMimeType) {
         String extension = EXTENSION_BY_MIME.getOrDefault(detectedMimeType, "");
         String uuid = UUID.randomUUID().toString();
         return extension.isEmpty()
-                ? "evidence/%d/%s".formatted(caseId, uuid) // 확장자 없음
-                : "evidence/%d/%s.%s".formatted(caseId, uuid, extension); // 확장자 있음
+                ? "evidence/%s/%s".formatted(caseId, uuid) // 확장자 없음
+                : "evidence/%s/%s.%s".formatted(caseId, uuid, extension); // 확장자 있음
     }
 }

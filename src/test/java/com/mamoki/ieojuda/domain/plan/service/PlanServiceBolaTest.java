@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.plan.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.confirmer.repository.DisputeContactRepository;
 import com.mamoki.ieojuda.domain.plan.dto.ReleasePolicyRequest;
 import com.mamoki.ieojuda.domain.plan.dto.SelfWarningEmailRequest;
@@ -25,9 +27,9 @@ import static org.mockito.Mockito.when;
 // 전부 PLAN_NOT_FOUND(404)로 막혀야 한다는 수평 권한 상승(BOLA) 회귀 테스트
 class PlanServiceBolaTest {
 
-    private static final Long OWNER_ID = 1L;
-    private static final Long ATTACKER_ID = 2L;
-    private static final Long PLAN_ID = 10L;
+    private static final UUID OWNER_ID = UUID.randomUUID();
+    private static final UUID ATTACKER_ID = UUID.randomUUID();
+    private static final UUID PLAN_ID = UUID.randomUUID();
 
     private PlanRepository planRepository;
     private DisputeContactRepository disputeContactRepository;

@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.plan.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
@@ -14,7 +16,7 @@ public class PlanOwnershipReader {
 
     private final PlanRepository planRepository;
 
-    public Plan findOwnedPlan(Long userId, Long planId) {
+    public Plan findOwnedPlan(UUID userId, UUID planId) {
         return planRepository.findByPlanIdAndUser_UserId(planId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAN_NOT_FOUND));
     }

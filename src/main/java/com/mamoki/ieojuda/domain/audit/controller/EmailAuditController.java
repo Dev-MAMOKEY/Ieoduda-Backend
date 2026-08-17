@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.audit.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.audit.dto.AssignPartnerRequest;
 import com.mamoki.ieojuda.domain.audit.dto.EmailDeliveryResponse;
 import com.mamoki.ieojuda.domain.audit.dto.ReauthRequest;
@@ -34,8 +36,8 @@ public class EmailAuditController {
     @Operation(summary = "이메일 발송 감사 조회", description = "사건에 속한 모든 발송 이력을 조회합니다. 이메일 본문·패키지 내용은 포함하지 않습니다.")
     @GetMapping("/email-deliveries")
     public ResponseEntity<RsData<List<EmailDeliveryResponse>>> getDeliveries(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "사건 ID") @PathVariable Long caseId
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "사건 ID") @PathVariable UUID caseId
     ) {
         return ResponseEntity.ok(RsData.success(emailAuditService.getDeliveries(userId, caseId)));
     }
@@ -43,9 +45,9 @@ public class EmailAuditController {
     @Operation(summary = "재시도 정책 실행하기", description = "반송·실패한 발송 건에 대해 새 링크를 발급해 재발송합니다.")
     @PostMapping("/email-deliveries/{logId}/retry")
     public ResponseEntity<RsData<EmailDeliveryResponse>> retry(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "사건 ID") @PathVariable Long caseId,
-            @Parameter(description = "발송 로그 ID") @PathVariable Long logId
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "사건 ID") @PathVariable UUID caseId,
+            @Parameter(description = "발송 로그 ID") @PathVariable UUID logId
     ) {
         return ResponseEntity.ok(RsData.success(emailAuditService.retry(userId, caseId, logId)));
     }
@@ -53,8 +55,8 @@ public class EmailAuditController {
     @Operation(summary = "사건 동결하기", description = "이 사건의 이후 발송·단계 전환을 전부 중지합니다. 되돌리기 어려운 조작이라 비밀번호 재확인이 필요합니다.")
     @PostMapping("/freeze")
     public ResponseEntity<RsData<Void>> freeze(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "사건 ID") @PathVariable Long caseId,
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "사건 ID") @PathVariable UUID caseId,
             @Valid @RequestBody ReauthRequest request
     ) {
         emailAuditService.freeze(userId, caseId, request.password());
@@ -64,8 +66,8 @@ public class EmailAuditController {
     @Operation(summary = "파트너사 배정", description = "이 사건의 증빙 검토를 담당할 외부 파트너사를 배정합니다. 배정 전까지는 어떤 파트너 검토자도 이 사건의 증빙을 조작할 수 없습니다.")
     @PostMapping("/assign-partner")
     public ResponseEntity<RsData<Void>> assignPartner(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "사건 ID") @PathVariable Long caseId,
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "사건 ID") @PathVariable UUID caseId,
             @Valid @RequestBody AssignPartnerRequest request
     ) {
         emailAuditService.assignPartner(userId, caseId, request.partnerId());

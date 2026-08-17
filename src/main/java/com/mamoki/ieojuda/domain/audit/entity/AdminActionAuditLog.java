@@ -13,6 +13,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
 import java.time.LocalDateTime;
 
 // issue #59 - 사건 동결·파트너 배정·증빙 판정 같은 고위험 조작의 호출자와 결과를 감사할 수 있게 남기는 로그
@@ -23,12 +24,12 @@ import java.time.LocalDateTime;
 public class AdminActionAuditLog {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "log_id")
-    private Long logId;
+    private UUID logId;
 
     @Column(name = "actor_user_id")
-    private Long actorUserId;
+    private UUID actorUserId;
 
     @Column(name = "actor_email", length = 255)
     private String actorEmail;
@@ -39,7 +40,7 @@ public class AdminActionAuditLog {
 
     // 조작 대상(사건 ID, 증빙 ID 등) - 대상 종류마다 테이블이 달라서 ID만 남기고 종류는 actionType으로 유추한다
     @Column(name = "target_id")
-    private Long targetId;
+    private UUID targetId;
 
     @Column(name = "success")
     private Boolean success;
@@ -51,8 +52,8 @@ public class AdminActionAuditLog {
     private LocalDateTime occurredAt;
 
     @Builder
-    public AdminActionAuditLog(Long actorUserId, String actorEmail, AdminActionType actionType,
-                                Long targetId, Boolean success, String detail) {
+    public AdminActionAuditLog(UUID actorUserId, String actorEmail, AdminActionType actionType,
+                                UUID targetId, Boolean success, String detail) {
         this.actorUserId = actorUserId;
         this.actorEmail = actorEmail;
         this.actionType = actionType;

@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -47,11 +48,12 @@ class ReleaseCaseSchedulerTest {
 
     @Test
     void progressExpiredWaitingCases_dispatchesRecipientFromSealedSnapshot_notFromLiveTables() {
-        // 사건 생성 시점에 봉인된 스냅샷: 항목이 recipientId=100번 담당자에게 배정되어 있었다
+        UUID recipientId = UUID.randomUUID();
+        // 사건 생성 시점에 봉인된 스냅샷: 항목이 recipientId 담당자에게 배정되어 있었다
         PlanSnapshotDto.ItemSnapshot itemSnapshot = new PlanSnapshotDto.ItemSnapshot(
-                1L, 100L, "target", "loc", "action", "title", "content", "precond",
+                UUID.randomUUID(), recipientId, "target", "loc", "action", "title", "content", "precond",
                 DisclosureScope.FAMILY, "excerpt", ItemStatus.APPROVED, 0, ItemActionType.TRANSFER);
-        PlanSnapshotDto snapshot = new PlanSnapshotDto(1L, 7, List.of(itemSnapshot), List.of(), List.of());
+        PlanSnapshotDto snapshot = new PlanSnapshotDto(UUID.randomUUID(), 7, List.of(itemSnapshot), List.of());
 
         Plan plan = mock(Plan.class);
         when(plan.getOrderConfirmedAt()).thenReturn(LocalDateTime.now());
@@ -68,13 +70,13 @@ class ReleaseCaseSchedulerTest {
         when(planSnapshotService.deserialize("{\"frozen\":true}")).thenReturn(snapshot);
 
         Recipient recipientFromSnapshot = mock(Recipient.class);
-        when(recipientRepository.findById(100L)).thenReturn(Optional.of(recipientFromSnapshot));
+        when(recipientRepository.findById(recipientId)).thenReturn(Optional.of(recipientFromSnapshot));
 
         scheduler.progressExpiredWaitingCases();
 
-        // 스냅샷에 적힌 담당자(100번)만 조회해서 그대로 인계 대상으로 넘긴다 -
+        // 스냅샷에 적힌 담당자만 조회해서 그대로 인계 대상으로 넘긴다 -
         // 사건이 열린 뒤 라이브 담당자가 다른 사람으로 재배정됐어도 그 값은 절대 읽지 않는다.
-        verify(recipientRepository).findById(100L);
+        verify(recipientRepository).findById(recipientId);
         verify(handoverStageService).createStagesAndDispatchFirst(releaseCase, List.of(recipientFromSnapshot));
         verify(releaseCase).startReleasing();
     }

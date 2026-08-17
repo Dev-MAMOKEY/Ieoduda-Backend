@@ -1,11 +1,13 @@
 package com.mamoki.ieojuda.domain.recipient.dto;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 // 대체 담당자 등록 + 수락 이메일 발송 결과
 public record BackupRegisterResponse(
-        @Schema(description = "대체 담당자 ID") Long recipientId,
+        @Schema(description = "대체 담당자 ID") UUID recipientId,
         @Schema(description = "대체 담당자 이름") String name,
         @Schema(description = "대체 담당자 이메일") String email,
         @Schema(description = "수락 상태", example = "PENDING", allowableValues = {"PENDING", "ACCEPTED", "DECLINED", "EXPIRED"}) String acceptanceStatus,

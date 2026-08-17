@@ -36,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.UUID;
 import java.util.List;
 import java.util.Map;
 
@@ -58,14 +59,14 @@ public class ConversationService {
 
     // 새 대화 세션 시작 - 처음 채팅을 시작할 때, 또는 나중에 수정하러 다시 들어올 때마다 호출
     @Transactional
-    public ConversationResponse startConversation(Long userId, Long planId) {
+    public ConversationResponse startConversation(UUID userId, UUID planId) {
         Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
         Conversation conversation = conversationRepository.save(Conversation.builder().plan(plan).build());
         return ConversationResponse.from(conversation);
     }
 
     // 대화 작성 화면 - 최신 턴부터 페이지 단위로 조회(무한 스크롤), 화면엔 오래된 순으로 뒤집어서 반환
-    public LifeAreaMessageHistoryResponse getHistory(Long userId, Long planId, Long conversationId, Pageable pageable) {
+    public LifeAreaMessageHistoryResponse getHistory(UUID userId, UUID planId, UUID conversationId, Pageable pageable) {
         Conversation conversation = findConversation(userId, planId, conversationId);
 
         Slice<LifeAreaMessage> slice = lifeAreaMessageRepository
@@ -81,7 +82,7 @@ public class ConversationService {
 
     // 대화 작성 화면 - 사용자 발화 전송 -> AI의 다음 턴(질문 또는 구조화 결과) 반환
     @Transactional
-    public LifeAreaTurnResponse sendMessage(Long userId, Long planId, Long conversationId, String userContent) {
+    public LifeAreaTurnResponse sendMessage(UUID userId, UUID planId, UUID conversationId, String userContent) {
         Conversation conversation = findConversation(userId, planId, conversationId);
         Plan plan = conversation.getPlan();
 
@@ -209,7 +210,7 @@ public class ConversationService {
         return role == MessageRole.ASSISTANT ? "assistant" : "user";
     }
 
-    private Conversation findConversation(Long userId, Long planId, Long conversationId) {
+    private Conversation findConversation(UUID userId, UUID planId, UUID conversationId) {
         planOwnershipReader.findOwnedPlan(userId, planId);
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CONVERSATION_NOT_FOUND));

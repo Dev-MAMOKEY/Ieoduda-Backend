@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
 import java.time.LocalDateTime;
 
 // issue #51 - DB 트랜잭션 롤백 시 S3 보정 삭제(EvidenceSubmitService.registerCompensatingDelete)
@@ -18,9 +19,9 @@ import java.time.LocalDateTime;
 public class EvidenceOrphanCleanup {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "cleanup_id")
-    private Long cleanupId;
+    private UUID cleanupId;
 
     @Column(name = "storage_key", length = 500, nullable = false)
     private String storageKey;

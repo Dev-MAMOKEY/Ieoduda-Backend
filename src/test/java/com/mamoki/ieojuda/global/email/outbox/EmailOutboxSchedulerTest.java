@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -102,7 +103,7 @@ class EmailOutboxSchedulerTest {
     void dispatchPending_whenSendFailsAtMaxAttempts_givesUpAndAudits() {
         EmailLog log = mock(EmailLog.class);
         EmailOutbox outbox = outboxOf(log, null);
-        when(outbox.getOutboxId()).thenReturn(7L);
+        when(outbox.getOutboxId()).thenReturn(UUID.randomUUID());
         when(outbox.getAttemptCount()).thenReturn(3); // 이미 maxAttempts(3)만큼 시도함
         when(emailOutboxRepository.findPendingForUpdateSkipLocked()).thenReturn(List.of(outbox));
         when(emailSender.send(eq("a@b.com"), any()))
@@ -114,14 +115,14 @@ class EmailOutboxSchedulerTest {
         verify(outbox).giveUp(anyString());
         verify(outbox, never()).recordFailedAttempt(anyString());
         verify(adminActionAuditService)
-                .recordSystem(eq(AdminActionType.EMAIL_OUTBOX_DISPATCH_FAILED), eq(7L), eq(false), anyString());
+                .recordSystem(eq(AdminActionType.EMAIL_OUTBOX_DISPATCH_FAILED), any(UUID.class), eq(false), anyString());
     }
 
     @Test
     void dispatchPending_whenBounceIsPermanent_givesUpImmediatelyRegardlessOfAttemptCount() {
         EmailLog log = mock(EmailLog.class);
         EmailOutbox outbox = outboxOf(log, null);
-        when(outbox.getOutboxId()).thenReturn(9L);
+        when(outbox.getOutboxId()).thenReturn(UUID.randomUUID());
         when(outbox.getAttemptCount()).thenReturn(0); // 첫 시도인데도
         when(emailOutboxRepository.findPendingForUpdateSkipLocked()).thenReturn(List.of(outbox));
         when(emailSender.send(eq("a@b.com"), any()))
