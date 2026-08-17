@@ -11,6 +11,7 @@ public record AiStructuredItemDto(
         String disclosureScope, // DisclosureScope.name()과 동일한 문자열(FAMILY/WORK/RELATIONSHIP)이어야 함
         String sourceExcerpt,   // 원문 근거 또는 선택값 근거
         Integer sortOrder,      // 같은 응답 안 항목들끼리의 실행 순서 (낮을수록 먼저)
-        String actionType       // "실행 순서 점검" 충돌 판정용 분류 - DELETE/TRANSFER/OTHER 중 하나여야 함
+        String actionType,      // "실행 순서 점검" 충돌 판정용 분류 - DELETE/TRANSFER/OTHER 중 하나여야 함
+        String semanticType     // issue #90 - CLOUD_DELETE/FILE_PRESERVE/CHANNEL_CLOSE/CLIENT_NOTIFY/DEVICE_RESET/RECORD_EXPORT 중 하나, 해당 없으면 null
 ) {
 }

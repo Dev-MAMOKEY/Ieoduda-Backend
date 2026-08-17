@@ -69,10 +69,16 @@ public class Item {
     @Column(name = "action_type", length = 30)
     private ItemActionType actionType;
 
+    // issue #90 - actionType보다 더 구체적인 분류(6종). 3개의 순서 쌍(클라우드 삭제/파일 보존,
+    // 채널 폐쇄/거래처 통지, 기기 초기화/기록 반출) 판정에 쓰이며, 해당 없는 항목은 null.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "semantic_type", length = 30)
+    private ItemSemanticType semanticType;
+
     @Builder
     public Item(LifeArea lifeArea, String targetName, String locationType, String action, String title, String content,
                 String precondition, DisclosureScope disclosureScope, String sourceExcerpt,
-                Integer sortOrder, ItemActionType actionType) {
+                Integer sortOrder, ItemActionType actionType, ItemSemanticType semanticType) {
         this.lifeArea = lifeArea;
         this.targetName = targetName;
         this.locationType = locationType;
@@ -84,6 +90,7 @@ public class Item {
         this.sourceExcerpt = sourceExcerpt;
         this.sortOrder = sortOrder;
         this.actionType = actionType != null ? actionType : ItemActionType.OTHER;
+        this.semanticType = semanticType;
         this.status = ItemStatus.PROPOSED;
     }
 
@@ -94,7 +101,8 @@ public class Item {
 
     // 대화창 인라인 "수정" 버튼 - AI가 만든 초안을 사용자가 직접 고침
     public void updateContent(String targetName, String locationType, String action, String title, String content,
-                               String precondition, DisclosureScope disclosureScope, ItemActionType actionType) {
+                               String precondition, DisclosureScope disclosureScope, ItemActionType actionType,
+                               ItemSemanticType semanticType) {
         this.targetName = targetName;
         this.locationType = locationType;
         this.action = action;
@@ -103,6 +111,7 @@ public class Item {
         this.precondition = precondition;
         this.disclosureScope = disclosureScope;
         this.actionType = actionType != null ? actionType : ItemActionType.OTHER;
+        this.semanticType = semanticType;
     }
 
     // 드래그로 실행 순서 변경

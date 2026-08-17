@@ -12,6 +12,7 @@ import com.mamoki.ieojuda.domain.plan.entity.Conversation;
 import com.mamoki.ieojuda.domain.plan.entity.DisclosureScope;
 import com.mamoki.ieojuda.domain.plan.entity.Item;
 import com.mamoki.ieojuda.domain.plan.entity.ItemActionType;
+import com.mamoki.ieojuda.domain.plan.entity.ItemSemanticType;
 import com.mamoki.ieojuda.domain.plan.entity.ItemStatus;
 import com.mamoki.ieojuda.domain.plan.entity.LifeArea;
 import com.mamoki.ieojuda.domain.plan.entity.LifeAreaCategory;
@@ -189,6 +190,7 @@ public class ConversationService {
                     .sourceExcerpt(dto.sourceExcerpt())
                     .sortOrder(dto.sortOrder() != null ? dto.sortOrder() : 0) // AI가 지시를 안 지키고 null을 줄 경우 대비
                     .actionType(parseActionType(dto.actionType())) // 순서 충돌 판정용 - AI가 형식을 안 지켜도 turn 전체를 막을 정도는 아니라 OTHER로 대체
+                    .semanticType(parseSemanticType(dto.semanticType())) // issue #90 - 6종 중 하나가 아니거나 없으면 null(해당 없음)
                     .build();
             savedItems.add(itemRepository.save(item));
         }
@@ -200,6 +202,15 @@ public class ConversationService {
             return ItemActionType.valueOf(actionType);
         } catch (IllegalArgumentException | NullPointerException e) {
             return ItemActionType.OTHER;
+        }
+    }
+
+    // issue #90 - actionType과 달리 6종 중 어디에도 해당하지 않는 게 정상 케이스이므로 실패 시 OTHER가 아니라 null
+    private ItemSemanticType parseSemanticType(String semanticType) {
+        try {
+            return ItemSemanticType.valueOf(semanticType);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return null;
         }
     }
 
