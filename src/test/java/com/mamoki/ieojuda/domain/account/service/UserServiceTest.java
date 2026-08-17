@@ -1,5 +1,6 @@
 package com.mamoki.ieojuda.domain.account.service;
 
+import com.mamoki.ieojuda.domain.account.dto.UserResponse;
 import com.mamoki.ieojuda.domain.account.dto.UserUpdateRequest;
 import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.account.repository.RefreshSessionRepository;
@@ -110,6 +111,17 @@ class UserServiceTest {
                 handoverStageRepository, objectionRepository, handoffCheckRepository, handoffCheckResponseRepository,
                 packageIssueRepository, dependencyRepository, evidenceStorageClient, releaseCaseGuardService,
                 sessionRevocationService, refreshSessionRepository, partnerReviewerRepository);
+    }
+
+    @Test
+    void getMe_returnsUserResponse() {
+        User user = User.builder().email("owner@test.com").password("hash").name("A").build();
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        UserResponse response = userService.getMe(1L);
+
+        assertThat(response.email()).isEqualTo("owner@test.com");
+        assertThat(response.name()).isEqualTo("A");
     }
 
     @Test

@@ -28,6 +28,12 @@ public class UserController {
 
     private final UserService userService;
 
+    @Operation(summary = "내 정보 조회")
+    @GetMapping
+    public ResponseEntity<RsData<UserResponse>> getMe(@AuthenticationPrincipal Long userId) {
+        return ResponseEntity.ok(RsData.success(userService.getMe(userId)));
+    }
+
     @Operation(summary = "이메일/이름 변경")
     @PutMapping
     public ResponseEntity<RsData<UserResponse>> update(
