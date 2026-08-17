@@ -185,7 +185,8 @@ public class ItemOrderService {
         }
     }
 
-    // 규칙 5 - 권한 집중. 전체 항목(담당자 미배정 포함) 대비 한 담당자의 배정 비율이 기준을 넘으면 그 담당자의 항목 전부를 표시
+    // 규칙 5 - 권한 집중. 전체 항목(담당자 미배정 포함) 대비 한 담당자의 배정 비율이 기준을 넘으면 그 담당자의 항목 전부를 표시.
+    // 담당자가 한 명뿐이면 재분배할 대상이 없으므로 검사하지 않는다.
     private void checkAuthorityConcentration(List<Item> items, Map<UUID, List<String>> conflictReasons) {
         if (items.isEmpty()) {
             return;
@@ -193,6 +194,9 @@ public class ItemOrderService {
         Map<UUID, List<Item>> byRecipient = items.stream()
                 .filter(item -> item.getRecipient() != null)
                 .collect(Collectors.groupingBy(item -> item.getRecipient().getAssigneeId()));
+        if (byRecipient.size() < 2) {
+            return;
+        }
 
         for (List<Item> assignedItems : byRecipient.values()) {
             if ((double) assignedItems.size() / items.size() > AUTHORITY_CONCENTRATION_THRESHOLD) {

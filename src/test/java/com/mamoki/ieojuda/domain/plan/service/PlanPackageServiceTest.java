@@ -28,8 +28,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-// issue #81 - 역할별 패키지 미리보기 및 작성자 봉인. 봉인 차단 검사 3가지(확인자수/금지정보/근거)를 검증한다.
-// 권한 집중·실행순서확정 검사는 #90 소관이라 이 이슈 범위에서 제외한다(사용자 확인됨).
+// issue #81/#90 - 역할별 패키지 미리보기 및 작성자 봉인. 봉인 차단 검사 5가지
+// (확인자수/금지정보/근거/권한집중/실행순서확정)를 순서대로 검증한다.
 class PlanPackageServiceTest {
 
     private PlanOwnershipReader planOwnershipReader;
@@ -168,6 +168,39 @@ class PlanPackageServiceTest {
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PACKAGE_SEAL_BLOCKED));
     }
 
+    // issue #90 - 한 담당자가 전체 항목의 과반(50% 초과)을 맡으면 봉인 차단
+    @Test
+    void seal_whenOneRecipientHandlesMoreThanHalf_throwsPackageSealBlocked() {
+        stubAcceptedConfirmers(2);
+        Recipient r1 = buildRecipient(UUID.randomUUID(), "이지수");
+        Recipient r2 = buildRecipient(UUID.randomUUID(), "김민수");
+        Item item1 = buildItem(r1, "계정1 정리", "비공개 전환", "", "근거1");
+        Item item2 = buildItem(r1, "계정2 정리", "비공개 전환", "", "근거2");
+        Item item3 = buildItem(r2, "계정3 정리", "비공개 전환", "", "근거3");
+        when(itemRepository.findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(PLAN_ID))
+                .thenReturn(List.of(item1, item2, item3));
+
+        assertThatThrownBy(() -> planPackageService.seal(USER_ID, PLAN_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PACKAGE_SEAL_BLOCKED));
+        assertThat(plan.getStatus()).isNotEqualTo(PlanStatus.SEALED);
+    }
+
+    // issue #90 - 실행 순서가 아직 확정(orderConfirmedAt != null)되지 않았으면 봉인 차단
+    @Test
+    void seal_whenOrderNotConfirmed_throwsOrderNotConfirmed() {
+        stubAcceptedConfirmers(2);
+        Recipient r1 = buildRecipient(UUID.randomUUID(), "이지수");
+        Item item = buildItem(r1, "계정 정리", "비공개 전환", "", "지수에게 SNS 정리를 부탁");
+        when(itemRepository.findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(PLAN_ID))
+                .thenReturn(List.of(item));
+
+        assertThatThrownBy(() -> planPackageService.seal(USER_ID, PLAN_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ORDER_NOT_CONFIRMED));
+        assertThat(plan.getStatus()).isNotEqualTo(PlanStatus.SEALED);
+    }
+
     @Test
     void seal_whenAllChecksPass_sealsThePlan() {
         stubAcceptedConfirmers(2);
@@ -175,6 +208,7 @@ class PlanPackageServiceTest {
         Item item = buildItem(r1, "계정 정리", "비공개 전환", "", "지수에게 SNS 정리를 부탁");
         when(itemRepository.findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(PLAN_ID))
                 .thenReturn(List.of(item));
+        plan.confirmOrder();
 
         var response = planPackageService.seal(USER_ID, PLAN_ID);
 
