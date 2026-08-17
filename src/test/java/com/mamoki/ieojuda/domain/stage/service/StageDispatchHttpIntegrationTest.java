@@ -241,26 +241,27 @@ class StageDispatchHttpIntegrationTest {
         assertThat(stage2Outbox.getBody()).contains("/posthumous-access/");
         assertThat(stage2Outbox.getBody()).doesNotContain("/recipient-acceptances/");
 
-        // 버그 회귀 방지 - 메일 본문에 박힌 링크를 그대로 뽑아서 #76의 실제 인증 API를 호출해본다.
-        // (이전엔 링크 문자열만 /posthumous-access/로 바뀌고 토큰은 여전히 recipient.inviteToken에
+        // 메일 본문에 박힌 링크에서 토큰을 뽑아 둔다 (버그 회귀 방지 - #76의 실제 인증 API를 호출해볼 것이다.
+        // 이전엔 링크 문자열만 /posthumous-access/로 바뀌고 토큰은 여전히 recipient.inviteToken에
         // 저장되고 있어서, 이 호출이 전부 TOKEN_INVALID로 실패했었다 - 단위 테스트로는 못 잡던 버그)
         java.util.regex.Matcher linkMatcher = java.util.regex.Pattern
-                .compile("/posthumous-access/([\\w-]+)").matcher(stage2EmailCaptor.getValue().body());
+                .compile("/posthumous-access/([\\w-]+)").matcher(stage2Outbox.getBody());
         assertThat(linkMatcher.find()).as("메일 본문에 사후 인증 링크가 있어야 한다").isTrue();
         String dispatchedPlainToken = linkMatcher.group(1);
-
-        HttpResponse<String> linkCheckResponse = get("/api/posthumous-access/" + dispatchedPlainToken);
-        assertThat(linkCheckResponse.statusCode()).isEqualTo(200);
-        assertThat(linkCheckResponse.body()).contains("\"recipientName\":\"담당자2\"");
 
         ReleaseCase reloadedCase = releaseCaseRepository.findById(releaseCase.getCaseId()).orElseThrow();
         assertThat(reloadedCase.getStatus()).isNotEqualTo(ReleaseCaseStatus.COMPLETED); // 아직 2단계가 안 끝남
 
-        // 실제 워커가 아웃박스를 처리한 상황을 재현 - completeStageIfAllActionsDone은 SENT 상태에서만
-        // 다음 완료를 받아들이므로, 2단계 담당자가 실제로 링크를 받으려면 이 단계가 선행되어야 한다.
+        // 실제 워커가 아웃박스를 처리한 상황을 재현 - checkUsable()은 SENT 상태에서만 링크를 허용하므로,
+        // 실제 SMTP 발송(=SENT 전환)이 일어나기 전까지는 링크 접근도 아직 허용되지 않는 게 맞다.
         emailOutboxScheduler.dispatchPending();
         HandoverStage sentStage2 = handoverStageRepository.findById(stage2.getStageId()).orElseThrow();
         assertThat(sentStage2.getStatus()).isEqualTo(HandoverStageStatus.SENT);
+
+        // SENT로 전환된 뒤에야 사후 인증 API가 실제로 통과해야 한다.
+        HttpResponse<String> linkCheckResponse = get("/api/posthumous-access/" + dispatchedPlainToken);
+        assertThat(linkCheckResponse.statusCode()).isEqualTo(200);
+        assertThat(linkCheckResponse.body()).contains("\"recipientName\":\"담당자2\"");
 
         // 2단계(마지막 단계) 담당자가 완료 -> 사건 전체가 COMPLETED 되어야 한다(완료조건 2)
         String stage2Session = issueVerifiedSession(sentStage2);

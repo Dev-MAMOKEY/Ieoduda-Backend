@@ -71,8 +71,8 @@ class HandoverStageServiceTest {
         packageActionCompletionRepository = mock(PackageActionCompletionRepository.class);
         accessTokenRepository = mock(AccessTokenRepository.class);
         handoverStageService = new HandoverStageService(
-                releaseCaseRepository, handoverStageRepository, recipientRepository, emailLogRepository,
-                emailSender, appProperties, permissionGuard, packageActionCompletionRepository, accessTokenRepository);
+                releaseCaseRepository, handoverStageRepository, recipientRepository, emailOutboxService,
+                appProperties, permissionGuard, packageActionCompletionRepository, accessTokenRepository);
 
         when(appProperties.getContactEmail()).thenReturn("support@ieoduda.example");
         when(appProperties.getInviteTokenTtlHours()).thenReturn(72L);
@@ -128,7 +128,6 @@ class HandoverStageServiceTest {
 
         handoverStageService.createStagesAndDispatchFirst(localCase, List.of(recipient));
 
-        verify(recipient).issueInviteToken(anyString(), any());
         verify(emailOutboxService).enqueue(
                 eq(plan), any(HandoverStage.class), eq(EmailType.POSTHUMOUS_HANDOFF_LINK),
                 eq("recipient@example.com"), any(EmailContent.class));

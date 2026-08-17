@@ -192,7 +192,7 @@ class EvidenceSubmitServiceTest {
 
         TransactionSynchronizationManager.initSynchronization();
         try {
-            evidenceSubmitService.submit("token", file, null);
+            evidenceSubmitService.submit("token", file, EvidenceType.DEATH_CERTIFICATE, null);
             // 실제 Spring 트랜잭션이 롤백된 뒤 afterCompletion을 호출하는 것과 동일하게 재현
             TransactionSynchronizationUtils.triggerAfterCompletion(
                     org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK);
