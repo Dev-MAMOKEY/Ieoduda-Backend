@@ -32,7 +32,10 @@ public class ConsentCheckFilter extends OncePerRequestFilter {
             "/swagger-ui.html",
             "/api/self-warning-email/**",
             "/api/dispute-contacts/*/verify",
-            "/users/me/consent"
+            // issue #94 - 동의 제출은 /api/consents로 옮겨졌다 (ConsentController).
+            // /users/me/consent는 상태 조회(GET)만 남아있지만 계속 제외해야 조회 자체가 막히지 않는다.
+            "/users/me/consent",
+            "/api/consents"
     };
 
     private final UserRepository userRepository;
