@@ -61,6 +61,12 @@ public class Plan extends BaseCreatedAtEntity {
         this.status = PlanStatus.DEACTIVATED;
     }
 
+    // issue #81 - 작성자가 역할별 패키지 미리보기를 확인하고 직접 승인(봉인)했음을 표시.
+    // 사망 신고 시점의 PlanVersion 스냅샷 봉인과는 별개 개념으로 둘 다 유지한다(부록 결정 (a)).
+    public void seal() {
+        this.status = PlanStatus.SEALED;
+    }
+
     public void updateWaitingDays(Integer waitingDays) {
         this.waitingDays = waitingDays;
     }
