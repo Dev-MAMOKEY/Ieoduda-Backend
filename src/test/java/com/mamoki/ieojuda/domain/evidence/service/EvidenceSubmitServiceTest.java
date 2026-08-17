@@ -140,16 +140,33 @@ class EvidenceSubmitServiceTest {
     }
 
     @Test
-    void submit_whenFileExceedsTwentyFiveMegabytes_rejectsAsPayloadTooLarge() {
+    void submit_whenFileExceedsFiftyMegabytes_rejectsAsPayloadTooLarge() {
         MockMultipartFile file = mock(MockMultipartFile.class);
         when(file.isEmpty()).thenReturn(false);
         when(file.getOriginalFilename()).thenReturn("proof.pdf");
-        when(file.getSize()).thenReturn(26L * 1024 * 1024);
+        when(file.getSize()).thenReturn(51L * 1024 * 1024);
 
         assertThatThrownBy(() -> evidenceSubmitService.submit(CASE_ID, "token", file, EvidenceType.DEATH_CERTIFICATE, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PAYLOAD_TOO_LARGE));
         verify(evidenceStorageClient, never()).store(any(), any());
+    }
+
+    // issue #93 - 옛 25MB 제한이었다면 거부됐을 30MB 파일이 새 50MB 제한에서는 실제로 통과해야 한다
+    @Test
+    void submit_whenFileIsThirtyMegabytes_previouslyRejectedNowSucceedsUnderNewFiftyMegabyteLimit() throws Exception {
+        byte[] pdfBytes = "%PDF-1.4\n1 0 obj << >> endobj\n%%EOF".getBytes(StandardCharsets.US_ASCII);
+        MockMultipartFile file = mock(MockMultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        when(file.getOriginalFilename()).thenReturn("proof.pdf");
+        when(file.getSize()).thenReturn(30L * 1024 * 1024);
+        when(file.getInputStream()).thenAnswer(invocation -> new java.io.ByteArrayInputStream(pdfBytes));
+        when(malwareScanner.scan(any())).thenReturn(ScanResult.passed());
+        when(evidenceStorageClient.store(eq(CASE_ID), any())).thenReturn(new StoredEvidence("evidence/10/uuid.pdf", pdfBytes.length));
+
+        evidenceSubmitService.submit(CASE_ID, "token", file, EvidenceType.DEATH_CERTIFICATE, null);
+
+        verify(evidenceStorageClient).store(eq(CASE_ID), any());
     }
 
     @Test

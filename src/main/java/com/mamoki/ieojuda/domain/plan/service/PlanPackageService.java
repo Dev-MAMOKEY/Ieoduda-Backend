@@ -71,6 +71,9 @@ public class PlanPackageService {
         if (acceptedConfirmerCount < 2) {
             throw new CustomException(ErrorCode.INSUFFICIENT_CONFIRMERS);
         }
+        if (plan.getUser().getName() == null || plan.getUser().getName().isBlank()) {
+            throw new CustomException(ErrorCode.PACKAGE_SEAL_BLOCKED);
+        }
 
         List<Item> items = itemRepository
                 .findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(planId);

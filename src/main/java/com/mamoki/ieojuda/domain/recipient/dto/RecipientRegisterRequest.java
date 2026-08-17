@@ -5,6 +5,8 @@ import java.util.UUID;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -22,8 +24,10 @@ public record RecipientRegisterRequest(
         @Email(message = "이메일 형식이 올바르지 않습니다.")
         @jakarta.validation.constraints.Size(max = 255, message = "담당자 이메일은 255자 이하여야 합니다.") String email,
 
-        @Schema(description = "최대 단계 대기 시간(시간 단위, 7/14/21일에 대응)", example = "168", allowableValues = {"168", "336", "504"})
-        @NotNull(message = "대기 기간을 선택해 주세요.") Integer maxWaitHours,
+        @Schema(description = "최대 단계 대기 시간(시간 단위, 7~30일)", example = "168")
+        @NotNull(message = "대기 기간을 선택해 주세요.")
+        @Min(value = 168, message = "대기 기간은 7일 이상이어야 합니다.")
+        @Max(value = 720, message = "대기 기간은 30일 이하여야 합니다.") Integer maxWaitHours,
 
         @Schema(description = "대체 담당자 (선택). [대체 담당자 등록하기]로 입력한 경우에만 전달")
         @Valid BackupRegisterRequest backup

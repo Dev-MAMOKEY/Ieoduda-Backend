@@ -47,7 +47,7 @@ import java.util.function.Supplier;
 public class EvidenceSubmitService {
 
     private static final Set<String> ALLOWED_MIME_TYPES = Set.of("application/pdf", "image/jpeg", "image/png");
-    private static final long MAX_FILE_SIZE = 25L * 1024 * 1024; // 25MB
+    private static final long MAX_FILE_SIZE = 50L * 1024 * 1024; // 50MB
     private static final long MAX_FILE_COUNT = 3;
     private static final int HEADER_LENGTH = 16;
 
