@@ -75,7 +75,7 @@ class PlanSummaryServiceTest {
     @Test
     void getMySummary_aggregatesEveryCollaboratorResponse() {
         ItemResponse item = new ItemResponse(UUID.randomUUID(), "target", "location", "action", "title", "content",
-                "", "FAMILY", "excerpt", "PROPOSED", 0, "OTHER");
+                "", "FAMILY", "excerpt", "PROPOSED", 0, "OTHER", null);
         when(lifeAreaService.getLifeAreas(USER_ID, PLAN_ID)).thenReturn(List.of(
                 new LifeAreaResponse("FAMILY", List.of(item, item, item)),
                 new LifeAreaResponse("RELATIONSHIP_CLEANUP", List.of()),
@@ -96,9 +96,9 @@ class PlanSummaryServiceTest {
                 List.of(acceptedAssignee, pendingAssignee), List.of(acceptedConfirmer, pendingConfirmer)));
 
         OrderCheckItemResponse conflicting = new OrderCheckItemResponse(
-                UUID.randomUUID(), 0, "삭제 항목", "DELETE", "담당자", 24, "ACCEPTED", true, "충돌 사유");
+                UUID.randomUUID(), 0, "삭제 항목", "DELETE", "CLOUD_DELETE", "담당자", 24, "ACCEPTED", true, "충돌 사유");
         OrderCheckItemResponse clean = new OrderCheckItemResponse(
-                UUID.randomUUID(), 1, "정상 항목", "OTHER", "담당자", 24, "ACCEPTED", false, null);
+                UUID.randomUUID(), 1, "정상 항목", "OTHER", null, "담당자", 24, "ACCEPTED", false, null);
         when(itemOrderService.getOrderCheck(USER_ID, PLAN_ID))
                 .thenReturn(OrderCheckResponse.of(List.of(conflicting, conflicting, clean)));
 

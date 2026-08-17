@@ -67,6 +67,7 @@ class PlanPackageHttpIntegrationTest {
     private User user;
     private Plan plan;
     private Recipient recipient;
+    private Recipient backupRecipient;
     private Item item;
     private String accessToken;
 
@@ -84,6 +85,11 @@ class PlanPackageHttpIntegrationTest {
                 .plan(plan).lifeArea(lifeArea).name("이지수").email("jisoo-pkg-" + UUID.randomUUID() + "@test.com")
                 .roleType(RoleType.RELATIONSHIP_MANAGER).isBackup(false)
                 .disclosureScope(DisclosureScope.RELATIONSHIP).maxWaitHours(168).backupFor(null).build());
+        // issue #90 - "대체 담당자 부재" 규칙이 순서 확정을 막지 않도록 대체 담당자를 함께 등록
+        backupRecipient = recipientRepository.saveAndFlush(Recipient.builder()
+                .plan(plan).lifeArea(lifeArea).name("대체-이지수").email("backup-jisoo-pkg-" + UUID.randomUUID() + "@test.com")
+                .roleType(RoleType.RELATIONSHIP_MANAGER).isBackup(true)
+                .disclosureScope(DisclosureScope.RELATIONSHIP).maxWaitHours(168).backupFor(recipient).build());
         item = itemRepository.saveAndFlush(Item.builder()
                 .lifeArea(lifeArea).targetName("이지수").locationType("인스타그램").action("인스타그램 아이디로 SNS 계정을 정리해줘")
                 .title("SNS 계정 처리").content("비공개로 전환").precondition("")
@@ -98,6 +104,7 @@ class PlanPackageHttpIntegrationTest {
     @AfterEach
     void tearDown() {
         itemRepository.delete(item);
+        recipientRepository.delete(backupRecipient);
         recipientRepository.delete(recipient);
         lifeAreaRepository.findByPlan_PlanId(plan.getPlanId()).forEach(lifeAreaRepository::delete);
         conversationRepository.findByPlan_PlanId(plan.getPlanId()).forEach(conversationRepository::delete);
@@ -133,6 +140,10 @@ class PlanPackageHttpIntegrationTest {
         confirmerRepository.saveAndFlush(c2);
 
         try {
+            // issue #90 - 봉인 전에 실행 순서를 확정해야 한다(ORDER_NOT_CONFIRMED 방지)
+            HttpResponse<String> confirmOrderResponse = post("/api/plans/" + plan.getPlanId() + "/items/order/confirm");
+            assertThat(confirmOrderResponse.statusCode()).isEqualTo(200);
+
             HttpResponse<String> response = post("/api/plans/" + plan.getPlanId() + "/packages/seal");
 
             assertThat(response.statusCode()).isEqualTo(200);

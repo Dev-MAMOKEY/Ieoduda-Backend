@@ -94,6 +94,7 @@ public enum ErrorCode {
     CONFIRMER_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "CONFIRMER_RESEND_NOT_ALLOWED", "현재 수락 상태에서는 수락 요청을 다시 보낼 수 없습니다."),
     DISPUTE_CONTACT_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "DISPUTE_CONTACT_RESEND_NOT_ALLOWED", "이미 검증이 완료된 연락처에는 검증 메일을 다시 보낼 수 없습니다."),
     ITEM_ORDER_CONFLICT(HttpStatus.CONFLICT, "ITEM_ORDER_CONFLICT", "순서 충돌이 있어 확정할 수 없습니다."),
+    ORDER_NOT_CONFIRMED(HttpStatus.CONFLICT, "ORDER_NOT_CONFIRMED", "실행 순서가 아직 확정되지 않아 패키지를 봉인할 수 없습니다."),
     PARTNER_NOT_ASSIGNED(HttpStatus.CONFLICT, "PARTNER_NOT_ASSIGNED", "이 사건에는 아직 담당 파트너사가 배정되지 않았습니다."),
     EVIDENCE_ALREADY_DELETED(HttpStatus.CONFLICT, "EVIDENCE_ALREADY_DELETED", "이미 삭제된 증빙입니다."),
     DUPLICATE_REQUEST(HttpStatus.CONFLICT, "DUPLICATE_REQUEST", "이미 처리 중이거나 처리된 요청입니다."),

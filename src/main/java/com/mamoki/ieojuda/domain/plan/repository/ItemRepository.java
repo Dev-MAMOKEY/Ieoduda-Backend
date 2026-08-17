@@ -25,6 +25,9 @@ public interface ItemRepository extends JpaRepository<Item, UUID> {
     // "실행 순서 점검" 화면 - 담당자가 배정된(=발송 대상이 확정된) 항목만 순서 점검 대상
     List<Item> findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(UUID planId);
 
+    // issue #90 - "담당자 누락"도 순서 점검 화면의 충돌 규칙 중 하나라, 담당자 없는 항목도 포함해야 한다
+    List<Item> findByLifeArea_Plan_PlanIdOrderBySortOrderAscItemIdAsc(UUID planId);
+
     // issue #86 - "AI 구조화 결과 검토" 화면 새로고침용 목록 조회. status/disclosureScope는 없으면(null) 필터링하지 않음
     @Query("SELECT i FROM Item i WHERE i.lifeArea.plan.planId = :planId " +
             "AND (:status IS NULL OR i.status = :status) " +

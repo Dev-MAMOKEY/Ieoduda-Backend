@@ -65,7 +65,7 @@ class ItemReviewServiceBolaTest {
     @Test
     void updateRejectsNonOwnerAndDoesNotTouchItemRepository() {
         ItemUpdateRequest request = new ItemUpdateRequest(
-                "대상", "위치", "행동", "제목", "내용", null, "FAMILY", "OTHER");
+                "대상", "위치", "행동", "제목", "내용", null, "FAMILY", "OTHER", null);
 
         assertThatThrownBy(() -> itemReviewService.update(ATTACKER_ID, PLAN_ID, ITEM_ID, request))
                 .isInstanceOfSatisfying(CustomException.class,
