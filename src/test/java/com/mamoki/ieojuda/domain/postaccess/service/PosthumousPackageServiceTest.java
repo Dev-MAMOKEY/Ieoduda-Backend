@@ -21,6 +21,7 @@ import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.entity.RoleType;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStage;
+import com.mamoki.ieojuda.domain.stage.service.HandoverStageService;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
@@ -60,6 +61,7 @@ class PosthumousPackageServiceTest {
     private TokenLookupGuard tokenLookupGuard;
     private PublicLinkAuditor publicLinkAuditor;
     private IdempotencyGuard idempotencyGuard;
+    private HandoverStageService handoverStageService;
     private PosthumousPackageService posthumousPackageService;
 
     private AccessToken accessToken;
@@ -75,9 +77,11 @@ class PosthumousPackageServiceTest {
         tokenLookupGuard = mock(TokenLookupGuard.class);
         publicLinkAuditor = mock(PublicLinkAuditor.class);
         idempotencyGuard = mock(IdempotencyGuard.class);
+        handoverStageService = mock(HandoverStageService.class);
         posthumousPackageService = new PosthumousPackageService(
                 accessTokenRepository, packageActionCompletionRepository, packageIssueRepository,
-                itemRepository, planSnapshotService, tokenLookupGuard, publicLinkAuditor, idempotencyGuard);
+                itemRepository, planSnapshotService, tokenLookupGuard, publicLinkAuditor, idempotencyGuard,
+                handoverStageService);
 
         when(tokenLookupGuard.resolve(anyString(), any())).thenAnswer(invocation -> {
             Supplier<Optional<?>> lookup = invocation.getArgument(1);
@@ -195,6 +199,8 @@ class PosthumousPackageServiceTest {
         assertThat(response.status()).isEqualTo("COMPLETED");
         verify(packageActionCompletionRepository, times(1)).save(any());
         verify(idempotencyGuard).claim("package-action-complete", null);
+        // issue #78 - 내 역할 항목이 1개뿐이라 이 완료로 단계 전체가 끝남 -> 단계 완료 판정 호출로 이어져야 한다
+        verify(handoverStageService).completeStageIfAllActionsDone(10L, 1);
     }
 
     @Test
@@ -205,6 +211,9 @@ class PosthumousPackageServiceTest {
                 .thenReturn(Optional.of(existing));
 
         posthumousPackageService.completeAction(SESSION_ID, 100L, "same-key");
+
+        // 이미 완료된 행동을 재요청했을 때는 단계 완료 판정도 다시 트리거하지 않는다(불필요한 재판정 방지)
+        verify(handoverStageService, never()).completeStageIfAllActionsDone(any(), org.mockito.ArgumentMatchers.anyInt());
 
         verify(packageActionCompletionRepository, never()).save(any());
     }

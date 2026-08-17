@@ -135,8 +135,10 @@ class PosthumousPackageHttpIntegrationTest {
         accessTokenRepository.findAll().stream()
                 .filter(t -> t.getHandoverStage().getStageId().equals(stage.getStageId()))
                 .forEach(accessTokenRepository::delete);
-        handoverStageRepository.delete(stage);
-        releaseCaseRepository.delete(releaseCase);
+        // issue #78 이후 행동 완료가 단계·사건까지 완료 처리할 수 있어(@Version 증가), 이 테스트가 들고
+        // 있는 인스턴스로 delete(entity)를 호출하면 낙관적 잠금 충돌이 날 수 있다 - ID 기준으로 삭제한다.
+        handoverStageRepository.deleteById(stage.getStageId());
+        releaseCaseRepository.deleteById(releaseCase.getCaseId());
         planVersionRepository.delete(planVersion);
         itemRepository.delete(item);
         recipientRepository.delete(recipient);

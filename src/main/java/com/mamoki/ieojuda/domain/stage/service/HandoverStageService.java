@@ -4,12 +4,14 @@ import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
 import com.mamoki.ieojuda.domain.audit.entity.EmailLog;
 import com.mamoki.ieojuda.domain.audit.entity.EmailType;
 import com.mamoki.ieojuda.domain.audit.repository.EmailLogRepository;
+import com.mamoki.ieojuda.domain.postaccess.repository.PackageActionCompletionRepository;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.domain.stage.dto.HandoverStageResponse;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStage;
+import com.mamoki.ieojuda.domain.stage.entity.HandoverStageStatus;
 import com.mamoki.ieojuda.domain.stage.repository.HandoverStageRepository;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
@@ -43,6 +45,7 @@ public class HandoverStageService {
     private final EmailSender emailSender;
     private final AppProperties appProperties;
     private final PermissionGuard permissionGuard;
+    private final PackageActionCompletionRepository packageActionCompletionRepository;
 
     public HandoverStageResponse getStage(Long userId, Long caseId, Long stageId) {
         permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
@@ -97,6 +100,42 @@ public class HandoverStageService {
             HandoverStage firstStage = stages.get(0);
             sendHandoffInvite(firstStage, firstStage.getRecipient());
         }
+    }
+
+    // issue #78 - 역할별 사후 패키지(#77)에서 행동 하나가 완료될 때마다 호출된다. 같은 단계의 여러
+    // 행동이 동시에 완료 요청되어도 "전부 완료 → 단계 완료 → 다음 단계 발송"이 한 번만 일어나도록,
+    // 이 단계 행에 비관적 잠금을 걸고 그 안에서 완료 개수를 다시 센다(호출자가 넘긴 개수는 신뢰하지 않음).
+    @Transactional
+    public void completeStageIfAllActionsDone(Long stageId, int totalActionCount) {
+        HandoverStage stage = handoverStageRepository.findByIdForUpdate(stageId)
+                .orElseThrow(() -> new CustomException(ErrorCode.HANDOVER_STAGE_NOT_FOUND));
+        // SENT 상태에서만 완료로 전이한다 - 이미 완료됐다면(동시 요청) 중복 발송 방지, BLOCKED/BOUNCED/
+        // FALLBACK 등 다른 상태라면 "BLOCKED 단계는 다음 단계를 열지 않는다" 규칙을 여기서도 지킨다.
+        if (stage.getStatus() != HandoverStageStatus.SENT) {
+            return;
+        }
+
+        long completedCount = packageActionCompletionRepository.countByHandoverStage_StageId(stageId);
+        if (completedCount < totalActionCount) {
+            return;
+        }
+
+        stage.complete();
+        dispatchNextOrCompleteCase(stage);
+    }
+
+    // 다음 stageOrder 담당자에게 발송하거나, 마지막 단계였다면 사건 전체를 완료 처리한다.
+    // BLOCKED 단계는 애초에 행동을 완료할 수 없어 이 경로를 타지 않으므로, 다음 단계가 자동으로 열리지 않는다.
+    private void dispatchNextOrCompleteCase(HandoverStage stage) {
+        HandoverStage next = handoverStageRepository
+                .findFirstByReleaseCase_CaseIdAndStageOrderGreaterThanOrderByStageOrderAsc(
+                        stage.getReleaseCase().getCaseId(), stage.getStageOrder())
+                .orElse(null);
+        if (next == null) {
+            stage.getReleaseCase().complete();
+            return;
+        }
+        sendHandoffInvite(next, next.getRecipient());
     }
 
     private void sendHandoffInvite(HandoverStage stage, Recipient recipient) {
