@@ -14,8 +14,7 @@ import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStage;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
-import com.mamoki.ieojuda.global.email.contract.EmailSendResult;
-import com.mamoki.ieojuda.global.email.sender.EmailSender;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.email.template.EmailBuilder;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.exception.CustomException;
@@ -40,7 +39,7 @@ public class EmailAuditService {
     private final ReleaseCaseRepository releaseCaseRepository;
     private final EmailLogRepository emailLogRepository;
     private final ExternalPartnerRepository externalPartnerRepository;
-    private final EmailSender emailSender;
+    private final EmailOutboxService emailOutboxService;
     private final AppProperties appProperties;
     private final PermissionGuard permissionGuard;
     private final ReauthGuard reauthGuard;
@@ -49,7 +48,7 @@ public class EmailAuditService {
     public List<EmailDeliveryResponse> getDeliveries(Long userId, Long caseId) {
         permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
         ReleaseCase releaseCase = findCase(caseId);
-        return emailLogRepository.findByPlan_PlanIdOrderBySentAtDesc(releaseCase.getPlan().getPlanId()).stream()
+        return emailLogRepository.findByPlan_PlanIdOrderByRequestedAtDesc(releaseCase.getPlan().getPlanId()).stream()
                 .map(EmailDeliveryResponse::from)
                 .toList();
     }
@@ -83,13 +82,8 @@ public class EmailAuditService {
                 secureLink,
                 appProperties.getContactEmail()
         );
-        EmailSendResult result = emailSender.send(recipient.getEmail(), content);
+        emailOutboxService.enqueueRetry(log, content);
 
-        if (result.success()) {
-            log.markRetried(result.messageId());
-        } else {
-            log.markBounced();
-        }
         return EmailDeliveryResponse.from(log);
     }
 

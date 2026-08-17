@@ -158,7 +158,7 @@ public class UserService {
     private void deletePlanData(Plan plan) {
         Long planId = plan.getPlanId();
 
-        emailLogRepository.deleteAll(emailLogRepository.findByPlan_PlanIdOrderBySentAtDesc(planId));
+        emailLogRepository.deleteAll(emailLogRepository.findByPlan_PlanIdOrderByRequestedAtDesc(planId));
         deleteEvidenceWithStorage(planId);
         objectionRepository.deleteAll(objectionRepository.findByPlan_PlanId(planId));
         handoffCheckResponseRepository.deleteAll(handoffCheckResponseRepository.findByHandoffCheck_Plan_PlanId(planId));

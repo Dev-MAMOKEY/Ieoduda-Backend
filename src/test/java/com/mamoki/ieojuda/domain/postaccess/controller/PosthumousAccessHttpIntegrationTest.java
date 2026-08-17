@@ -19,8 +19,7 @@ import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStage;
 import com.mamoki.ieojuda.domain.stage.repository.HandoverStageRepository;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
-import com.mamoki.ieojuda.global.email.contract.EmailSendResult;
-import com.mamoki.ieojuda.global.email.sender.EmailSender;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,9 +72,11 @@ class PosthumousAccessHttpIntegrationTest {
     @Autowired
     private EmailLogRepository emailLogRepository;
 
-    // 실제 SMTP 발송을 막기 위해 EmailSender만 목으로 대체 - 그 외 전부 실제 컨텍스트/DB 사용
+    // 실제 SMTP 발송을 막기 위해 EmailOutboxService만 목으로 대체 - 그 외 전부 실제 컨텍스트/DB 사용
+    // (issue #51 - 발송이 비동기 아웃박스로 바뀌어, 이 테스트는 실제 발송이 아니라 큐 등록 시점의
+    // EmailContent를 검증한다)
     @MockitoBean
-    private EmailSender emailSender;
+    private EmailOutboxService emailOutboxService;
 
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
@@ -86,7 +87,6 @@ class PosthumousAccessHttpIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        when(emailSender.send(anyString(), any(EmailContent.class))).thenReturn(EmailSendResult.success("msg-http-test"));
 
         user = userRepository.saveAndFlush(User.builder()
                 .email("posthumous-http-" + UUID.randomUUID() + "@test.com").password("hash").name("김나무").build());
@@ -105,7 +105,7 @@ class PosthumousAccessHttpIntegrationTest {
 
     @AfterEach
     void tearDown() {
-        emailLogRepository.findByPlan_PlanIdOrderBySentAtDesc(plan.getPlanId()).forEach(emailLogRepository::delete);
+        emailLogRepository.findByPlan_PlanIdOrderByRequestedAtDesc(plan.getPlanId()).forEach(emailLogRepository::delete);
         accessTokenRepository.findAll().stream()
                 .filter(t -> t.getHandoverStage().getStageId().equals(sentStage.getStageId()))
                 .forEach(accessTokenRepository::delete);
@@ -136,7 +136,7 @@ class PosthumousAccessHttpIntegrationTest {
         assertThat(otpResp.body()).contains("\"maskedEmail\":\"ji***");
 
         ArgumentCaptor<EmailContent> captor = ArgumentCaptor.forClass(EmailContent.class);
-        verify(emailSender).send(anyString(), captor.capture());
+        verify(emailOutboxService).enqueue(any(), any(), any(), anyString(), captor.capture());
         String otpCode = extractOtpCode(captor.getValue().body());
 
         HttpResponse<String> verifyResp = post("/api/posthumous-access/" + plainToken + "/verify",
@@ -196,7 +196,7 @@ class PosthumousAccessHttpIntegrationTest {
         assertThat(otpResp.statusCode()).isEqualTo(200);
 
         ArgumentCaptor<EmailContent> captor = ArgumentCaptor.forClass(EmailContent.class);
-        verify(emailSender).send(anyString(), captor.capture());
+        verify(emailOutboxService).enqueue(any(), any(), any(), anyString(), captor.capture());
         String realCode = extractOtpCode(captor.getValue().body());
         String wrongCode = realCode.equals("000000") ? "111111" : "000000";
 

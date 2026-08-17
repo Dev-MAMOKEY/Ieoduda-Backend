@@ -17,9 +17,12 @@ import com.mamoki.ieojuda.global.scan.MalwareScanner;
 import com.mamoki.ieojuda.global.scan.ScanResult;
 import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
 import com.mamoki.ieojuda.global.storage.contract.StoredEvidence;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
@@ -30,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -47,6 +51,7 @@ class EvidenceSubmitServiceTest {
     private PublicLinkAuditor publicLinkAuditor;
     private IdempotencyGuard idempotencyGuard;
     private MalwareScanner malwareScanner;
+    private EvidenceOrphanCleanupService evidenceOrphanCleanupService;
     private EvidenceSubmitService evidenceSubmitService;
 
     private Confirmer confirmer;
@@ -63,9 +68,10 @@ class EvidenceSubmitServiceTest {
         publicLinkAuditor = mock(PublicLinkAuditor.class);
         idempotencyGuard = mock(IdempotencyGuard.class);
         malwareScanner = mock(MalwareScanner.class);
+        evidenceOrphanCleanupService = mock(EvidenceOrphanCleanupService.class);
         evidenceSubmitService = new EvidenceSubmitService(
                 confirmerRepository, releaseCaseRepository, evidenceRepository, evidenceStorageClient,
-                tokenLookupGuard, publicLinkAuditor, idempotencyGuard, malwareScanner);
+                tokenLookupGuard, publicLinkAuditor, idempotencyGuard, malwareScanner, evidenceOrphanCleanupService);
 
         // TokenLookupGuard는 실제 구현처럼 supplier를 그대로 실행해 confirmerRepository 목 설정이
         // 기존과 동일하게 동작하도록 위임한다.
@@ -89,6 +95,14 @@ class EvidenceSubmitServiceTest {
 
         when(evidenceRepository.countByReleaseCase_CaseId(10L)).thenReturn(0L);
         when(evidenceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    @AfterEach
+    void tearDown() {
+        // registerCompensatingDelete 관련 테스트가 스레드로컬 동기화 상태를 남기지 않도록 정리
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     @Test
@@ -154,5 +168,30 @@ class EvidenceSubmitServiceTest {
         evidenceSubmitService.submit("token", file, null);
 
         verify(releaseCase, never()).startEvidenceReview();
+    }
+
+    // issue #51 - DB 트랜잭션이 롤백된 뒤 보정 삭제(afterCompletion) 자체가 실패하면, 이전에는 로그만
+    // 남기고 예외를 삼켰다. 이제는 EvidenceOrphanCleanupService에 재처리 대상으로 기록해야 한다.
+    @Test
+    void submit_whenTransactionRollsBackAndCompensatingDeleteFails_recordsOrphanForRetry() {
+        byte[] pdfBytes = "%PDF-1.4\n%%EOF".getBytes(StandardCharsets.US_ASCII);
+        MockMultipartFile file = new MockMultipartFile("file", "proof.pdf", "application/pdf", pdfBytes);
+        when(malwareScanner.scan(any())).thenReturn(ScanResult.passed());
+        when(evidenceStorageClient.store(eq(10L), any()))
+                .thenReturn(new StoredEvidence("evidence/10/uuid.pdf", pdfBytes.length));
+        // 보정 삭제 자체가 실패하는 상황을 재현
+        doThrow(new RuntimeException("S3 unreachable")).when(evidenceStorageClient).delete("evidence/10/uuid.pdf");
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            evidenceSubmitService.submit("token", file, null);
+            // 실제 Spring 트랜잭션이 롤백된 뒤 afterCompletion을 호출하는 것과 동일하게 재현
+            TransactionSynchronizationUtils.triggerAfterCompletion(
+                    org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        verify(evidenceOrphanCleanupService).recordOrphan(eq("evidence/10/uuid.pdf"), eq("RuntimeException"));
     }
 }

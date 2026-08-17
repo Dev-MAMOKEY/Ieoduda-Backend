@@ -1,5 +1,6 @@
 package com.mamoki.ieojuda.domain.plan.service;
 
+import com.mamoki.ieojuda.domain.audit.entity.EmailType;
 import com.mamoki.ieojuda.domain.confirmer.repository.DisputeContactRepository;
 import com.mamoki.ieojuda.domain.plan.dto.PlanResponse;
 import com.mamoki.ieojuda.domain.plan.dto.ReleasePolicyRequest;
@@ -11,8 +12,7 @@ import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
-import com.mamoki.ieojuda.global.email.contract.EmailSendResult;
-import com.mamoki.ieojuda.global.email.sender.EmailSender;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.email.template.EmailBuilder;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.email.token.TokenValidator;
@@ -40,7 +40,7 @@ public class PlanService {
     private final PlanRepository planRepository;
     private final PlanOwnershipReader planOwnershipReader;
     private final DisputeContactRepository disputeContactRepository;
-    private final EmailSender emailSender;
+    private final EmailOutboxService emailOutboxService;
     private final AppProperties appProperties;
 
     public PlanResponse getPlan(Long userId, Long planId) {
@@ -99,9 +99,10 @@ public class PlanService {
                 secureLink,
                 appProperties.getContactEmail()
         );
-        EmailSendResult sendResult = emailSender.send(request.email(), content);
+        // 발송은 EmailOutboxScheduler가 비동기로 처리한다 (실제 발송 결과는 "이메일 발송 감사" 화면에서 확인)
+        emailOutboxService.enqueue(plan, null, EmailType.WAITING_PERIOD_WARNING, request.email(), content);
 
-        return SelfWarningEmailResponse.of(plan, sendResult.success());
+        return SelfWarningEmailResponse.of(plan, true);
     }
 
     // 본인 경고 이메일 검증 링크 클릭 - 로그인 불필요(토큰 자체가 증명), planId도 토큰으로 역추적

@@ -1,7 +1,6 @@
 package com.mamoki.ieojuda.domain.postaccess.service;
 
 import com.mamoki.ieojuda.domain.account.entity.User;
-import com.mamoki.ieojuda.domain.audit.repository.EmailLogRepository;
 import com.mamoki.ieojuda.domain.plan.entity.DisclosureScope;
 import com.mamoki.ieojuda.domain.plan.entity.LifeArea;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
@@ -13,8 +12,7 @@ import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.entity.RoleType;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStage;
 import com.mamoki.ieojuda.global.config.AppProperties;
-import com.mamoki.ieojuda.global.email.contract.EmailSendResult;
-import com.mamoki.ieojuda.global.email.sender.EmailSender;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
@@ -38,8 +36,7 @@ import static org.mockito.Mockito.when;
 class PosthumousAccessServiceTest {
 
     private AccessTokenRepository accessTokenRepository;
-    private EmailLogRepository emailLogRepository;
-    private EmailSender emailSender;
+    private EmailOutboxService emailOutboxService;
     private AppProperties appProperties;
     private TokenLookupGuard tokenLookupGuard;
     private PublicLinkAuditor publicLinkAuditor;
@@ -52,8 +49,7 @@ class PosthumousAccessServiceTest {
     @SuppressWarnings("unchecked")
     void setUp() {
         accessTokenRepository = mock(AccessTokenRepository.class);
-        emailLogRepository = mock(EmailLogRepository.class);
-        emailSender = mock(EmailSender.class);
+        emailOutboxService = mock(EmailOutboxService.class);
         appProperties = mock(AppProperties.class);
         tokenLookupGuard = mock(TokenLookupGuard.class);
         publicLinkAuditor = mock(PublicLinkAuditor.class);
@@ -61,7 +57,7 @@ class PosthumousAccessServiceTest {
         // 목이 아닌 실제 인스턴스를 쓴다(트랜잭션 자체는 이 단위 테스트 범위 밖 - HTTP 통합 테스트가 검증).
         otpAttemptRecorder = new OtpAttemptRecorder(accessTokenRepository);
         posthumousAccessService = new PosthumousAccessService(
-                accessTokenRepository, emailLogRepository, emailSender, appProperties,
+                accessTokenRepository, emailOutboxService, appProperties,
                 tokenLookupGuard, publicLinkAuditor, otpAttemptRecorder);
 
         when(appProperties.getContactEmail()).thenReturn("support@ieoduda.example");
@@ -72,9 +68,6 @@ class PosthumousAccessServiceTest {
             Supplier<Optional<?>> lookup = invocation.getArgument(1);
             return lookup.get().orElseThrow(() -> new CustomException(ErrorCode.TOKEN_INVALID));
         });
-
-        when(emailSender.send(anyString(), any())).thenReturn(EmailSendResult.success("msg-1"));
-        when(emailLogRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     // 기본값: 단계가 실제로 발송된(SENT) 상태 - 링크가 정상적으로 유효한 경우

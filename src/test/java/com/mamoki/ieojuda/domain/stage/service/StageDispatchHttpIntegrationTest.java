@@ -30,8 +30,10 @@ import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStage;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStageStatus;
 import com.mamoki.ieojuda.domain.stage.repository.HandoverStageRepository;
-import com.mamoki.ieojuda.global.email.contract.EmailContent;
 import com.mamoki.ieojuda.global.email.contract.EmailSendResult;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutbox;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxRepository;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxScheduler;
 import com.mamoki.ieojuda.global.email.sender.EmailSender;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import org.junit.jupiter.api.AfterEach;
@@ -54,7 +56,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 // issue #78 - HandoverStage.complete()가 호출되지 않아 발송 체인이 1단계에서 영구히 멈추던 버그의
@@ -92,8 +93,17 @@ class StageDispatchHttpIntegrationTest {
     @Autowired
     private EmailLogRepository emailLogRepository;
     @Autowired
+    private EmailOutboxRepository emailOutboxRepository;
+    @Autowired
+    private EmailOutboxScheduler emailOutboxScheduler;
+    @Autowired
     private PlanSnapshotService planSnapshotService;
 
+    // issue #51 - 실제 SMTP 발송(EmailSender)만 목으로 막고, 아웃박스 쓰기 경로(EmailOutboxService/
+    // EmailLogRepository/EmailOutboxRepository)는 전부 실제 빈을 그대로 쓴다 - 그래야 "1단계 완료 시
+    // 실제로 EmailLog/EmailOutbox 행이 커밋되는지"까지 이 통합 테스트가 검증할 수 있다. 실제 발송은
+    // EmailOutboxScheduler가 별도 주기로 담당하므로, 이 시점에는 아직 SENT가 아니라 PENDING이어야 한다
+    // (과거 버그: 여기서 곧바로 SENT였음).
     @MockitoBean
     private EmailSender emailSender;
 
@@ -112,7 +122,7 @@ class StageDispatchHttpIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        when(emailSender.send(anyString(), any(EmailContent.class))).thenReturn(EmailSendResult.success("msg-dispatch-test"));
+        when(emailSender.send(anyString(), any())).thenReturn(EmailSendResult.success("msg-dispatch-test"));
 
         user = userRepository.saveAndFlush(User.builder()
                 .email("stage-dispatch-" + UUID.randomUUID() + "@test.com").password("hash").name("김나무").build());
@@ -167,7 +177,12 @@ class StageDispatchHttpIntegrationTest {
 
     @AfterEach
     void tearDown() {
-        emailLogRepository.findByPlan_PlanIdOrderBySentAtDesc(plan.getPlanId()).forEach(emailLogRepository::delete);
+        var logs = emailLogRepository.findByPlan_PlanIdOrderByRequestedAtDesc(plan.getPlanId());
+        // EmailOutbox.emailLog는 FK(log_id NOT NULL)이므로, 참조하는 로그보다 먼저 지워야 한다.
+        emailOutboxRepository.findAll().stream()
+                .filter(outbox -> logs.stream().anyMatch(log -> log.getLogId().equals(outbox.getEmailLog().getLogId())))
+                .forEach(emailOutboxRepository::delete);
+        logs.forEach(emailLogRepository::delete);
         packageActionCompletionRepository.findByHandoverStage_StageId(stage1.getStageId()).forEach(packageActionCompletionRepository::delete);
         packageActionCompletionRepository.findByHandoverStage_StageId(stage2.getStageId()).forEach(packageActionCompletionRepository::delete);
         accessTokenRepository.findAll().stream()
@@ -210,17 +225,21 @@ class StageDispatchHttpIntegrationTest {
         HandoverStage reloadedStage1 = handoverStageRepository.findById(stage1.getStageId()).orElseThrow();
         assertThat(reloadedStage1.getStatus()).isEqualTo(HandoverStageStatus.COMPLETED);
 
+        // issue #51 - 실제 SMTP 발송은 EmailOutboxScheduler가 비동기로 담당하므로, 이 시점에는
+        // 아직 SENT가 아니라 아웃박스에 큐 등록만 된 PENDING 상태여야 한다(과거 버그: 여기서 곧바로 SENT였음).
         HandoverStage reloadedStage2 = handoverStageRepository.findById(stage2.getStageId()).orElseThrow();
-        assertThat(reloadedStage2.getStatus()).isEqualTo(HandoverStageStatus.SENT);
-        assertThat(emailLogRepository.findByPlan_PlanIdOrderBySentAtDesc(plan.getPlanId()))
+        assertThat(reloadedStage2.getStatus()).isEqualTo(HandoverStageStatus.PENDING);
+        assertThat(emailLogRepository.findByPlan_PlanIdOrderByRequestedAtDesc(plan.getPlanId()))
                 .anyMatch(log -> log.getHandoverStage().getStageId().equals(stage2.getStageId()));
 
         // issue #79 - 2단계는 정상적으로 자기 순서가 온 것이지 대체 담당자 전환이 아니므로 최초 발송 문구를 받아야 한다
-        org.mockito.ArgumentCaptor<EmailContent> stage2EmailCaptor = org.mockito.ArgumentCaptor.forClass(EmailContent.class);
-        verify(emailSender).send(org.mockito.ArgumentMatchers.eq(recipient2.getEmail()), stage2EmailCaptor.capture());
-        assertThat(stage2EmailCaptor.getValue().body()).doesNotContain("대체 담당자로 지정되었습니다");
-        assertThat(stage2EmailCaptor.getValue().body()).contains("/posthumous-access/");
-        assertThat(stage2EmailCaptor.getValue().body()).doesNotContain("/recipient-acceptances/");
+        EmailOutbox stage2Outbox = emailOutboxRepository.findAll().stream()
+                .filter(outbox -> recipient2.getEmail().equals(outbox.getRecipientEmail()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("2단계 담당자 앞으로 등록된 아웃박스 행이 없다"));
+        assertThat(stage2Outbox.getBody()).doesNotContain("대체 담당자로 지정되었습니다");
+        assertThat(stage2Outbox.getBody()).contains("/posthumous-access/");
+        assertThat(stage2Outbox.getBody()).doesNotContain("/recipient-acceptances/");
 
         // 버그 회귀 방지 - 메일 본문에 박힌 링크를 그대로 뽑아서 #76의 실제 인증 API를 호출해본다.
         // (이전엔 링크 문자열만 /posthumous-access/로 바뀌고 토큰은 여전히 recipient.inviteToken에
@@ -237,8 +256,14 @@ class StageDispatchHttpIntegrationTest {
         ReleaseCase reloadedCase = releaseCaseRepository.findById(releaseCase.getCaseId()).orElseThrow();
         assertThat(reloadedCase.getStatus()).isNotEqualTo(ReleaseCaseStatus.COMPLETED); // 아직 2단계가 안 끝남
 
+        // 실제 워커가 아웃박스를 처리한 상황을 재현 - completeStageIfAllActionsDone은 SENT 상태에서만
+        // 다음 완료를 받아들이므로, 2단계 담당자가 실제로 링크를 받으려면 이 단계가 선행되어야 한다.
+        emailOutboxScheduler.dispatchPending();
+        HandoverStage sentStage2 = handoverStageRepository.findById(stage2.getStageId()).orElseThrow();
+        assertThat(sentStage2.getStatus()).isEqualTo(HandoverStageStatus.SENT);
+
         // 2단계(마지막 단계) 담당자가 완료 -> 사건 전체가 COMPLETED 되어야 한다(완료조건 2)
-        String stage2Session = issueVerifiedSession(reloadedStage2);
+        String stage2Session = issueVerifiedSession(sentStage2);
         HttpResponse<String> completeStage2 = post(
                 "/api/posthumous-packages/" + stage2Session + "/actions/" + item2.getItemId() + "/complete");
         assertThat(completeStage2.statusCode()).isEqualTo(200);
@@ -265,7 +290,7 @@ class StageDispatchHttpIntegrationTest {
 
         HandoverStage reloadedStage2 = handoverStageRepository.findById(stage2.getStageId()).orElseThrow();
         assertThat(reloadedStage2.getStatus()).isEqualTo(HandoverStageStatus.PENDING); // 열리지 않았어야 한다
-        assertThat(emailLogRepository.findByPlan_PlanIdOrderBySentAtDesc(plan.getPlanId()))
+        assertThat(emailLogRepository.findByPlan_PlanIdOrderByRequestedAtDesc(plan.getPlanId()))
                 .noneMatch(log -> log.getHandoverStage().getStageId().equals(stage2.getStageId()));
     }
 

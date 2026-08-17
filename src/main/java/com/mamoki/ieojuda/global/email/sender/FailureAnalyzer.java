@@ -2,6 +2,7 @@ package com.mamoki.ieojuda.global.email.sender;
 
 import com.mamoki.ieojuda.global.email.contract.BounceType;
 import com.mamoki.ieojuda.global.email.contract.EmailFaill;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import jakarta.mail.SendFailedException;
 import jakarta.mail.internet.AddressException;
 import org.springframework.mail.MailAuthenticationException;
@@ -19,6 +20,11 @@ public class FailureAnalyzer {
         // 주소 형식 오류 (전송 시도 이전, MimeMessageHelper.setTo() 등에서 발생)
         if (exception instanceof AddressException) {
             return new Result(BounceType.PERMANENT, EmailFaill.INVALID_ADDRESS_FORMAT);
+        }
+
+        // issue #51 - 회로 차단기가 OPEN 상태라 이번 시도 자체가 거부됨 (연속 실패가 누적된 상황)
+        if (exception instanceof CallNotPermittedException) {
+            return new Result(BounceType.TEMPORARY, EmailFaill.CONNECTION_TIMEOUT);
         }
 
         // 메일 서버 인증 실패

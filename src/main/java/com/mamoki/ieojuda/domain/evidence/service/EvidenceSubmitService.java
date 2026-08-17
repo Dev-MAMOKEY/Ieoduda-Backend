@@ -56,6 +56,7 @@ public class EvidenceSubmitService {
     private final PublicLinkAuditor publicLinkAuditor;
     private final IdempotencyGuard idempotencyGuard;
     private final MalwareScanner malwareScanner;
+    private final EvidenceOrphanCleanupService evidenceOrphanCleanupService;
 
     @Transactional
     public EvidenceSubmitResponse submit(String plainToken, MultipartFile file, String idempotencyKey) {
@@ -191,6 +192,7 @@ public class EvidenceSubmitService {
                     evidenceStorageClient.delete(storageKey);
                 } catch (Exception e) {
                     log.error("[Evidence Orphan Cleanup Failed] storageKey={}, cause={}", storageKey, e.getMessage(), e);
+                    evidenceOrphanCleanupService.recordOrphan(storageKey, e.getClass().getSimpleName());
                 }
             }
         });

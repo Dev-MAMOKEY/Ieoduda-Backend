@@ -12,11 +12,11 @@ import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
 import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.service.PlanOwnershipReader;
+import com.mamoki.ieojuda.domain.audit.entity.EmailType;
 import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
-import com.mamoki.ieojuda.global.email.contract.EmailSendResult;
-import com.mamoki.ieojuda.global.email.sender.EmailSender;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.email.template.EmailBuilder;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.exception.CustomException;
@@ -40,7 +40,7 @@ public class ConfirmerService {
 
     private final PlanOwnershipReader planOwnershipReader;
     private final ConfirmerRepository confirmerRepository;
-    private final EmailSender emailSender;
+    private final EmailOutboxService emailOutboxService;
     private final AppProperties appProperties;
 
     @Transactional
@@ -70,8 +70,9 @@ public class ConfirmerService {
         }
     }
 
-    // 확인자 저장 + 초대 토큰 발급 + 수락 이메일 발송
-    // 이메일 발송 실패는 예외로 던지지 않는다 - 확인자 저장은 유지하고 건별 결과만 응답에 담는다
+    // 확인자 저장 + 초대 토큰 발급 + 수락 이메일 발송 큐 등록
+    // 실제 발송은 EmailOutboxScheduler가 비동기로 처리하므로, 여기서는 큐 등록 자체의 성공만 응답에 담는다
+    // (실제 발송 결과는 "이메일 발송 감사" 화면에서 확인)
     private ConfirmerRegisterResponse registerOne(Plan plan, ConfirmerRegisterRequest request) {
         Confirmer confirmer = confirmerRepository.save(Confirmer.builder()
                 .plan(plan)
@@ -79,23 +80,19 @@ public class ConfirmerService {
                 .email(request.email())
                 .build());
 
-        EmailSendResult sendResult = issueInviteAndSend(confirmer);
+        issueInviteAndSend(confirmer);
 
-        return ConfirmerRegisterResponse.of(
-                confirmer,
-                sendResult.success(),
-                sendResult.bounceType() == null ? null : sendResult.bounceType().name()
-        );
+        return ConfirmerRegisterResponse.of(confirmer, true, null);
     }
 
-    private EmailSendResult issueInviteAndSend(Confirmer confirmer) {
+    private void issueInviteAndSend(Confirmer confirmer) {
         String plainToken = TokenProvider.generatePlainToken();
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
         confirmer.issueInviteToken(TokenProvider.hashToken(plainToken), expiresAt);
-        return sendAcceptanceEmail(confirmer, plainToken, expiresAt);
+        sendAcceptanceEmail(confirmer, plainToken, expiresAt);
     }
 
-    private EmailSendResult sendAcceptanceEmail(Confirmer confirmer, String plainToken, LocalDateTime expiresAt) {
+    private void sendAcceptanceEmail(Confirmer confirmer, String plainToken, LocalDateTime expiresAt) {
         String secureLink = appProperties.getBaseUrl() + "/confirmer-acceptances/" + plainToken;
         EmailContent content = EmailBuilder.build(
                 "지정 확인자",
@@ -104,7 +101,7 @@ public class ConfirmerService {
                 secureLink,
                 appProperties.getContactEmail()
         );
-        return emailSender.send(confirmer.getEmail(), content);
+        emailOutboxService.enqueue(confirmer.getPlan(), null, EmailType.CONFIRMER_ACCEPTANCE_INVITE, confirmer.getEmail(), content);
     }
 
     // "역할 점검" 화면 상세 - 이름 클릭 시 해당 확인자 정보
@@ -128,13 +125,9 @@ public class ConfirmerService {
         }
 
         confirmer.resetAcceptance();
-        EmailSendResult sendResult = issueInviteAndSend(confirmer);
+        issueInviteAndSend(confirmer);
 
-        return ConfirmerResendResponse.of(
-                confirmer,
-                sendResult.success(),
-                sendResult.bounceType() == null ? null : sendResult.bounceType().name()
-        );
+        return ConfirmerResendResponse.of(confirmer, true, null);
     }
 
     // "확인자 수정하기" - 이름/이메일 수정. 이메일이 바뀌면 재검증이 필요하므로 수락 이메일을 다시 보낸다
@@ -144,16 +137,11 @@ public class ConfirmerService {
         Confirmer confirmer = findOwnedConfirmer(planId, confirmId);
 
         boolean emailChanged = confirmer.updateContact(request.name(), request.email());
+        if (emailChanged) {
+            issueInviteAndSend(confirmer);
+        }
 
-        EmailSendResult sendResult = emailChanged
-                ? issueInviteAndSend(confirmer)
-                : null;
-
-        return ConfirmerUpdateResponse.of(
-                confirmer,
-                sendResult != null && sendResult.success(),
-                sendResult == null || sendResult.bounceType() == null ? null : sendResult.bounceType().name()
-        );
+        return ConfirmerUpdateResponse.of(confirmer, emailChanged, null);
     }
 
     private Confirmer findOwnedConfirmer(Long planId, Long confirmId) {

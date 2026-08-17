@@ -1,8 +1,6 @@
 package com.mamoki.ieojuda.domain.postaccess.service;
 
-import com.mamoki.ieojuda.domain.audit.entity.EmailLog;
 import com.mamoki.ieojuda.domain.audit.entity.EmailType;
-import com.mamoki.ieojuda.domain.audit.repository.EmailLogRepository;
 import com.mamoki.ieojuda.domain.postaccess.dto.OtpSendResponse;
 import com.mamoki.ieojuda.domain.postaccess.dto.OtpVerifyRequest;
 import com.mamoki.ieojuda.domain.postaccess.dto.OtpVerifyResponse;
@@ -13,8 +11,7 @@ import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStageStatus;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
-import com.mamoki.ieojuda.global.email.contract.EmailSendResult;
-import com.mamoki.ieojuda.global.email.sender.EmailSender;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.email.template.EmailBuilder;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.email.token.TokenValidator;
@@ -45,8 +42,7 @@ public class PosthumousAccessService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final AccessTokenRepository accessTokenRepository;
-    private final EmailLogRepository emailLogRepository;
-    private final EmailSender emailSender;
+    private final EmailOutboxService emailOutboxService;
     private final AppProperties appProperties;
     private final TokenLookupGuard tokenLookupGuard;
     private final PublicLinkAuditor publicLinkAuditor;
@@ -79,15 +75,9 @@ public class PosthumousAccessService {
                 otpExpiresAt.atZone(ZoneId.systemDefault()),
                 appProperties.getContactEmail()
         );
-        EmailSendResult result = emailSender.send(recipient.getEmail(), content);
-
-        emailLogRepository.save(EmailLog.builder()
-                .plan(accessToken.getHandoverStage().getPlan())
-                .handoverStage(accessToken.getHandoverStage())
-                .emailType(EmailType.OTP)
-                .recipientEmail(recipient.getEmail())
-                .messageId(result.messageId())
-                .build());
+        // 실제 SMTP 발송은 EmailOutboxScheduler가 담당한다 (issue #51 - 발송 실패가 성공으로 기록되지 않도록)
+        emailOutboxService.enqueue(accessToken.getHandoverStage().getPlan(), accessToken.getHandoverStage(),
+                EmailType.OTP, recipient.getEmail(), content);
 
         return new OtpSendResponse(
                 EmailMasker.mask(recipient.getEmail()),

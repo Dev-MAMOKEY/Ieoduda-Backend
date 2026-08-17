@@ -1,7 +1,7 @@
 package com.mamoki.ieojuda.domain.stage.service;
 
 import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
-import com.mamoki.ieojuda.domain.audit.repository.EmailLogRepository;
+import com.mamoki.ieojuda.domain.audit.entity.EmailType;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.entity.PlanVersion;
 import com.mamoki.ieojuda.domain.postaccess.entity.AccessToken;
@@ -14,9 +14,11 @@ import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCaseStatus;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStage;
+import com.mamoki.ieojuda.domain.stage.entity.HandoverStageStatus;
 import com.mamoki.ieojuda.domain.stage.repository.HandoverStageRepository;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.email.contract.EmailSendResult;
 import com.mamoki.ieojuda.global.email.sender.EmailSender;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
@@ -39,6 +41,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+// issue #51 - 핵심 버그 회귀 테스트: sendHandoffInvite는 더는 SMTP 결과와 무관하게 stage.send()나
+// "발송됨" 기록을 하지 않는다. 실제 발송(및 성공 시 stage.send())은 EmailOutboxScheduler만 담당한다.
 // issue #78 - HandoverStage.complete()가 정의만 되고 호출되지 않아 발송 체인이 1단계에서 멈추던 문제.
 // "전부 완료 -> 다음 단계 발송 -> 마지막이면 사건 완료", "BLOCKED는 다음 단계를 열지 않는다"를 검증한다.
 class HandoverStageServiceTest {
@@ -46,8 +50,7 @@ class HandoverStageServiceTest {
     private ReleaseCaseRepository releaseCaseRepository;
     private HandoverStageRepository handoverStageRepository;
     private RecipientRepository recipientRepository;
-    private EmailLogRepository emailLogRepository;
-    private EmailSender emailSender;
+    private EmailOutboxService emailOutboxService;
     private AppProperties appProperties;
     private PermissionGuard permissionGuard;
     private PackageActionCompletionRepository packageActionCompletionRepository;
@@ -62,8 +65,7 @@ class HandoverStageServiceTest {
         releaseCaseRepository = mock(ReleaseCaseRepository.class);
         handoverStageRepository = mock(HandoverStageRepository.class);
         recipientRepository = mock(RecipientRepository.class);
-        emailLogRepository = mock(EmailLogRepository.class);
-        emailSender = mock(EmailSender.class);
+        emailOutboxService = mock(EmailOutboxService.class);
         appProperties = mock(AppProperties.class);
         permissionGuard = mock(PermissionGuard.class);
         packageActionCompletionRepository = mock(PackageActionCompletionRepository.class);
@@ -75,8 +77,6 @@ class HandoverStageServiceTest {
         when(appProperties.getContactEmail()).thenReturn("support@ieoduda.example");
         when(appProperties.getInviteTokenTtlHours()).thenReturn(72L);
         when(appProperties.getBaseUrl()).thenReturn("https://ieoduda.example");
-        when(emailSender.send(anyString(), any())).thenReturn(EmailSendResult.success("msg-1"));
-        when(emailLogRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(handoverStageRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(accessTokenRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -118,13 +118,41 @@ class HandoverStageServiceTest {
     }
 
     @Test
+    void createStagesAndDispatchFirst_enqueuesEmail_andNeverMarksStageSentSynchronously() {
+        ReleaseCase localCase = mock(ReleaseCase.class);
+        Plan plan = mock(Plan.class);
+        when(localCase.getPlan()).thenReturn(plan);
+        Recipient recipient = mock(Recipient.class);
+        when(recipient.getEmail()).thenReturn("recipient@example.com");
+        when(recipient.getRoleType()).thenReturn(RoleType.FAMILY_MANAGER);
+
+        handoverStageService.createStagesAndDispatchFirst(localCase, List.of(recipient));
+
+        verify(recipient).issueInviteToken(anyString(), any());
+        verify(emailOutboxService).enqueue(
+                eq(plan), any(HandoverStage.class), eq(EmailType.POSTHUMOUS_HANDOFF_LINK),
+                eq("recipient@example.com"), any(EmailContent.class));
+        // 이 서비스는 발송 결과를 알 수 없으므로, 이 메서드가 끝난 뒤에도 단계는 여전히 PENDING이어야 한다
+        // (과거 버그: SMTP 성공 여부와 무관하게 여기서 바로 SENT/sentAt을 기록했음).
+        HandoverStage createdStage = captureCreatedStage();
+        assertThat(createdStage.getStatus()).isEqualTo(HandoverStageStatus.PENDING);
+        assertThat(createdStage.getSentAt()).isNull();
+    }
+
+    private HandoverStage captureCreatedStage() {
+        var captor = ArgumentCaptor.forClass(HandoverStage.class);
+        verify(emailOutboxService).enqueue(any(), captor.capture(), any(), anyString(), any());
+        return captor.getValue();
+    }
+
+    @Test
     void completeStageIfAllActionsDone_whenNotAllCompleted_doesNothing() {
         when(packageActionCompletionRepository.countByHandoverStage_StageId(1L)).thenReturn(1L);
 
         handoverStageService.completeStageIfAllActionsDone(1L, 3);
 
-        assertThat(currentStage.getStatus()).isNotEqualTo(com.mamoki.ieojuda.domain.stage.entity.HandoverStageStatus.COMPLETED);
-        verify(emailSender, never()).send(anyString(), any());
+        assertThat(currentStage.getStatus()).isNotEqualTo(HandoverStageStatus.COMPLETED);
+        verify(emailOutboxService, never()).enqueue(any(), any(), any(), anyString(), any());
     }
 
     @Test
@@ -141,13 +169,13 @@ class HandoverStageServiceTest {
 
         handoverStageService.completeStageIfAllActionsDone(1L, 2);
 
-        assertThat(currentStage.getStatus()).isEqualTo(com.mamoki.ieojuda.domain.stage.entity.HandoverStageStatus.COMPLETED);
-        assertThat(nextStage.getStatus()).isEqualTo(com.mamoki.ieojuda.domain.stage.entity.HandoverStageStatus.SENT);
+        assertThat(currentStage.getStatus()).isEqualTo(HandoverStageStatus.COMPLETED);
+        assertThat(nextStage.getStatus()).isEqualTo(HandoverStageStatus.PENDING); // 아직 발송은 워커가 처리 전
         assertThat(releaseCase.getStatus()).isNotEqualTo(ReleaseCaseStatus.COMPLETED);
 
         // issue #79 - 다음 단계로 자기 순서가 온 것뿐이니 대체 담당자 문구가 아니라 최초 발송 문구를 받아야 한다
         ArgumentCaptor<EmailContent> captor = ArgumentCaptor.forClass(EmailContent.class);
-        verify(emailSender).send(eq("next@test.com"), captor.capture());
+        verify(emailOutboxService).enqueue(any(), any(), any(), eq("next@test.com"), captor.capture());
         EmailContent content = captor.getValue();
         assertThat(content.body()).doesNotContain("대체 담당자로 지정되었습니다");
         assertThat(content.body()).contains("업무 담당자 역할로 전달드릴 내용이 있습니다");
@@ -164,10 +192,10 @@ class HandoverStageServiceTest {
 
         handoverStageService.completeStageIfAllActionsDone(1L, 1);
 
-        assertThat(currentStage.getStatus()).isEqualTo(com.mamoki.ieojuda.domain.stage.entity.HandoverStageStatus.COMPLETED);
+        assertThat(currentStage.getStatus()).isEqualTo(HandoverStageStatus.COMPLETED);
         assertThat(releaseCase.getStatus()).isEqualTo(ReleaseCaseStatus.COMPLETED);
         assertThat(releaseCase.getCompletedAt()).isNotNull();
-        verify(emailSender, never()).send(anyString(), any());
+        verify(emailOutboxService, never()).enqueue(any(), any(), any(), anyString(), any());
     }
 
     @Test
@@ -177,7 +205,7 @@ class HandoverStageServiceTest {
 
         handoverStageService.completeStageIfAllActionsDone(1L, 1);
 
-        verify(emailSender, never()).send(anyString(), any());
+        verify(emailOutboxService, never()).enqueue(any(), any(), any(), anyString(), any());
         verify(handoverStageRepository, never())
                 .findFirstByReleaseCase_CaseIdAndStageOrderGreaterThanOrderByStageOrderAsc(any(), any());
     }
@@ -190,8 +218,8 @@ class HandoverStageServiceTest {
 
         handoverStageService.completeStageIfAllActionsDone(1L, 1);
 
-        assertThat(currentStage.getStatus()).isEqualTo(com.mamoki.ieojuda.domain.stage.entity.HandoverStageStatus.BLOCKED);
-        verify(emailSender, never()).send(anyString(), any());
+        assertThat(currentStage.getStatus()).isEqualTo(HandoverStageStatus.BLOCKED);
+        verify(emailOutboxService, never()).enqueue(any(), any(), any(), anyString(), any());
         verify(handoverStageRepository, never())
                 .findFirstByReleaseCase_CaseIdAndStageOrderGreaterThanOrderByStageOrderAsc(any(), any());
     }
@@ -206,7 +234,7 @@ class HandoverStageServiceTest {
         handoverStageService.createStagesAndDispatchFirst(releaseCase, List.of(firstRecipient));
 
         ArgumentCaptor<EmailContent> captor = ArgumentCaptor.forClass(EmailContent.class);
-        verify(emailSender).send(eq("first@test.com"), captor.capture());
+        verify(emailOutboxService).enqueue(any(), any(), any(), eq("first@test.com"), captor.capture());
         EmailContent content = captor.getValue();
         assertThat(content.subject()).doesNotContain("대체 담당자");
         assertThat(content.body()).doesNotContain("이전 담당자가 응답하지 않아");
@@ -231,7 +259,7 @@ class HandoverStageServiceTest {
         handoverStageService.fallback(userId, caseId, stageId);
 
         ArgumentCaptor<EmailContent> captor = ArgumentCaptor.forClass(EmailContent.class);
-        verify(emailSender).send(eq("backup@test.com"), captor.capture());
+        verify(emailOutboxService).enqueue(any(), any(), any(), eq("backup@test.com"), captor.capture());
         EmailContent content = captor.getValue();
         assertThat(content.subject()).contains("대체 담당자");
         assertThat(content.body()).contains("이전 담당자가 응답하지 않아 대체 담당자로 지정되었습니다. 역할 수락 여부를 확인해 주세요.");

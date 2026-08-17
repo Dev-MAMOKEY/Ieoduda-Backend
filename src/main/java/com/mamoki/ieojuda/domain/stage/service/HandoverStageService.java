@@ -1,7 +1,6 @@
 package com.mamoki.ieojuda.domain.stage.service;
 
 import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
-import com.mamoki.ieojuda.domain.audit.entity.EmailLog;
 import com.mamoki.ieojuda.domain.audit.entity.EmailType;
 import com.mamoki.ieojuda.domain.audit.repository.EmailLogRepository;
 import com.mamoki.ieojuda.domain.postaccess.entity.AccessToken;
@@ -17,8 +16,7 @@ import com.mamoki.ieojuda.domain.stage.entity.HandoverStageStatus;
 import com.mamoki.ieojuda.domain.stage.repository.HandoverStageRepository;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
-import com.mamoki.ieojuda.global.email.contract.EmailSendResult;
-import com.mamoki.ieojuda.global.email.sender.EmailSender;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.email.template.EmailBuilder;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.exception.CustomException;
@@ -43,8 +41,7 @@ public class HandoverStageService {
     private final ReleaseCaseRepository releaseCaseRepository;
     private final HandoverStageRepository handoverStageRepository;
     private final RecipientRepository recipientRepository;
-    private final EmailLogRepository emailLogRepository;
-    private final EmailSender emailSender;
+    private final EmailOutboxService emailOutboxService;
     private final AppProperties appProperties;
     private final PermissionGuard permissionGuard;
     private final PackageActionCompletionRepository packageActionCompletionRepository;
@@ -172,16 +169,9 @@ public class HandoverStageService {
                         expiresAt.atZone(ZoneId.systemDefault()),
                         secureLink,
                         appProperties.getContactEmail());
-        EmailSendResult result = emailSender.send(recipient.getEmail(), content);
-
-        emailLogRepository.save(EmailLog.builder()
-                .plan(stage.getPlan())
-                .handoverStage(stage)
-                .emailType(EmailType.POSTHUMOUS_HANDOFF_LINK)
-                .recipientEmail(recipient.getEmail())
-                .messageId(result.messageId())
-                .build());
-        stage.send();
+        // 실제 SMTP 발송은 EmailOutboxScheduler가 담당한다. stage.send()/EmailLog 기록도
+        // 발송이 실제로 성공했을 때만 워커가 수행하므로, 여기서는 무조건 SENT로 기록되는 일이 없다.
+        emailOutboxService.enqueue(stage.getPlan(), stage, EmailType.POSTHUMOUS_HANDOFF_LINK, recipient.getEmail(), content);
     }
 
     private HandoverStage findStage(ReleaseCase releaseCase, Long stageId) {

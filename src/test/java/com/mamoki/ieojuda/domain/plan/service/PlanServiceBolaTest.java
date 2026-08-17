@@ -7,7 +7,7 @@ import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.entity.PlanStatus;
 import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.global.config.AppProperties;
-import com.mamoki.ieojuda.global.email.sender.EmailSender;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,19 +31,19 @@ class PlanServiceBolaTest {
 
     private PlanRepository planRepository;
     private DisputeContactRepository disputeContactRepository;
-    private EmailSender emailSender;
+    private EmailOutboxService emailOutboxService;
     private PlanService planService;
 
     @BeforeEach
     void setUp() {
         planRepository = mock(PlanRepository.class);
         disputeContactRepository = mock(DisputeContactRepository.class);
-        emailSender = mock(EmailSender.class);
+        emailOutboxService = mock(EmailOutboxService.class);
         planService = new PlanService(
                 planRepository,
                 new PlanOwnershipReader(planRepository),
                 disputeContactRepository,
-                emailSender,
+                emailOutboxService,
                 mock(AppProperties.class)
         );
         // 사용자 A의 계획만 존재한다 - 사용자 B(공격자)로 조회하면 항상 빈 Optional
@@ -86,7 +86,7 @@ class PlanServiceBolaTest {
                 ATTACKER_ID, PLAN_ID, new SelfWarningEmailRequest("attacker@example.com")))
                 .isInstanceOfSatisfying(CustomException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PLAN_NOT_FOUND));
-        verifyNoInteractions(emailSender);
+        verifyNoInteractions(emailOutboxService);
     }
 
     @Test
