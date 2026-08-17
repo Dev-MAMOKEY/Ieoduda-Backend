@@ -18,7 +18,7 @@ class EvidenceTest {
         Evidence evidence = Evidence.builder()
                 .confirmer(mock(Confirmer.class)).plan(mock(Plan.class)).releaseCase(mock(ReleaseCase.class))
                 .storageKey("evidence/1/proof.pdf").fileName("proof.pdf").mimeType("application/pdf")
-                .integrityHash("hash-abc").build();
+                .integrityHash("hash-abc").evidenceType(EvidenceType.DEATH_CERTIFICATE).build();
 
         evidence.approve();
 
@@ -30,7 +30,7 @@ class EvidenceTest {
         Evidence evidence = Evidence.builder()
                 .confirmer(mock(Confirmer.class)).plan(mock(Plan.class)).releaseCase(mock(ReleaseCase.class))
                 .storageKey("evidence/1/proof.pdf").fileName("proof.pdf").mimeType("application/pdf")
-                .integrityHash("hash-abc").build();
+                .integrityHash("hash-abc").evidenceType(EvidenceType.DEATH_CERTIFICATE).build();
         evidence.approve();
         evidence.markDeleteFailed("first attempt failed");
 

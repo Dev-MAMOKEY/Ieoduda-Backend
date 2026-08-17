@@ -4,6 +4,7 @@ import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
 import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
 import com.mamoki.ieojuda.domain.evidence.dto.EvidenceSubmitResponse;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
+import com.mamoki.ieojuda.domain.evidence.entity.EvidenceType;
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
@@ -58,7 +59,7 @@ public class EvidenceSubmitService {
     private final MalwareScanner malwareScanner;
 
     @Transactional
-    public EvidenceSubmitResponse submit(String plainToken, MultipartFile file, String idempotencyKey) {
+    public EvidenceSubmitResponse submit(String plainToken, MultipartFile file, EvidenceType evidenceType, String idempotencyKey) {
         Confirmer confirmer = findByToken(plainToken);
         if (confirmer.getAcceptanceStatus() != AcceptanceStatus.ACCEPTED) {
             publicLinkAuditor.recordStateFailure(ErrorCode.FORBIDDEN);
@@ -100,6 +101,7 @@ public class EvidenceSubmitService {
                 .fileName(file.getOriginalFilename())
                 .mimeType(inspection.mimeType())
                 .integrityHash(inspection.integrityHash())
+                .evidenceType(evidenceType)
                 .build());
 
         if (releaseCase.getStatus() == ReleaseCaseStatus.EVIDENCE_PENDING) {

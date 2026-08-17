@@ -7,6 +7,7 @@ import com.mamoki.ieojuda.domain.account.service.AuthService;
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
 import com.mamoki.ieojuda.domain.confirmer.entity.Relationship;
 import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
+import com.mamoki.ieojuda.domain.evidence.entity.EvidenceType;
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
 import com.mamoki.ieojuda.domain.evidence.service.EvidenceSubmitService;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
@@ -209,7 +210,7 @@ class IssueFiftySevenConcurrencyTest {
                                     "file", "proof-" + i + ".pdf", "application/pdf",
                                     "%PDF-1.4".getBytes(StandardCharsets.US_ASCII));
                             try {
-                                evidenceSubmitService.submit(plainToken, file, null);
+                                evidenceSubmitService.submit(plainToken, file, EvidenceType.DEATH_CERTIFICATE, null);
                                 return true;
                             } catch (CustomException e) {
                                 assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_SUBMISSION_INVALID);

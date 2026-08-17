@@ -6,6 +6,7 @@ import com.mamoki.ieojuda.domain.audit.service.AdminActionAuditService;
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
 import com.mamoki.ieojuda.domain.evidence.dto.EvidenceDeletionStatusResponse;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
+import com.mamoki.ieojuda.domain.evidence.entity.EvidenceType;
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
@@ -47,7 +48,7 @@ class EvidenceDeletionServiceTest {
         Evidence evidence = Evidence.builder()
                 .confirmer(mock(Confirmer.class)).plan(mock(Plan.class)).releaseCase(mock(ReleaseCase.class))
                 .storageKey("evidence/7/proof.pdf").fileName("proof.pdf").mimeType("application/pdf")
-                .integrityHash("hash-xyz").build();
+                .integrityHash("hash-xyz").evidenceType(EvidenceType.DEATH_CERTIFICATE).build();
         evidence.approve();
         evidence.markDeleted(); // 스케줄러가 실제로 지운 상황을 재현
         when(evidenceRepository.findById(7L)).thenReturn(Optional.of(evidence));
@@ -57,6 +58,8 @@ class EvidenceDeletionServiceTest {
         assertThat(response.deletedAt()).isNotNull();
         assertThat(response.integrityHash()).isEqualTo("hash-xyz");
         assertThat(response.overdue()).isFalse(); // 이미 삭제됐으므로 경보 대상 아님
+        // issue #88 완료 조건 - 원본 삭제 후에도 감사 기록에 증빙 종류가 남아야 한다
+        assertThat(response.evidenceType()).isEqualTo("DEATH_CERTIFICATE");
     }
 
     @Test
@@ -64,7 +67,7 @@ class EvidenceDeletionServiceTest {
         Evidence evidence = Evidence.builder()
                 .confirmer(mock(Confirmer.class)).plan(mock(Plan.class)).releaseCase(mock(ReleaseCase.class))
                 .storageKey("evidence/8/proof.pdf").fileName("proof.pdf").mimeType("application/pdf")
-                .integrityHash("hash-old").build();
+                .integrityHash("hash-old").evidenceType(EvidenceType.DEATH_CERTIFICATE).build();
         evidence.approve(); // deleteScheduledAt = 지금 + 30일... 이므로 아직 미래 - overdue 아님을 함께 확인
         when(evidenceRepository.findById(8L)).thenReturn(Optional.of(evidence));
 

@@ -7,6 +7,8 @@ import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCaseStatus;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
+import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
+import com.mamoki.ieojuda.domain.evidence.entity.EvidenceType;
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
@@ -19,6 +21,7 @@ import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
 import com.mamoki.ieojuda.global.storage.contract.StoredEvidence;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.nio.charset.StandardCharsets;
@@ -98,7 +101,7 @@ class EvidenceSubmitServiceTest {
         byte[] exeBytes = {'M', 'Z', (byte) 0x90, 0x00, 0x03, 0x00, 0x00, 0x00};
         MockMultipartFile file = new MockMultipartFile("file", "proof.pdf", "application/pdf", exeBytes);
 
-        assertThatThrownBy(() -> evidenceSubmitService.submit("token", file, null))
+        assertThatThrownBy(() -> evidenceSubmitService.submit("token", file, EvidenceType.DEATH_CERTIFICATE, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_SUBMISSION_INVALID));
         verify(evidenceStorageClient, never()).store(any(), any());
@@ -111,7 +114,7 @@ class EvidenceSubmitServiceTest {
         MockMultipartFile file = new MockMultipartFile("file", "proof.pdf", "application/pdf", pdfBytes);
         when(malwareScanner.scan(any())).thenReturn(ScanResult.infected("EICAR_TEST_SIGNATURE_DETECTED"));
 
-        assertThatThrownBy(() -> evidenceSubmitService.submit("token", file, null))
+        assertThatThrownBy(() -> evidenceSubmitService.submit("token", file, EvidenceType.DEATH_CERTIFICATE, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_SUBMISSION_INVALID));
         verify(evidenceStorageClient, never()).store(any(), any());
@@ -124,7 +127,7 @@ class EvidenceSubmitServiceTest {
         when(file.getOriginalFilename()).thenReturn("proof.pdf");
         when(file.getSize()).thenReturn(26L * 1024 * 1024);
 
-        assertThatThrownBy(() -> evidenceSubmitService.submit("token", file, null))
+        assertThatThrownBy(() -> evidenceSubmitService.submit("token", file, EvidenceType.DEATH_CERTIFICATE, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PAYLOAD_TOO_LARGE));
         verify(evidenceStorageClient, never()).store(any(), any());
@@ -137,10 +140,15 @@ class EvidenceSubmitServiceTest {
         when(malwareScanner.scan(any())).thenReturn(ScanResult.passed());
         when(evidenceStorageClient.store(eq(10L), any())).thenReturn(new StoredEvidence("evidence/10/uuid.pdf", pdfBytes.length));
 
-        evidenceSubmitService.submit("token", file, null);
+        evidenceSubmitService.submit("token", file, EvidenceType.DEATH_CERTIFICATE, null);
 
         verify(evidenceStorageClient).store(eq(10L), any());
         verify(releaseCase).startEvidenceReview();
+
+        // issue #88 완료 조건 - 제출한 증빙 종류가 실제로 저장되어야 한다
+        ArgumentCaptor<Evidence> captor = ArgumentCaptor.forClass(Evidence.class);
+        verify(evidenceRepository).save(captor.capture());
+        assertThat(captor.getValue().getEvidenceType()).isEqualTo(EvidenceType.DEATH_CERTIFICATE);
     }
 
     @Test
@@ -151,7 +159,7 @@ class EvidenceSubmitServiceTest {
         when(malwareScanner.scan(any())).thenReturn(ScanResult.passed());
         when(evidenceStorageClient.store(eq(10L), any())).thenReturn(new StoredEvidence("evidence/10/uuid.pdf", pdfBytes.length));
 
-        evidenceSubmitService.submit("token", file, null);
+        evidenceSubmitService.submit("token", file, EvidenceType.DEATH_CERTIFICATE, null);
 
         verify(releaseCase, never()).startEvidenceReview();
     }
