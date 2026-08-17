@@ -3,6 +3,8 @@ package com.mamoki.ieojuda.domain.plan.controller;
 import com.mamoki.ieojuda.domain.plan.dto.ItemReviewRequest;
 import com.mamoki.ieojuda.domain.plan.dto.ItemResponse;
 import com.mamoki.ieojuda.domain.plan.dto.ItemUpdateRequest;
+import com.mamoki.ieojuda.domain.plan.entity.DisclosureScope;
+import com.mamoki.ieojuda.domain.plan.entity.ItemStatus;
 import com.mamoki.ieojuda.domain.plan.service.ItemReviewService;
 import com.mamoki.ieojuda.global.rsdata.RsData;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,7 +21,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 // 명세서 "AI 구조화 결과 검토" 화면 - 항목 조회/승인/수정/삭제
 @Tag(name = "Item Review", description = "AI 구조화 결과 검토 - 항목 조회/승인/수정/삭제")
@@ -29,6 +34,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class ItemReviewController {
 
     private final ItemReviewService itemReviewService;
+
+    @Operation(summary = "항목 목록 조회", description = "계획에 쌓인 항목을 상태·공개 범위별로 필터링해 조회합니다. sortOrder 기준 정렬.")
+    @GetMapping
+    public ResponseEntity<RsData<List<ItemResponse>>> getItems(
+            @AuthenticationPrincipal Long userId,
+            @Parameter(description = "계획 ID") @PathVariable Long planId,
+            @Parameter(description = "검토 상태 필터") @RequestParam(required = false) ItemStatus status,
+            @Parameter(description = "공개 범위 필터", example = "FAMILY") @RequestParam(required = false) DisclosureScope disclosureScope
+    ) {
+        return ResponseEntity.ok(RsData.success(itemReviewService.getItems(userId, planId, status, disclosureScope)));
+    }
 
     @Operation(summary = "항목 단건 조회")
     @GetMapping("/{itemId}")
