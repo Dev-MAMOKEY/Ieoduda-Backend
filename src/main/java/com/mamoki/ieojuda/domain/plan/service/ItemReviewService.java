@@ -11,6 +11,7 @@ import com.mamoki.ieojuda.domain.plan.entity.ItemActionType;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
+import com.mamoki.ieojuda.global.validation.CredentialDetector;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +37,12 @@ public class ItemReviewService {
         // 명세서 예외 처리: 원문 근거 없는 항목은 승인할 수 없음
         if (item.getSourceExcerpt() == null || item.getSourceExcerpt().isBlank()) {
             throw new CustomException(ErrorCode.UNGROUNDED_ITEM_NOT_APPROVABLE);
+        }
+        // issue #91 3차 방어 - 대화 저장 시점 검증을 우회해 들어온(예: 인라인 수정) 자격증명도 승인 시점에 다시 막는다
+        if (CredentialDetector.containsCredential(item.getAction())
+                || CredentialDetector.containsCredential(item.getContent())
+                || CredentialDetector.containsCredential(item.getLocationType())) {
+            throw new CustomException(ErrorCode.SUSPECTED_CREDENTIAL_INPUT);
         }
         item.approve();
 
