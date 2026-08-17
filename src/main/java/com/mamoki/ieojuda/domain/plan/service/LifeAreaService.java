@@ -30,7 +30,7 @@ public class LifeAreaService {
 
     public List<LifeAreaResponse> getLifeAreas(UUID userId, UUID planId) {
         planOwnershipReader.findOwnedPlan(userId, planId);
-        List<Item> items = itemRepository.findByLifeArea_Plan_PlanIdOrderByItemIdAsc(planId);
+        List<Item> items = itemRepository.findByPlanIdAndFilters(planId, null, null);
 
         Map<LifeAreaCategory, List<Item>> itemsByCategory = items.stream()
                 .collect(Collectors.groupingBy(

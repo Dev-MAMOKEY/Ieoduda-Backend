@@ -45,7 +45,8 @@ public class SecurityConfig {
             "/api/recipient-acceptances/**",// 역할 담당자 수락
             "/api/confirmer-acceptances/**", // 지정확인자 수락 / 사망 신고
             "/api/posthumous-access/**", // 사후 인계 링크 검증 / OTP 발송·확인
-            "/api/posthumous-packages/**" // 역할별 사후 패키지 조회 / 행동 완료 / 문제 신고 (열람 세션이 곧 인증)
+            "/api/posthumous-packages/**", // 역할별 사후 패키지 조회 / 행동 완료 / 문제 신고 (열람 세션이 곧 인증)
+            "/api/handoff-checks/**" // 선택형 생전 인계 점검 - 담당자 응답 (발송은 /api/plans/{planId}/handoff-checks라 별도 경로)
     };
 
     // 로그인한 작성자 본인 - 자기 계획의 대기 상태 조회 / 취소 (ADMIN_ONLY_PATHS의 /api/release-cases/**보다
@@ -96,7 +97,8 @@ public class SecurityConfig {
                 new RateLimitRule("posthumous-package-issue", "/api/posthumous-packages/*/issues", "POST", 10, Duration.ofHours(1)),
                 new RateLimitRule("posthumous-package", "/api/posthumous-packages/**", null, 60, Duration.ofHours(1)),
                 new RateLimitRule("confirmer-link", "/api/confirmer-acceptances/**", null, 30, Duration.ofHours(1)),
-                new RateLimitRule("recipient-link", "/api/recipient-acceptances/**", null, 30, Duration.ofHours(1))
+                new RateLimitRule("recipient-link", "/api/recipient-acceptances/**", null, 30, Duration.ofHours(1)),
+                new RateLimitRule("handoff-check-link", "/api/handoff-checks/**", null, 30, Duration.ofHours(1))
         );
     }
 

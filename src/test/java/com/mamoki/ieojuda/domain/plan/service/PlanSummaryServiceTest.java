@@ -83,9 +83,11 @@ class PlanSummaryServiceTest {
         ));
 
         HandoffCheckAssigneeResponse acceptedAssignee =
-                new HandoffCheckAssigneeResponse(UUID.randomUUID(), "A", "FAMILY_MANAGER", true, true, "backup", true, null, true);
+                new HandoffCheckAssigneeResponse(UUID.randomUUID(), "A", "FAMILY_MANAGER", true, true, "backup", true, null, true,
+                        null, null, null, null, null, null);
         HandoffCheckAssigneeResponse pendingAssignee =
-                new HandoffCheckAssigneeResponse(UUID.randomUUID(), "B", "WORK_MANAGER", true, false, null, false, null, false);
+                new HandoffCheckAssigneeResponse(UUID.randomUUID(), "B", "WORK_MANAGER", true, false, null, false, null, false,
+                        null, null, null, null, null, null);
         HandoffCheckConfirmerResponse acceptedConfirmer =
                 new HandoffCheckConfirmerResponse(UUID.randomUUID(), "C", true, true, null, true);
         HandoffCheckConfirmerResponse pendingConfirmer =
