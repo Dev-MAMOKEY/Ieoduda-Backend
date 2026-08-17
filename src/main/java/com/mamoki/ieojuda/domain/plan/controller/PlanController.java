@@ -38,8 +38,11 @@ public class PlanController {
     private final PlanService planService;
     private final PlanSummaryService planSummaryService;
 
+    // issue #94 - 명세서 "계획 홈" 경로(GET /api/plans/current/summary)와 실제 구현(GET /api/plans/me)이
+    // 어긋나 있던 것을 명세서 경로로 정렬했다. 명세서의 "GET /api/release-cases/current"(사후 사건 상태)는
+    // 별도 엔드포인트가 아니라 이 응답의 releaseCase 필드로 흡수되어 있다(issue #84).
     @Operation(summary = "내 계획 조회", description = "로그인한 사용자의 계획 홈 요약을 조회합니다. 계획은 회원가입 시 자동으로 1개 생성되므로, planId를 아직 모를 때(로그인 직후 등) 사용합니다.")
-    @GetMapping("/me")
+    @GetMapping("/current/summary")
     public ResponseEntity<RsData<PlanSummaryResponse>> getMyPlan(@AuthenticationPrincipal UUID userId) {
         return ResponseEntity.ok(RsData.success(planSummaryService.getMySummary(userId)));
     }
