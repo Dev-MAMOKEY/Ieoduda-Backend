@@ -1,6 +1,7 @@
 package com.mamoki.ieojuda.domain.plan.controller;
 
 import com.mamoki.ieojuda.domain.plan.service.PlanService;
+import com.mamoki.ieojuda.domain.plan.service.PlanSummaryService;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
@@ -15,8 +16,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PlanControllerValidationTest {
 
     private final PlanService planService = mock(PlanService.class);
+    private final PlanSummaryService planSummaryService = mock(PlanSummaryService.class);
     private final MockMvc mockMvc = MockMvcBuilders
-            .standaloneSetup(new PlanController(planService))
+            .standaloneSetup(new PlanController(planService, planSummaryService))
             .build();
 
     @ParameterizedTest
