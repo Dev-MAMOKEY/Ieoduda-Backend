@@ -51,6 +51,10 @@ import java.util.Map;
 @Transactional(readOnly = true)
 public class ConversationService {
 
+    // issue #52 - 대화 세션 하나가 무한히 길어져 OpenAI 요청이 비대해지는 것을 막는 상한.
+    // 한 번의 발화 상한(4,000자)은 LifeAreaMessageRequest에서 검증한다.
+    private static final int MAX_HISTORY_LENGTH = 12_000;
+
     private final PlanOwnershipReader planOwnershipReader;
     private final ConversationRepository conversationRepository;
     private final LifeAreaMessageRepository lifeAreaMessageRepository;
@@ -96,6 +100,13 @@ public class ConversationService {
         // step 1. 이 세션 안에서 지금까지의 대화 이력 로드
         List<LifeAreaMessage> history = lifeAreaMessageRepository
                 .findByConversation_ConversationIdOrderByMessageIdAsc(conversation.getConversationId());
+
+        // issue #52 - 전체 이력 길이 상한. 이번 메세지를 저장하기 전에 확인해야
+        // "거절된 입력은 저장하지 않는다"는 원칙을 지킬 수 있다.
+        int historyLength = history.stream().mapToInt(message -> message.getContent().length()).sum();
+        if (historyLength + userContent.length() > MAX_HISTORY_LENGTH) {
+            throw new CustomException(ErrorCode.CONVERSATION_HISTORY_TOO_LONG);
+        }
 
         // step 2. 이번 사용자 메세지 저장
         LifeAreaMessage userMessage = lifeAreaMessageRepository.save(
@@ -222,12 +233,30 @@ public class ConversationService {
         };
     }
 
+    // issue #52 - "응답 JSON 구조를 서버에서 엄격히 검증". JSON 파싱 자체가 실패하는 경우뿐 아니라,
+    // 파싱은 됐지만 type이 QUESTION/RESULT가 아니거나 그에 맞는 필드(question/items)가 비어 있는 경우도
+    // AI_RESPONSE_INVALID로 통일해서 처리한다 - 이전에는 후자가 걸러지지 않고 question=null인 애매한
+    // 응답으로 그냥 통과했다.
     private AiTurnResult parseAiTurnResult(String rawContent) {
+        AiTurnResult turnResult;
         try {
-            return objectMapper.readValue(rawContent, AiTurnResult.class);
+            turnResult = objectMapper.readValue(rawContent, AiTurnResult.class);
         } catch (Exception e) {
-            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+            throw new CustomException(ErrorCode.AI_RESPONSE_INVALID);
         }
+
+        if ("QUESTION".equalsIgnoreCase(turnResult.type())) {
+            if (turnResult.question() == null || turnResult.question().isBlank()) {
+                throw new CustomException(ErrorCode.AI_RESPONSE_INVALID);
+            }
+        } else if ("RESULT".equalsIgnoreCase(turnResult.type())) {
+            if (turnResult.items() == null || turnResult.items().isEmpty()) {
+                throw new CustomException(ErrorCode.AI_RESPONSE_INVALID);
+            }
+        } else {
+            throw new CustomException(ErrorCode.AI_RESPONSE_INVALID);
+        }
+        return turnResult;
     }
 
     private String toOpenAiRole(MessageRole role) {
