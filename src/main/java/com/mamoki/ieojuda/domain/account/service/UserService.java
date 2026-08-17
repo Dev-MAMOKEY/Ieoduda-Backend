@@ -122,6 +122,10 @@ public class UserService {
         disputeContactRepository.findByPlan_PlanId(planId).forEach(DisputeContact::invalidateInviteToken);
     }
 
+    public UserResponse getMe(Long userId) {
+        return UserResponse.from(findUser(userId));
+    }
+
     // "사후 인계 안내" 화면 - 필수 동의 조회/기록. ConsentCheckFilter가 이 값으로 전체 API 접근을 막는다.
     public ConsentResponse getConsentStatus(Long userId) {
         return ConsentResponse.from(findUser(userId));
