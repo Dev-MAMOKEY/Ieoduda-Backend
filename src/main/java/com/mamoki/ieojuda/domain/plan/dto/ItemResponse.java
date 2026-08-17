@@ -1,11 +1,13 @@
 package com.mamoki.ieojuda.domain.plan.dto;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.plan.entity.Item;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 // AI가 만든(또는 사용자가 검토한) 항목 하나 - 대화 턴 응답, 구역별 목록, 검토/수정 응답에서 공통으로 사용
 public record ItemResponse(
-        @Schema(description = "항목 ID") Long itemId,
+        @Schema(description = "항목 ID") UUID itemId,
         @Schema(description = "이 항목의 대상 이름", example = "김민수") String targetName,
         @Schema(description = "자료/계정 위치 유형", example = "구글 클라우드 앨범") String locationType,
         @Schema(description = "수행해야 할 행동 전체 설명", example = "인스타그램 아이디 비밀번호를 통해 SNS 계정을 정리해줘") String action,

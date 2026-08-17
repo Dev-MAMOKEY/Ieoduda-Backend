@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.confirmer.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.confirmer.dto.DisputeContactRegisterRequest;
 import com.mamoki.ieojuda.domain.confirmer.dto.DisputeContactResponse;
 import com.mamoki.ieojuda.domain.confirmer.service.DisputeContactService;
@@ -30,8 +32,8 @@ public class DisputeContactController {
     @Operation(summary = "이의 제기 연락처 등록", description = "이의 제기 연락처를 등록하고 그 주소로 검증 메일을 발송합니다.")
     @PostMapping("/plans/{planId}/dispute-contacts")
     public ResponseEntity<RsData<DisputeContactResponse>> register(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "계획 ID") @PathVariable Long planId,
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "계획 ID") @PathVariable UUID planId,
             @Valid @RequestBody DisputeContactRegisterRequest request
     ) {
         return ResponseEntity.ok(RsData.success(disputeContactService.register(userId, planId, request)));
@@ -40,9 +42,9 @@ public class DisputeContactController {
     @Operation(summary = "이의 제기 연락처 수정", description = "이름/이메일을 수정합니다. 이메일이 바뀌면 검증 상태가 초기화되고 새 검증 메일이 발송됩니다.")
     @PutMapping("/plans/{planId}/dispute-contacts/{contactId}")
     public ResponseEntity<RsData<DisputeContactResponse>> update(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "계획 ID") @PathVariable Long planId,
-            @Parameter(description = "이의 제기 연락처 ID") @PathVariable Long contactId,
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "계획 ID") @PathVariable UUID planId,
+            @Parameter(description = "이의 제기 연락처 ID") @PathVariable UUID contactId,
             @Valid @RequestBody DisputeContactRegisterRequest request
     ) {
         return ResponseEntity.ok(RsData.success(disputeContactService.update(userId, planId, contactId, request)));
@@ -54,5 +56,14 @@ public class DisputeContactController {
     public ResponseEntity<RsData<Void>> verify(@Parameter(description = "검증 토큰") @PathVariable String token) {
         disputeContactService.verify(token);
         return ResponseEntity.ok(RsData.success(null));
+    }
+
+    @Operation(summary = "이의 제기 연락처 검증 메일 다시 보내기", description = "첫 검증 메일을 놓쳤을 때 새 검증 메일을 보냅니다. 이전 검증 링크는 무효화됩니다. 이미 검증이 완료된 연락처에는 보낼 수 없습니다.")
+    @PostMapping("/dispute-contacts/{contactId}/verification-email")
+    public ResponseEntity<RsData<DisputeContactResponse>> resendVerificationEmail(
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "이의 제기 연락처 ID") @PathVariable UUID contactId
+    ) {
+        return ResponseEntity.ok(RsData.success(disputeContactService.resendVerificationEmail(userId, contactId)));
     }
 }

@@ -27,6 +27,7 @@ import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.openai.component.OpenAIClient;
 import com.mamoki.ieojuda.global.openai.dto.OpenAIMessageDto;
 import com.mamoki.ieojuda.global.openai.dto.OpenAIResponse;
+import com.mamoki.ieojuda.global.validation.CredentialDetector;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -36,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.UUID;
 import java.util.List;
 import java.util.Map;
 
@@ -58,14 +60,14 @@ public class ConversationService {
 
     // 새 대화 세션 시작 - 처음 채팅을 시작할 때, 또는 나중에 수정하러 다시 들어올 때마다 호출
     @Transactional
-    public ConversationResponse startConversation(Long userId, Long planId) {
+    public ConversationResponse startConversation(UUID userId, UUID planId) {
         Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
         Conversation conversation = conversationRepository.save(Conversation.builder().plan(plan).build());
         return ConversationResponse.from(conversation);
     }
 
     // 대화 작성 화면 - 최신 턴부터 페이지 단위로 조회(무한 스크롤), 화면엔 오래된 순으로 뒤집어서 반환
-    public LifeAreaMessageHistoryResponse getHistory(Long userId, Long planId, Long conversationId, Pageable pageable) {
+    public LifeAreaMessageHistoryResponse getHistory(UUID userId, UUID planId, UUID conversationId, Pageable pageable) {
         Conversation conversation = findConversation(userId, planId, conversationId);
 
         Slice<LifeAreaMessage> slice = lifeAreaMessageRepository
@@ -81,9 +83,14 @@ public class ConversationService {
 
     // 대화 작성 화면 - 사용자 발화 전송 -> AI의 다음 턴(질문 또는 구조화 결과) 반환
     @Transactional
-    public LifeAreaTurnResponse sendMessage(Long userId, Long planId, Long conversationId, String userContent) {
+    public LifeAreaTurnResponse sendMessage(UUID userId, UUID planId, UUID conversationId, String userContent) {
         Conversation conversation = findConversation(userId, planId, conversationId);
         Plan plan = conversation.getPlan();
+
+        // issue #91 1차 방어 - 자격증명 의심 입력은 저장도, AI 전송도 하지 않는다 (명세서 "삶의 구역 작성" 예외 처리)
+        if (CredentialDetector.containsCredential(userContent)) {
+            throw new CustomException(ErrorCode.SUSPECTED_CREDENTIAL_INPUT);
+        }
 
         // step 1. 이 세션 안에서 지금까지의 대화 이력 로드
         List<LifeAreaMessage> history = lifeAreaMessageRepository
@@ -104,6 +111,13 @@ public class ConversationService {
             openAiHistory.add(new OpenAIMessageDto(toOpenAiRole(message.getRole()), message.getContent()));
         }
         openAiHistory.add(new OpenAIMessageDto(toOpenAiRole(MessageRole.USER), userMessage.getContent()));
+
+        // issue #91 2차 방어 - 1차 방어가 생기기 전에 저장된 과거 이력에 자격증명이 남아있을 가능성에 대비해
+        // OpenAI로 나가기 직전 전체 이력을 다시 검사한다. 여기서 걸리면 트랜잭션이 롤백되어 방금 저장한
+        // 사용자 메세지도 함께 취소된다.
+        if (openAiHistory.stream().anyMatch(message -> CredentialDetector.containsCredential(message.content()))) {
+            throw new CustomException(ErrorCode.SUSPECTED_CREDENTIAL_INPUT);
+        }
 
         // step 4. OpenAI 호출 - 계획 만들기 폼이 없어졌으므로 별도 seedContext 없이 대화 이력만으로 판단
         OpenAIResponse response = openAIClient.getChatCompletion(openAiHistory);
@@ -209,7 +223,7 @@ public class ConversationService {
         return role == MessageRole.ASSISTANT ? "assistant" : "user";
     }
 
-    private Conversation findConversation(Long userId, Long planId, Long conversationId) {
+    private Conversation findConversation(UUID userId, UUID planId, UUID conversationId) {
         planOwnershipReader.findOwnedPlan(userId, planId);
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CONVERSATION_NOT_FOUND));

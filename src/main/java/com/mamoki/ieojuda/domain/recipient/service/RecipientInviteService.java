@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.UUID;
 import java.util.List;
 
 // 명세서 "역할 수락 이메일/화면" - 담당자가 초대 링크로 진입해 역할을 확인하고 수락/거절 (로그인 불필요, 토큰이 곧 인증)
@@ -41,7 +42,7 @@ public class RecipientInviteService {
         Recipient recipient = findByToken(plainToken);
         checkNotExpired(recipient);
 
-        Long itemOwnerId = Boolean.TRUE.equals(recipient.getIsBackup()) && recipient.getBackupFor() != null
+        UUID itemOwnerId = Boolean.TRUE.equals(recipient.getIsBackup()) && recipient.getBackupFor() != null
                 ? recipient.getBackupFor().getAssigneeId()
                 : recipient.getAssigneeId();
         List<RecipientInviteTaskResponse> tasks = itemRepository.findByRecipient_AssigneeIdOrderByItemIdAsc(itemOwnerId).stream()

@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.account.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.account.entity.RefreshSession;
 import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.account.repository.RefreshSessionRepository;

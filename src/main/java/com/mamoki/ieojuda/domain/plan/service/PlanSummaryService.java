@@ -10,7 +10,7 @@ import com.mamoki.ieojuda.domain.plan.dto.PlanSummaryResponse;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.domain.releasecase.dto.ReleaseStatusResponse;
-import com.mamoki.ieojuda.domain.releasecase.service.ReleaseStatusService;
+import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 // 명세서 "계획 홈" 화면 - 프론트가 API 한 번으로 화면을 그릴 수 있도록 기존 서비스 4개의 조회 결과를 조합한다.
 // 새 쿼리를 추가하지 않고 LifeAreaService/ItemOrderService/HandoffCheckService/ReleaseStatusService를 그대로 재사용한다.
@@ -35,12 +36,12 @@ public class PlanSummaryService {
     private final LifeAreaService lifeAreaService;
     private final ItemOrderService itemOrderService;
     private final HandoffCheckService handoffCheckService;
-    private final ReleaseStatusService releaseStatusService;
+    private final ReleaseCaseRepository releaseCaseRepository;
 
-    public PlanSummaryResponse getMySummary(Long userId) {
+    public PlanSummaryResponse getMySummary(UUID userId) {
         Plan plan = planRepository.findByUser_UserId(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PLAN_NOT_FOUND));
-        Long planId = plan.getPlanId();
+        UUID planId = plan.getPlanId();
 
         var lifeAreas = lifeAreaService.getLifeAreas(userId, planId).stream()
                 .map(LifeAreaSummaryResponse::from)
@@ -60,7 +61,10 @@ public class PlanSummaryService {
         long unresolvedConflictCount = itemOrderService.getOrderCheck(userId, planId).items().stream()
                 .filter(OrderCheckItemResponse::conflict).count();
 
-        ReleaseStatusResponse releaseCase = releaseStatusService.getStatus(userId, planId);
+        // ReleaseStatusService는 caseId를 이미 아는 화면(사후 인계 대기 상태 조회/취소) 전용이라 planId만
+        // 가진 이 화면에서는 쓸 수 없다 - 저장소에서 최신 사건을 직접 찾아 같은 응답으로 감싼다.
+        ReleaseStatusResponse releaseCase = ReleaseStatusResponse.of(
+                releaseCaseRepository.findFirstByPlan_PlanIdOrderByCaseIdDesc(planId).orElse(null));
 
         return new PlanSummaryResponse(
                 plan.getPlanId(),

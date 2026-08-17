@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -73,8 +74,9 @@ class EvidenceDeletionSchedulerTest {
 
     @Test
     void deleteExpiredEvidences_whenStorageDeleteFails_marksFailedAndAudits() {
+        UUID evidenceId = UUID.randomUUID();
         Evidence evidence = mock(Evidence.class);
-        when(evidence.getEvidenceId()).thenReturn(5L);
+        when(evidence.getEvidenceId()).thenReturn(evidenceId);
         when(evidence.getStorageKey()).thenReturn("evidence/5/uuid.pdf");
         when(evidence.getDeleteScheduledAt()).thenReturn(LocalDateTime.now().minusDays(1));
         when(evidenceRepository.findDueForDeletionForUpdateSkipLocked(any())).thenReturn(List.of(evidence));
@@ -85,19 +87,19 @@ class EvidenceDeletionSchedulerTest {
 
         verify(evidence, never()).markDeleted();
         verify(evidence).markDeleteFailed(anyString());
-        verify(adminActionAuditService).recordSystem(eq(AdminActionType.EVIDENCE_DELETE), eq(5L), eq(false), anyString());
+        verify(adminActionAuditService).recordSystem(eq(AdminActionType.EVIDENCE_DELETE), eq(evidenceId), eq(false), anyString());
     }
 
     @Test
     void deleteExpiredEvidences_whenOneOfSeveralFails_theOthersStillGetDeleted() {
         Evidence failing = mock(Evidence.class);
-        when(failing.getEvidenceId()).thenReturn(1L);
+        when(failing.getEvidenceId()).thenReturn(UUID.randomUUID());
         when(failing.getStorageKey()).thenReturn("evidence/1/fail.pdf");
         when(failing.getDeleteScheduledAt()).thenReturn(LocalDateTime.now().minusDays(1));
         doThrow(new RuntimeException("boom")).when(evidenceStorageClient).delete("evidence/1/fail.pdf");
 
         Evidence succeeding = mock(Evidence.class);
-        when(succeeding.getEvidenceId()).thenReturn(2L);
+        when(succeeding.getEvidenceId()).thenReturn(UUID.randomUUID());
         when(succeeding.getStorageKey()).thenReturn("evidence/2/ok.pdf");
         when(succeeding.getDeleteScheduledAt()).thenReturn(LocalDateTime.now().minusDays(1));
 
@@ -114,8 +116,9 @@ class EvidenceDeletionSchedulerTest {
     // issue #80 완료 조건 - "30일 초과 미삭제 건이 경보로 감지된다"
     @Test
     void deleteExpiredEvidences_whenScheduledDatePlus30DaysHasPassed_logsSecurityAlert() {
+        UUID evidenceId = UUID.randomUUID();
         Evidence severelyOverdue = mock(Evidence.class);
-        when(severelyOverdue.getEvidenceId()).thenReturn(9L);
+        when(severelyOverdue.getEvidenceId()).thenReturn(evidenceId);
         when(severelyOverdue.getStorageKey()).thenReturn("evidence/9/old.pdf");
         when(severelyOverdue.getDeleteScheduledAt()).thenReturn(LocalDateTime.now().minusDays(31));
         when(evidenceRepository.findDueForDeletionForUpdateSkipLocked(any())).thenReturn(List.of(severelyOverdue));
@@ -124,13 +127,13 @@ class EvidenceDeletionSchedulerTest {
 
         assertThat(logs).anyMatch(event -> event.getLevel() == Level.ERROR
                 && event.getFormattedMessage().contains("[SECURITY ALERT]")
-                && event.getFormattedMessage().contains("evidenceId=9"));
+                && event.getFormattedMessage().contains("evidenceId=" + evidenceId));
     }
 
     @Test
     void deleteExpiredEvidences_whenWithinThirtyDayGracePeriod_doesNotLogSecurityAlert() {
         Evidence recentlyDue = mock(Evidence.class);
-        when(recentlyDue.getEvidenceId()).thenReturn(10L);
+        when(recentlyDue.getEvidenceId()).thenReturn(UUID.randomUUID());
         when(recentlyDue.getStorageKey()).thenReturn("evidence/10/recent.pdf");
         when(recentlyDue.getDeleteScheduledAt()).thenReturn(LocalDateTime.now().minusDays(10)); // 삭제 예정일은 지났지만 +30일 유예 안
         when(evidenceRepository.findDueForDeletionForUpdateSkipLocked(any())).thenReturn(List.of(recentlyDue));

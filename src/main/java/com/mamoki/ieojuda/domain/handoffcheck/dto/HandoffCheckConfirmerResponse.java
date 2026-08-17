@@ -1,12 +1,14 @@
 package com.mamoki.ieojuda.domain.handoffcheck.dto;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
 import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 // "선택형 생전 인계 점검" 화면 - 지정 확인자 한 명당 박스 하나
 public record HandoffCheckConfirmerResponse(
-        @Schema(description = "확인자 ID") Long confirmId,
+        @Schema(description = "확인자 ID") UUID confirmId,
         @Schema(description = "확인자 이름") String name,
         @Schema(description = "수락 요청 이메일 발송 완료 여부") boolean isEmailSent,
         @Schema(description = "역할 수락 완료 여부") boolean isRoleAccepted,

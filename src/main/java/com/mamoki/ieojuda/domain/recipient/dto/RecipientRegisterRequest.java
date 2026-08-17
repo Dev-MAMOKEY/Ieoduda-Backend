@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.recipient.dto;
 
+import java.util.UUID;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -9,7 +11,7 @@ import jakarta.validation.constraints.NotNull;
 // "AI 구조화 결과 검토"에서 승인된 항목 하나에 배정할 역할 담당자 입력
 public record RecipientRegisterRequest(
         @Schema(description = "담당자를 배정할 승인된 항목 ID", example = "1")
-        @NotNull(message = "항목을 선택해 주세요.") Long itemId,
+        @NotNull(message = "항목을 선택해 주세요.") UUID itemId,
 
         @Schema(description = "담당자 이름", example = "김민수")
         @NotBlank(message = "담당자 이름을 입력해 주세요.")

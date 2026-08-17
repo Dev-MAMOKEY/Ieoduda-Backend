@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.evidence.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
 import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.audit.entity.AdminActionType;
@@ -27,7 +29,7 @@ public class EvidenceDeletionService {
     private final PermissionGuard permissionGuard;
     private final AdminActionAuditService adminActionAuditService;
 
-    public EvidenceDeletionStatusResponse getStatus(Long userId, Long evidenceId) {
+    public EvidenceDeletionStatusResponse getStatus(UUID userId, UUID evidenceId) {
         permissionGuard.require(userId, AdminPermission.EVIDENCE_DELETE_RETRY);
         return EvidenceDeletionStatusResponse.from(findEvidence(evidenceId));
     }
@@ -35,7 +37,7 @@ public class EvidenceDeletionService {
     // "재처리 요청하기" - 자동 삭제가 실패한 증빙을 다시 삭제 시도. 사람 행위자가 있는 고위험
     // 조작인데 지금까지 감사 기록이 전혀 없었으므로 여기서 남긴다.
     @Transactional
-    public EvidenceDeletionStatusResponse retryDeletion(Long userId, Long evidenceId) {
+    public EvidenceDeletionStatusResponse retryDeletion(UUID userId, UUID evidenceId) {
         User actor = permissionGuard.require(userId, AdminPermission.EVIDENCE_DELETE_RETRY);
         Evidence evidence = findEvidence(evidenceId);
 
@@ -55,7 +57,7 @@ public class EvidenceDeletionService {
         return EvidenceDeletionStatusResponse.from(evidence);
     }
 
-    private Evidence findEvidence(Long evidenceId) {
+    private Evidence findEvidence(UUID evidenceId) {
         return evidenceRepository.findById(evidenceId)
                 .orElseThrow(() -> new CustomException(ErrorCode.EVIDENCE_NOT_FOUND));
     }

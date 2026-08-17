@@ -4,11 +4,12 @@ import com.mamoki.ieojuda.domain.releasecase.dto.ReleaseStatusResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
+import java.util.UUID;
 
 // "계획 홈" 화면 전체 - 프론트가 이 화면 하나를 그리는 데 필요한 정보를 한 번의 호출로 제공한다.
 // 종합 AI 준비도 점수는 명세서에서 "제공하지 않습니다"라고 명시했으므로 포함하지 않는다.
 public record PlanSummaryResponse(
-        @Schema(description = "계획 ID") Long planId,
+        @Schema(description = "계획 ID") UUID planId,
         @Schema(description = "계획 상태", example = "DRAFT", allowableValues = {"DRAFT", "SEALED", "DEACTIVATED"}) String status,
         @Schema(description = "작성자 이름") String userName,
         @Schema(description = "구역별 요약 (가족/관계 정리/업무 연속성)") List<LifeAreaSummaryResponse> lifeAreas,

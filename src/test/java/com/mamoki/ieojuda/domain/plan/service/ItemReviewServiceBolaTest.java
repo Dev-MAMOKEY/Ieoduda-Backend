@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.plan.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.plan.dto.ItemReviewRequest;
 import com.mamoki.ieojuda.domain.plan.dto.ItemResponse;
 import com.mamoki.ieojuda.domain.plan.dto.ItemUpdateRequest;
@@ -27,10 +29,10 @@ import static org.mockito.Mockito.when;
 // delete는 실제 삭제(파괴적)이므로, 거부됐을 때 itemRepository에 전혀 손대지 않는지가 특히 중요하다.
 class ItemReviewServiceBolaTest {
 
-    private static final Long OWNER_ID = 1L;
-    private static final Long ATTACKER_ID = 2L;
-    private static final Long PLAN_ID = 10L;
-    private static final Long ITEM_ID = 100L;
+    private static final UUID OWNER_ID = UUID.randomUUID();
+    private static final UUID ATTACKER_ID = UUID.randomUUID();
+    private static final UUID PLAN_ID = UUID.randomUUID();
+    private static final UUID ITEM_ID = UUID.randomUUID();
 
     private PlanRepository planRepository;
     private ItemRepository itemRepository;

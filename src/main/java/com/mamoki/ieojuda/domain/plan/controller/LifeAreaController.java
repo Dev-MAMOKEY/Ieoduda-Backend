@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.plan.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.plan.dto.LifeAreaResponse;
 import com.mamoki.ieojuda.domain.plan.service.LifeAreaService;
 import com.mamoki.ieojuda.global.rsdata.RsData;
@@ -30,8 +32,8 @@ public class LifeAreaController {
     @Operation(summary = "삶의 구역별 항목 조회", description = "가족/관계 정리/업무 연속성 3개 구역 각각에 지금까지 쌓인 항목 전체를 조회합니다.")
     @GetMapping
     public ResponseEntity<RsData<List<LifeAreaResponse>>> getLifeAreas(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "계획 ID") @PathVariable Long planId
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "계획 ID") @PathVariable UUID planId
     ) {
         return ResponseEntity.ok(RsData.success(lifeAreaService.getLifeAreas(userId, planId)));
     }

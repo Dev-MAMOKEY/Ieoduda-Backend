@@ -96,7 +96,7 @@ class InputLimitHttpIntegrationTest {
         }
 
         Flow.Publisher<? extends ByteBuffer> fixedLengthBody = body;
-        HttpRequest request = HttpRequest.newBuilder(uri("/api/confirmer-acceptances/test-token/evidences"))
+        HttpRequest request = HttpRequest.newBuilder(uri("/api/release-cases/" + java.util.UUID.randomUUID() + "/evidence/submit"))
                 .timeout(Duration.ofSeconds(60))
                 .header("Content-Type", "multipart/form-data; boundary=" + boundary)
                 .POST(HttpRequest.BodyPublishers.fromPublisher(fixedLengthBody, contentLength))

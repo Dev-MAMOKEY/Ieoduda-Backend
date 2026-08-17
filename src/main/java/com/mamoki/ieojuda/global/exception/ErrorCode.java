@@ -16,12 +16,13 @@ public enum ErrorCode {
     // 계획 / 삶의 구역 / AI 구조화 관련 예외 (400)
     INVALID_WAITING_PERIOD(HttpStatus.BAD_REQUEST, "INVALID_WAITING_PERIOD", "대기 기간은 7일 이상 30일 이하여야 합니다."),
     CONSENT_REQUIRED(HttpStatus.BAD_REQUEST, "CONSENT_REQUIRED", "사후 인계 조건과 안전 범위를 확인해 주세요."),
-    SUSPECTED_CREDENTIAL_INPUT(HttpStatus.BAD_REQUEST, "SUSPECTED_CREDENTIAL_INPUT", "비밀번호 등 자격증명으로 의심되는 내용은 저장할 수 없습니다."),
+    SUSPECTED_CREDENTIAL_INPUT(HttpStatus.BAD_REQUEST, "SUSPECTED_CREDENTIAL_INPUT", "비밀번호·PIN·OTP·복구 코드로 보이는 내용은 저장할 수 없습니다. 위치 유형만 적어 주세요."),
     UNGROUNDED_ITEM_NOT_APPROVABLE(HttpStatus.BAD_REQUEST, "UNGROUNDED_ITEM_NOT_APPROVABLE", "원문 근거가 없는 항목은 승인할 수 없습니다."),
     ITEM_NOT_APPROVED(HttpStatus.BAD_REQUEST, "ITEM_NOT_APPROVED", "승인되지 않은 항목에는 담당자를 등록할 수 없습니다."),
     PROHIBITED_ACTION_DETECTED(HttpStatus.BAD_REQUEST, "PROHIBITED_ACTION_DETECTED", "AI가 처리할 수 없는 금지 행동이 포함되어 있습니다."),
     PACKAGE_SEAL_BLOCKED(HttpStatus.BAD_REQUEST, "PACKAGE_SEAL_BLOCKED", "금지 정보나 근거 없는 항목이 있어 패키지를 봉인할 수 없습니다."),
     CIRCULAR_DEPENDENCY_DETECTED(HttpStatus.BAD_REQUEST, "CIRCULAR_DEPENDENCY_DETECTED", "발송 단계에 순환 의존 관계가 존재합니다."),
+    PLAN_NOT_SEALED(HttpStatus.BAD_REQUEST, "PLAN_NOT_SEALED", "봉인된 계획만 인계 점검을 보낼 수 있습니다."),
 
     // 담당자 / 확인자 / 이의 제기 연락처 관련 예외 (400)
     INSUFFICIENT_CONFIRMERS(HttpStatus.BAD_REQUEST, "INSUFFICIENT_CONFIRMERS", "수락을 완료한 지정 확인자가 2명 미만이라 계획을 봉인할 수 없습니다."),
@@ -91,6 +92,7 @@ public enum ErrorCode {
     BACKUP_RECIPIENT_EMAIL_DUPLICATED(HttpStatus.CONFLICT, "BACKUP_RECIPIENT_EMAIL_DUPLICATED", "대체 담당자 이메일은 주 담당자와 같을 수 없습니다."),
     RECIPIENT_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "RECIPIENT_RESEND_NOT_ALLOWED", "현재 수락 상태에서는 수락 요청을 다시 보낼 수 없습니다."),
     CONFIRMER_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "CONFIRMER_RESEND_NOT_ALLOWED", "현재 수락 상태에서는 수락 요청을 다시 보낼 수 없습니다."),
+    DISPUTE_CONTACT_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "DISPUTE_CONTACT_RESEND_NOT_ALLOWED", "이미 검증이 완료된 연락처에는 검증 메일을 다시 보낼 수 없습니다."),
     ITEM_ORDER_CONFLICT(HttpStatus.CONFLICT, "ITEM_ORDER_CONFLICT", "순서 충돌이 있어 확정할 수 없습니다."),
     PARTNER_NOT_ASSIGNED(HttpStatus.CONFLICT, "PARTNER_NOT_ASSIGNED", "이 사건에는 아직 담당 파트너사가 배정되지 않았습니다."),
     EVIDENCE_ALREADY_DELETED(HttpStatus.CONFLICT, "EVIDENCE_ALREADY_DELETED", "이미 삭제된 증빙입니다."),

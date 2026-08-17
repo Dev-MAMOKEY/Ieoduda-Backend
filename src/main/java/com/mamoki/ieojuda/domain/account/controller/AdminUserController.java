@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.account.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.account.service.AdminUserService;
 import com.mamoki.ieojuda.global.rsdata.RsData;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,7 +27,7 @@ public class AdminUserController {
     @Operation(summary = "계정 정지", description = "해당 계정의 모든 세션을 즉시 폐기하고 정지 상태로 전환합니다.")
     @PostMapping("/suspend")
     public ResponseEntity<RsData<Void>> suspend(
-            @Parameter(description = "사용자 ID") @PathVariable Long userId
+            @Parameter(description = "사용자 ID") @PathVariable UUID userId
     ) {
         adminUserService.suspend(userId);
         return ResponseEntity.ok(RsData.success(null));
@@ -34,7 +36,7 @@ public class AdminUserController {
     @Operation(summary = "계정 정지 해제")
     @PostMapping("/reactivate")
     public ResponseEntity<RsData<Void>> reactivate(
-            @Parameter(description = "사용자 ID") @PathVariable Long userId
+            @Parameter(description = "사용자 ID") @PathVariable UUID userId
     ) {
         adminUserService.reactivate(userId);
         return ResponseEntity.ok(RsData.success(null));

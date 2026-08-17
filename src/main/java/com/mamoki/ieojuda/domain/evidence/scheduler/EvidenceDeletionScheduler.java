@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 import java.util.List;
 
 // 명세서 "증빙 삭제 감사" 화면 - 검토 완료일 기준 30일이 지난 증빙 원본을 자동으로 삭제한다.

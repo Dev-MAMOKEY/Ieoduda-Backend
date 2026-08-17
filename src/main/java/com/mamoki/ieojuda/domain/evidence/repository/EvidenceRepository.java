@@ -6,15 +6,16 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 import java.util.List;
 
-public interface EvidenceRepository extends JpaRepository<Evidence, Long> {
+public interface EvidenceRepository extends JpaRepository<Evidence, UUID> {
 
     // "공식 증빙 자료 제출" 화면 - 사건당 최대 3개 제한 검증용
-    long countByReleaseCase_CaseId(Long caseId);
+    long countByReleaseCase_CaseId(UUID caseId);
 
     // 계정 삭제 시 이 계획에 제출된 증빙을 전부 지우기 위한 조회 (S3 원본도 같이 정리해야 함)
-    List<Evidence> findByPlan_PlanId(Long planId);
+    List<Evidence> findByPlan_PlanId(UUID planId);
 
     // "증빙 삭제 감사" 스케줄러 - 삭제 예정일이 지났고 아직 삭제되지 않은 증빙을 찾는다.
     // ReleaseCaseScheduler와 같은 이유로 FOR UPDATE SKIP LOCKED를 써서 다중 인스턴스가 같은 행을

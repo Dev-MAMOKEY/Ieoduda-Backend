@@ -1,11 +1,13 @@
 package com.mamoki.ieojuda.domain.plan.dto;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.plan.entity.Item;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 // 명세서 "역할별 패키지 미리보기" - 담당자 한 명이 받게 될 행동 하나
 public record PackageActionPreview(
-        @Schema(description = "항목 ID") Long itemId,
+        @Schema(description = "항목 ID") UUID itemId,
         @Schema(description = "대상 이름") String targetName,
         @Schema(description = "위치 유형") String locationType,
         @Schema(description = "수행해야 할 행동 전체 설명") String action,

@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.UUID;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
@@ -39,7 +40,7 @@ public class DisputeContactService {
     private final PublicLinkAuditor publicLinkAuditor;
 
     @Transactional
-    public DisputeContactResponse register(Long userId, Long planId, DisputeContactRegisterRequest request) {
+    public DisputeContactResponse register(UUID userId, UUID planId, DisputeContactRegisterRequest request) {
         Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
 
         DisputeContact contact = disputeContactRepository.save(DisputeContact.builder()
@@ -54,7 +55,7 @@ public class DisputeContactService {
 
     // "대기 이의제기 수정" 화면 - 이미 등록된 연락처의 이름/이메일 수정. 이메일이 바뀌면 검증을 다시 받아야 하므로 재발송한다.
     @Transactional
-    public DisputeContactResponse update(Long userId, Long planId, Long contactId, DisputeContactRegisterRequest request) {
+    public DisputeContactResponse update(UUID userId, UUID planId, UUID contactId, DisputeContactRegisterRequest request) {
         planOwnershipReader.findOwnedPlan(userId, planId);
         DisputeContact contact = findContact(planId, contactId);
         boolean emailChanged = !contact.getEmail().equals(request.email());
@@ -89,7 +90,25 @@ public class DisputeContactService {
         return true;
     }
 
-    private DisputeContact findContact(Long planId, Long contactId) {
+    // "대기 이의제기 설정" 화면 - 검증 메일을 놓쳤을 때 다시 보내기. Recipient/Confirmer의 재발송과 동일 패턴
+    // (플랫 경로 + 소유권은 plan.user로 직접 확인 - 노션 명세서가 /plans/{planId}/ 없이 /dispute-contacts/{id}/뿐이라 planId를 받지 않음)
+    @Transactional
+    public DisputeContactResponse resendVerificationEmail(UUID userId, UUID contactId) {
+        DisputeContact contact = disputeContactRepository.findById(contactId)
+                .orElseThrow(() -> new CustomException(ErrorCode.DISPUTE_CONTACT_NOT_FOUND));
+        if (!contact.getPlan().getUser().getUserId().equals(userId)) {
+            throw new CustomException(ErrorCode.DISPUTE_CONTACT_NOT_FOUND);
+        }
+        if (Boolean.TRUE.equals(contact.getIsVerified())) {
+            throw new CustomException(ErrorCode.DISPUTE_CONTACT_RESEND_NOT_ALLOWED);
+        }
+
+        // issueInviteToken()이 기존 토큰 해시를 덮어쓰므로, 이전 토큰은 더 이상 조회되지 않아 자동으로 무효화된다
+        boolean emailSent = issueTokenAndSendVerificationEmail(contact);
+        return DisputeContactResponse.of(contact, emailSent);
+    }
+
+    private DisputeContact findContact(UUID planId, UUID contactId) {
         DisputeContact contact = disputeContactRepository.findById(contactId)
                 .orElseThrow(() -> new CustomException(ErrorCode.DISPUTE_CONTACT_NOT_FOUND));
         if (!contact.getPlan().getPlanId().equals(planId)) {

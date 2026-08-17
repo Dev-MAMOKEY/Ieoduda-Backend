@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.evidence.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.evidence.dto.EvidenceDeletionStatusResponse;
 import com.mamoki.ieojuda.domain.evidence.service.EvidenceDeletionService;
 import com.mamoki.ieojuda.global.rsdata.RsData;
@@ -28,8 +30,8 @@ public class EvidenceDeletionController {
     @Operation(summary = "증빙 삭제 상태 조회", description = "검토완료일·삭제예정일·삭제상태·무결성해시·실패사유를 조회합니다.")
     @GetMapping("/deletion-status")
     public ResponseEntity<RsData<EvidenceDeletionStatusResponse>> getStatus(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "증빙 ID") @PathVariable Long evidenceId
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "증빙 ID") @PathVariable UUID evidenceId
     ) {
         return ResponseEntity.ok(RsData.success(evidenceDeletionService.getStatus(userId, evidenceId)));
     }
@@ -37,8 +39,8 @@ public class EvidenceDeletionController {
     @Operation(summary = "삭제 재처리 요청", description = "자동 삭제가 실패한 증빙을 다시 삭제 시도합니다.")
     @PostMapping("/deletion-retry")
     public ResponseEntity<RsData<EvidenceDeletionStatusResponse>> retryDeletion(
-            @AuthenticationPrincipal Long userId,
-            @Parameter(description = "증빙 ID") @PathVariable Long evidenceId
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "증빙 ID") @PathVariable UUID evidenceId
     ) {
         return ResponseEntity.ok(RsData.success(evidenceDeletionService.retryDeletion(userId, evidenceId)));
     }

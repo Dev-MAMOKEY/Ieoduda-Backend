@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
 import java.time.LocalDateTime;
 
 // issue #62 - 테이블명 오탈자(role_assigness) 정리. 수동 마이그레이션(ALTER TABLE ... RENAME)으로
@@ -20,9 +21,9 @@ import java.time.LocalDateTime;
 public class Recipient {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "assignee_id")
-    private Long assigneeId;
+    private UUID assigneeId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "plan_id", nullable = false)

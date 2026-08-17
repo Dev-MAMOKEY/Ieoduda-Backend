@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.recipient.controller;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientBulkRegisterRequest;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientBulkRegisterResponse;
 import com.mamoki.ieojuda.domain.recipient.dto.RecipientDetailResponse;
@@ -34,8 +36,8 @@ public class RecipientController {
     @Operation(summary = "역할 담당자 일괄 등록", description = "승인된 항목 개수만큼 담당자 정보를 한 번에 등록하고, 등록 즉시 역할 수락 이메일을 발송합니다. 각 담당자는 대체 담당자(backup)를 선택적으로 1명 함께 등록할 수 있으며, 등록 시 대체 담당자에게도 수락 이메일이 발송됩니다. 일부 발송이 실패해도 담당자 저장은 유지되며 건별 발송 결과가 응답에 담깁니다.")
     @PostMapping
     public ResponseEntity<RsData<RecipientBulkRegisterResponse>> registerAll(
-            @AuthenticationPrincipal Long userId, // 현재 로그인한 사용자 ID 식별
-            @Parameter(description = "계획 ID") @PathVariable Long planId,
+            @AuthenticationPrincipal UUID userId, // 현재 로그인한 사용자 ID 식별
+            @Parameter(description = "계획 ID") @PathVariable UUID planId,
             @Valid @RequestBody RecipientBulkRegisterRequest request
     ) {
         RecipientBulkRegisterResponse result = recipientService.registerAll(userId, planId, request);
@@ -46,9 +48,9 @@ public class RecipientController {
     @Operation(summary = "역할 담당자 상세 조회", description = "이름 클릭 시 해당 담당자에게 배정된 항목 전체(제목/내용/행동 등)를 조회합니다.")
     @GetMapping("/{assigneeId}")
     public ResponseEntity<RsData<RecipientDetailResponse>> getRecipient(
-            @AuthenticationPrincipal Long userId, // 현재 로그인한 사용자 ID 식별
-            @Parameter(description = "계획 ID") @PathVariable Long planId,
-            @Parameter(description = "담당자 ID") @PathVariable Long assigneeId
+            @AuthenticationPrincipal UUID userId, // 현재 로그인한 사용자 ID 식별
+            @Parameter(description = "계획 ID") @PathVariable UUID planId,
+            @Parameter(description = "담당자 ID") @PathVariable UUID assigneeId
     ) {
         RecipientDetailResponse result = recipientService.getRecipient(userId, planId, assigneeId);
         return ResponseEntity.ok(RsData.success(result));
@@ -58,9 +60,9 @@ public class RecipientController {
     @Operation(summary = "역할 담당자 수정", description = "담당자 이름/이메일을 수정합니다. 이메일이 바뀌면 수락 상태가 초기화되고 새 수락 이메일이 발송됩니다.")
     @PutMapping("/{assigneeId}")
     public ResponseEntity<RsData<RecipientUpdateResponse>> updateRecipient(
-            @AuthenticationPrincipal Long userId, // 현재 로그인한 사용자 ID 식별
-            @Parameter(description = "계획 ID") @PathVariable Long planId,
-            @Parameter(description = "담당자 ID") @PathVariable Long assigneeId,
+            @AuthenticationPrincipal UUID userId, // 현재 로그인한 사용자 ID 식별
+            @Parameter(description = "계획 ID") @PathVariable UUID planId,
+            @Parameter(description = "담당자 ID") @PathVariable UUID assigneeId,
             @Valid @RequestBody RecipientUpdateRequest request
     ) {
         RecipientUpdateResponse result = recipientService.updateRecipient(userId, planId, assigneeId, request);

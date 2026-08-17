@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.account.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.account.repository.UserRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
@@ -19,19 +21,19 @@ public class AdminUserService {
     private final SessionRevocationService sessionRevocationService;
 
     @Transactional
-    public void suspend(Long userId) {
+    public void suspend(UUID userId) {
         User user = findUser(userId);
         user.suspend();
         sessionRevocationService.revokeAllSessions(user);
     }
 
     @Transactional
-    public void reactivate(Long userId) {
+    public void reactivate(UUID userId) {
         User user = findUser(userId);
         user.reactivate();
     }
 
-    private User findUser(Long userId) {
+    private User findUser(UUID userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
     }

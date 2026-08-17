@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.UUID;
 import java.util.List;
 import java.util.Objects;
 
@@ -54,7 +55,7 @@ public class ReleaseCaseScheduler {
 
         PlanSnapshotDto snapshot = planSnapshotService.deserialize(releaseCase.getPlanVersion().getSnapshotData());
 
-        List<Long> orderedRecipientIds = snapshot.items().stream()
+        List<UUID> orderedRecipientIds = snapshot.items().stream()
                 .filter(item -> item.recipientId() != null)
                 .sorted(Comparator.comparing(PlanSnapshotDto.ItemSnapshot::sortOrder))
                 .map(PlanSnapshotDto.ItemSnapshot::recipientId)

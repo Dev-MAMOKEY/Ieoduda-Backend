@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -65,7 +66,7 @@ class EvidenceOrphanCleanupSchedulerTest {
     @Test
     void cleanupOrphans_whenStorageDeleteFails_marksFailedAndAudits() {
         EvidenceOrphanCleanup cleanup = mock(EvidenceOrphanCleanup.class);
-        when(cleanup.getCleanupId()).thenReturn(5L);
+        when(cleanup.getCleanupId()).thenReturn(UUID.randomUUID());
         when(cleanup.getStorageKey()).thenReturn("evidence/5/uuid.pdf");
         when(evidenceOrphanCleanupRepository.findPendingForUpdateSkipLocked()).thenReturn(List.of(cleanup));
         doThrow(new CustomException(ErrorCode.EVIDENCE_STORAGE_FAILED))
@@ -76,18 +77,18 @@ class EvidenceOrphanCleanupSchedulerTest {
         verify(cleanup, never()).markDeleted();
         verify(cleanup).markDeleteFailed(anyString());
         verify(adminActionAuditService)
-                .recordSystem(eq(AdminActionType.EVIDENCE_ORPHAN_CLEANUP), eq(5L), eq(false), anyString());
+                .recordSystem(eq(AdminActionType.EVIDENCE_ORPHAN_CLEANUP), any(UUID.class), eq(false), anyString());
     }
 
     @Test
     void cleanupOrphans_whenOneOfSeveralFails_theOthersStillGetDeleted() {
         EvidenceOrphanCleanup failing = mock(EvidenceOrphanCleanup.class);
-        when(failing.getCleanupId()).thenReturn(1L);
+        when(failing.getCleanupId()).thenReturn(UUID.randomUUID());
         when(failing.getStorageKey()).thenReturn("evidence/1/fail.pdf");
         doThrow(new RuntimeException("boom")).when(evidenceStorageClient).delete("evidence/1/fail.pdf");
 
         EvidenceOrphanCleanup succeeding = mock(EvidenceOrphanCleanup.class);
-        when(succeeding.getCleanupId()).thenReturn(2L);
+        when(succeeding.getCleanupId()).thenReturn(UUID.randomUUID());
         when(succeeding.getStorageKey()).thenReturn("evidence/2/ok.pdf");
 
         when(evidenceOrphanCleanupRepository.findPendingForUpdateSkipLocked())

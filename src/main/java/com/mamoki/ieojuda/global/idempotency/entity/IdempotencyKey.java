@@ -12,6 +12,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
 import java.time.LocalDateTime;
 
 // 클라이언트가 보낸 Idempotency-Key를 (요청 종류, 키 값) 조합으로 선점하는 마커.
@@ -23,9 +24,9 @@ import java.time.LocalDateTime;
 public class IdempotencyKey {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "idempotency_key_id")
-    private Long idempotencyKeyId;
+    private UUID idempotencyKeyId;
 
     @Column(name = "scope", length = 100, nullable = false)
     private String scope;

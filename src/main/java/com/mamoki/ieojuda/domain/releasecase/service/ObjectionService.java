@@ -1,5 +1,7 @@
 package com.mamoki.ieojuda.domain.releasecase.service;
 
+import java.util.UUID;
+
 import com.mamoki.ieojuda.domain.confirmer.entity.DisputeContact;
 import com.mamoki.ieojuda.domain.confirmer.repository.DisputeContactRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
@@ -33,18 +35,25 @@ public class ObjectionService {
     // 이메일 검증까지 마친 연락처는, 이후 언제든 이 토큰으로 다시 접근해 이의를 제기할 수 있는 개인 접근키를 겸한다
     // (검증 자체에 쓰인 만료시각은 "검증 대기" 창구용이라 여기서는 별도로 검사하지 않는다)
     @Transactional
-    public ObjectionResponse raise(String plainToken, ObjectionRequest request) {
-        DisputeContact contact = tokenLookupGuard.resolve(plainToken,
-                () -> disputeContactRepository.findByInviteToken(TokenProvider.hashToken(plainToken)));
+    public ObjectionResponse raise(UUID caseId, ObjectionRequest request) {
+        DisputeContact contact = tokenLookupGuard.resolve(request.token(),
+                () -> disputeContactRepository.findByInviteToken(TokenProvider.hashToken(request.token())));
 
         if (!Boolean.TRUE.equals(contact.getIsVerified())) {
             publicLinkAuditor.recordStateFailure(ErrorCode.DISPUTE_CONTACT_NOT_VERIFIED);
             throw new CustomException(ErrorCode.DISPUTE_CONTACT_NOT_VERIFIED);
         }
 
-        Plan plan = contact.getPlan();
-        ReleaseCase releaseCase = releaseCaseRepository.findFirstByPlan_PlanIdOrderByCaseIdDesc(plan.getPlanId())
+        ReleaseCase releaseCase = releaseCaseRepository.findById(caseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RELEASE_CASE_NOT_FOUND));
+
+        Plan plan = contact.getPlan();
+        // URL의 caseId가 토큰이 가리키는 이의 제기 연락처의 사건과 실제로 같은지 검증 - 토큰은 유효하지만
+        // 다른 사건의 caseId를 끼워 넣는 시도를 막는다.
+        if (!releaseCase.getPlan().getPlanId().equals(plan.getPlanId())) {
+            publicLinkAuditor.recordStateFailure(ErrorCode.FORBIDDEN);
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
 
         Objection objection = objectionRepository.save(Objection.builder()
                 .plan(plan)
