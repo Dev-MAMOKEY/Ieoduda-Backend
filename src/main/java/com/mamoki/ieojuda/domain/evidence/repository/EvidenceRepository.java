@@ -2,7 +2,10 @@ package com.mamoki.ieojuda.domain.evidence.repository;
 
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface EvidenceRepository extends JpaRepository<Evidence, Long> {
@@ -12,4 +15,14 @@ public interface EvidenceRepository extends JpaRepository<Evidence, Long> {
 
     // 계정 삭제 시 이 계획에 제출된 증빙을 전부 지우기 위한 조회 (S3 원본도 같이 정리해야 함)
     List<Evidence> findByPlan_PlanId(Long planId);
+
+    // "증빙 삭제 감사" 스케줄러 - 삭제 예정일이 지났고 아직 삭제되지 않은 증빙을 찾는다.
+    // ReleaseCaseScheduler와 같은 이유로 FOR UPDATE SKIP LOCKED를 써서 다중 인스턴스가 같은 행을
+    // 중복 처리하지 않게 하고, LIMIT으로 한 배치가 잡는 행 잠금 개수를 제한한다(다음 주기에 이어서 처리).
+    @Query(value = "SELECT * FROM evidences " +
+            "WHERE deleted_at IS NULL AND delete_scheduled_at IS NOT NULL AND delete_scheduled_at <= :now " +
+            "ORDER BY delete_scheduled_at " +
+            "LIMIT 100 " +
+            "FOR UPDATE SKIP LOCKED", nativeQuery = true)
+    List<Evidence> findDueForDeletionForUpdateSkipLocked(@Param("now") LocalDateTime now);
 }

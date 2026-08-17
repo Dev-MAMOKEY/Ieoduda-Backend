@@ -23,6 +23,7 @@ import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -160,5 +161,38 @@ class PartnerReviewServiceTest {
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INSUFFICIENT_PERMISSION));
         verify(evidenceRepository, never()).findById(any());
+    }
+
+    // 원본이 이미 삭제된 증빙은 세 경로(조회/다운로드/판정) 모두 차단되어야 한다 -
+    // 특히 판정을 막지 못하면 존재하지 않는 파일을 승인/반려하는 정합성 결함이 생긴다.
+    @Test
+    void getReview_whenEvidenceAlreadyDeleted_isBlocked() {
+        when(evidence.getDeletedAt()).thenReturn(LocalDateTime.now());
+
+        assertThatThrownBy(() -> partnerReviewService.getReview(USER_ID, REVIEW_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_ALREADY_DELETED));
+    }
+
+    @Test
+    void getFile_whenEvidenceAlreadyDeleted_isBlocked() {
+        when(evidence.getDeletedAt()).thenReturn(LocalDateTime.now());
+
+        assertThatThrownBy(() -> partnerReviewService.getFile(USER_ID, REVIEW_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_ALREADY_DELETED));
+        verify(evidenceStorageClient, never()).load(any());
+    }
+
+    @Test
+    void decide_whenEvidenceAlreadyDeleted_isBlocked() {
+        when(evidence.getDeletedAt()).thenReturn(LocalDateTime.now());
+        PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
+                PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "pw");
+
+        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_ALREADY_DELETED));
+        verify(evidence, never()).approve();
     }
 }
