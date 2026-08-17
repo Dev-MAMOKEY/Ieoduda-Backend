@@ -42,7 +42,9 @@ public class SecurityConfig {
             "/api/dispute-contacts/*/verify",
             "/api/dispute-contacts/*/objections", // 이의 제기 접수
             "/api/recipient-acceptances/**",// 역할 담당자 수락
-            "/api/confirmer-acceptances/**" // 지정확인자 수락 / 사망 신고 / 증빙 제출
+            "/api/confirmer-acceptances/**", // 지정확인자 수락 / 사망 신고 / 증빙 제출
+            "/api/posthumous-access/**", // 사후 인계 링크 검증 / OTP 발송·확인
+            "/api/posthumous-packages/**" // 역할별 사후 패키지 조회 / 행동 완료 / 문제 신고 (열람 세션이 곧 인증)
     };
 
     // 운영관리자 전용 - 이메일 발송 감사/재시도/사건 동결/단계 조회·대체담당자 전환
@@ -78,6 +80,12 @@ public class SecurityConfig {
                 new RateLimitRule("objection", "/api/dispute-contacts/*/objections", "POST", 10, Duration.ofHours(1)),
                 new RateLimitRule("dispute-verify", "/api/dispute-contacts/*/verify", null, 20, Duration.ofHours(1)),
                 new RateLimitRule("self-warning-email", "/api/self-warning-email/**", null, 20, Duration.ofHours(1)),
+                new RateLimitRule("posthumous-otp", "/api/posthumous-access/*/otp", "POST", 5, Duration.ofHours(1)),
+                new RateLimitRule("posthumous-verify", "/api/posthumous-access/*/verify", "POST", 10, Duration.ofHours(1)),
+                new RateLimitRule("posthumous-link", "/api/posthumous-access/**", null, 30, Duration.ofHours(1)),
+                new RateLimitRule("posthumous-package-complete", "/api/posthumous-packages/*/actions/*/complete", "POST", 20, Duration.ofHours(1)),
+                new RateLimitRule("posthumous-package-issue", "/api/posthumous-packages/*/issues", "POST", 10, Duration.ofHours(1)),
+                new RateLimitRule("posthumous-package", "/api/posthumous-packages/**", null, 60, Duration.ofHours(1)),
                 new RateLimitRule("confirmer-link", "/api/confirmer-acceptances/**", null, 30, Duration.ofHours(1)),
                 new RateLimitRule("recipient-link", "/api/recipient-acceptances/**", null, 30, Duration.ofHours(1))
         );

@@ -27,6 +27,10 @@ public class EvidenceDeletionScheduler {
     private final EvidenceStorageClient evidenceStorageClient;
     private final AdminActionAuditService adminActionAuditService;
 
+    // issue #80 - 삭제 예정일을 30일 넘게 초과한 건은 반복 삭제 실패를 뜻한다 - 재시도와 별개로
+    // 운영자가 알아챌 수 있도록 보안 경보를 남긴다.
+    private static final int SECURITY_ALERT_GRACE_DAYS = 30;
+
     // 10분마다 - 대기기간이 일 단위인 도메인 특성상 촘촘한 주기가 필요하지 않음
     @Scheduled(fixedRate = 600_000)
     @Transactional
@@ -34,7 +38,17 @@ public class EvidenceDeletionScheduler {
         List<Evidence> dueEvidences = evidenceRepository.findDueForDeletionForUpdateSkipLocked(LocalDateTime.now());
 
         for (Evidence evidence : dueEvidences) {
+            alertIfSeverelyOverdue(evidence);
             deleteOne(evidence);
+        }
+    }
+
+    // 삭제 예정일(deleteScheduledAt) 기준으로 다시 30일이 더 지났는데도 아직 삭제되지 않았다면
+    // (반복 삭제 실패가 누적된 상태) 매 주기 경보를 남긴다.
+    private void alertIfSeverelyOverdue(Evidence evidence) {
+        if (evidence.getDeleteScheduledAt().plusDays(SECURITY_ALERT_GRACE_DAYS).isBefore(LocalDateTime.now())) {
+            log.error("[SECURITY ALERT] 증빙 원본 미삭제 30일 초과. evidenceId={}, deleteScheduledAt={}",
+                    evidence.getEvidenceId(), evidence.getDeleteScheduledAt());
         }
     }
 

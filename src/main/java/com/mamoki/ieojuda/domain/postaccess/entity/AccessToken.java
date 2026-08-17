@@ -15,6 +15,10 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class AccessToken {
 
+    // OTP 인증 성공 후 열람 세션이 유효한 시간(분) - PosthumousAccessService(#76)와
+    // PosthumousPackageService(#77)가 세션 만료 판단 기준으로 함께 참조한다.
+    public static final int SESSION_TTL_MINUTES = 60;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "token_id")
@@ -54,5 +58,28 @@ public class AccessToken {
         this.used = false;
     }
 
+    // OTP 코드 발송 - 코드 해시와 발송 시각 갱신 (재발송 시에도 동일하게 덮어씀)
+    public void recordOtpSend(String otpCodeHash) {
+        this.otpCodeHash = otpCodeHash;
+        this.otpSentAt = LocalDateTime.now();
+    }
 
+    // OTP 검증 실패 1회 기록, 갱신된 시도 횟수를 반환
+    public int incrementAttempt() {
+        this.attemptCount = this.attemptCount + 1;
+        return this.attemptCount;
+    }
+
+    // OTP 검증 성공 - 링크 자체는 1회성으로 소진 처리(재검증·재조회 차단). 새 컬럼 없이 기존 필드만 사용:
+    // 같은 원본 토큰이 곧 열람 세션 식별자로도 쓰이고, verifiedAt이 세션 시작 시각(만료 판단 기준)이 된다.
+    public void verify() {
+        this.verifiedAt = LocalDateTime.now();
+        this.used = true;
+    }
+
+    // 역할별 사후 패키지 조회(#77)에서 쓰는 세션 유효성 판단 - OTP 인증을 통과했고(verifiedAt 존재)
+    // 세션 유효 시간(60분) 이내인지 확인한다.
+    public boolean isSessionValid(LocalDateTime now) {
+        return verifiedAt != null && verifiedAt.plusMinutes(SESSION_TTL_MINUTES).isAfter(now);
+    }
 }
