@@ -42,6 +42,7 @@ class DeathReportServiceTest {
     private DeathReportService deathReportService;
 
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
         confirmerRepository = mock(ConfirmerRepository.class);
         releaseCaseRepository = mock(ReleaseCaseRepository.class);

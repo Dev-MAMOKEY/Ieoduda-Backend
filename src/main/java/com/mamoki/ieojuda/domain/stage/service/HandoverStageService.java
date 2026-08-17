@@ -1,5 +1,6 @@
 package com.mamoki.ieojuda.domain.stage.service;
 
+import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
 import com.mamoki.ieojuda.domain.audit.entity.EmailLog;
 import com.mamoki.ieojuda.domain.audit.entity.EmailType;
 import com.mamoki.ieojuda.domain.audit.repository.EmailLogRepository;
@@ -18,6 +19,7 @@ import com.mamoki.ieojuda.global.email.template.EmailBuilder;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
+import com.mamoki.ieojuda.global.security.PermissionGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 // 명세서 "단계 완료 / 대체 담당자" 화면 - 역할 담당자·서비스 운영자 공용
+// issue #59 - 운영자 경로(getStage/fallback)는 CASE_SUPERVISE 세부 권한 검사
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -39,8 +42,10 @@ public class HandoverStageService {
     private final EmailLogRepository emailLogRepository;
     private final EmailSender emailSender;
     private final AppProperties appProperties;
+    private final PermissionGuard permissionGuard;
 
-    public HandoverStageResponse getStage(Long caseId, Long stageId) {
+    public HandoverStageResponse getStage(Long userId, Long caseId, Long stageId) {
+        permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
         ReleaseCase releaseCase = releaseCaseRepository.findById(caseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RELEASE_CASE_NOT_FOUND));
         return HandoverStageResponse.from(findStage(releaseCase, stageId));
@@ -48,7 +53,8 @@ public class HandoverStageService {
 
     // 무응답·영구반송·문제신고로 대체 담당자에게 전환. 대체 담당자가 없으면 사건을 차단 상태로 유지한다.
     @Transactional
-    public HandoverStageResponse fallback(Long caseId, Long stageId) {
+    public HandoverStageResponse fallback(Long userId, Long caseId, Long stageId) {
+        permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
         ReleaseCase releaseCase = releaseCaseRepository.findById(caseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RELEASE_CASE_NOT_FOUND));
         if (Boolean.TRUE.equals(releaseCase.getFrozen())) {

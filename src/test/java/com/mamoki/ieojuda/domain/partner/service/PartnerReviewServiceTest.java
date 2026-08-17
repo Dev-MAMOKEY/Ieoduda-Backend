@@ -1,0 +1,158 @@
+package com.mamoki.ieojuda.domain.partner.service;
+
+import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
+import com.mamoki.ieojuda.domain.account.entity.User;
+import com.mamoki.ieojuda.domain.audit.entity.AdminActionType;
+import com.mamoki.ieojuda.domain.audit.service.AdminActionAuditService;
+import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
+import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
+import com.mamoki.ieojuda.domain.evidence.entity.EvidenceReviewStatus;
+import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
+import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewDecisionRequest;
+import com.mamoki.ieojuda.domain.partner.entity.ExternalPartner;
+import com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer;
+import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
+import com.mamoki.ieojuda.domain.plan.entity.Plan;
+import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
+import com.mamoki.ieojuda.global.exception.CustomException;
+import com.mamoki.ieojuda.global.exception.ErrorCode;
+import com.mamoki.ieojuda.global.security.PermissionGuard;
+import com.mamoki.ieojuda.global.security.ReauthGuard;
+import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+// issue #59 회귀 테스트 - 역할(EXTERNAL) 하나만으로는 소속 파트너사에 배정되지 않은 사건·증빙을
+// 조작할 수 없어야 하고(조직 경계), 증빙 판정은 재인증 없이는 실행되지 않아야 한다.
+class PartnerReviewServiceTest {
+
+    private static final Long USER_ID = 1L;
+    private static final Long REVIEW_ID = 10L;
+
+    private EvidenceRepository evidenceRepository;
+    private PartnerReviewerRepository partnerReviewerRepository;
+    private EvidenceStorageClient evidenceStorageClient;
+    private PermissionGuard permissionGuard;
+    private ReauthGuard reauthGuard;
+    private AdminActionAuditService adminActionAuditService;
+    private PartnerReviewService partnerReviewService;
+
+    private User actor;
+    private Evidence evidence;
+    private ReleaseCase releaseCase;
+    private PartnerReviewer reviewer;
+    private ExternalPartner reviewerPartner;
+
+    @BeforeEach
+    void setUp() {
+        evidenceRepository = mock(EvidenceRepository.class);
+        partnerReviewerRepository = mock(PartnerReviewerRepository.class);
+        evidenceStorageClient = mock(EvidenceStorageClient.class);
+        permissionGuard = mock(PermissionGuard.class);
+        reauthGuard = mock(ReauthGuard.class);
+        adminActionAuditService = mock(AdminActionAuditService.class);
+        partnerReviewService = new PartnerReviewService(
+                evidenceRepository, partnerReviewerRepository, evidenceStorageClient,
+                permissionGuard, reauthGuard, adminActionAuditService);
+
+        actor = mock(User.class);
+        when(permissionGuard.require(USER_ID, AdminPermission.EVIDENCE_REVIEW)).thenReturn(actor);
+
+        reviewerPartner = mock(ExternalPartner.class);
+        when(reviewerPartner.getPartnerId()).thenReturn(100L);
+        reviewer = mock(PartnerReviewer.class);
+        when(reviewer.getIsActive()).thenReturn(true);
+        when(reviewer.getPartner()).thenReturn(reviewerPartner);
+        when(partnerReviewerRepository.findByUser_UserId(USER_ID)).thenReturn(Optional.of(reviewer));
+
+        releaseCase = mock(ReleaseCase.class);
+        Plan plan = mock(Plan.class);
+        Confirmer confirmer = mock(Confirmer.class);
+        when(confirmer.getName()).thenReturn("확인자");
+        evidence = mock(Evidence.class);
+        when(evidence.getReleaseCase()).thenReturn(releaseCase);
+        when(evidence.getPlan()).thenReturn(plan);
+        when(evidence.getConfirmer()).thenReturn(confirmer);
+        when(evidence.getReviewStatus()).thenReturn(EvidenceReviewStatus.PENDING);
+        when(evidenceRepository.findById(REVIEW_ID)).thenReturn(Optional.of(evidence));
+    }
+
+    @Test
+    void decide_whenCaseHasNoAssignedPartner_isBlocked() {
+        when(releaseCase.getAssignedPartner()).thenReturn(null);
+        PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
+                PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "pw");
+
+        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PARTNER_NOT_ASSIGNED));
+        verify(evidence, never()).approve();
+    }
+
+    @Test
+    void decide_whenCaseAssignedToAnotherPartner_isBlockedByOrgBoundary() {
+        ExternalPartner otherPartner = mock(ExternalPartner.class);
+        when(otherPartner.getPartnerId()).thenReturn(999L); // reviewerPartner는 100L - 다른 조직
+        when(releaseCase.getAssignedPartner()).thenReturn(otherPartner);
+        PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
+                PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "pw");
+
+        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PARTNER_SCOPE_DENIED));
+        verify(evidence, never()).approve();
+    }
+
+    @Test
+    void decide_whenCaseAssignedToReviewersOwnPartner_proceeds() {
+        when(releaseCase.getAssignedPartner()).thenReturn(reviewerPartner); // 같은 조직(100L)
+        PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
+                PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "correct-pw");
+
+        partnerReviewService.decide(REVIEW_ID, USER_ID, request);
+
+        verify(evidence).approve();
+        verify(releaseCase).approveEvidenceAndStartWaiting(any());
+        verify(adminActionAuditService).record(actor, AdminActionType.EVIDENCE_DECISION, REVIEW_ID, true, "APPROVE");
+    }
+
+    @Test
+    void decide_whenReauthFails_blocksTheDecisionAndRecordsTheFailure() {
+        when(releaseCase.getAssignedPartner()).thenReturn(reviewerPartner);
+        doThrow(new CustomException(ErrorCode.REAUTH_FAILED))
+                .when(reauthGuard).verify(actor, "wrong-pw");
+        PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
+                PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "wrong-pw");
+
+        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.REAUTH_FAILED));
+
+        verify(evidence, never()).approve();
+        verify(adminActionAuditService).record(actor, AdminActionType.EVIDENCE_DECISION, REVIEW_ID, false, "재인증 실패");
+    }
+
+    @Test
+    void decide_whenUserLacksEvidenceReviewPermission_isBlockedBeforeAnyLookup() {
+        when(permissionGuard.require(USER_ID, AdminPermission.EVIDENCE_REVIEW))
+                .thenThrow(new CustomException(ErrorCode.INSUFFICIENT_PERMISSION));
+        PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
+                PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "pw");
+
+        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INSUFFICIENT_PERMISSION));
+        verify(evidenceRepository, never()).findById(any());
+    }
+}
