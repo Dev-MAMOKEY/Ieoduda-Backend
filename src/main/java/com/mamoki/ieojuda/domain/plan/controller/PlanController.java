@@ -3,12 +3,14 @@ package com.mamoki.ieojuda.domain.plan.controller;
 import java.util.UUID;
 
 import com.mamoki.ieojuda.domain.plan.dto.PlanResponse;
+import com.mamoki.ieojuda.domain.plan.dto.PlanSummaryResponse;
 import com.mamoki.ieojuda.domain.plan.dto.ReleasePolicyRequest;
 import com.mamoki.ieojuda.domain.plan.dto.ReleasePolicyResponse;
 import com.mamoki.ieojuda.domain.plan.dto.ReleaseSettingsResponse;
 import com.mamoki.ieojuda.domain.plan.dto.SelfWarningEmailRequest;
 import com.mamoki.ieojuda.domain.plan.dto.SelfWarningEmailResponse;
 import com.mamoki.ieojuda.domain.plan.service.PlanService;
+import com.mamoki.ieojuda.domain.plan.service.PlanSummaryService;
 import com.mamoki.ieojuda.global.rsdata.RsData;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -34,11 +36,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class PlanController {
 
     private final PlanService planService;
+    private final PlanSummaryService planSummaryService;
 
-    @Operation(summary = "내 계획 조회", description = "로그인한 사용자의 계획을 조회합니다. 계획은 회원가입 시 자동으로 1개 생성되므로, planId를 아직 모를 때(로그인 직후 등) 사용합니다.")
+    @Operation(summary = "내 계획 조회", description = "로그인한 사용자의 계획 홈 요약을 조회합니다. 계획은 회원가입 시 자동으로 1개 생성되므로, planId를 아직 모를 때(로그인 직후 등) 사용합니다.")
     @GetMapping("/me")
-    public ResponseEntity<RsData<PlanResponse>> getMyPlan(@AuthenticationPrincipal UUID userId) {
-        return ResponseEntity.ok(RsData.success(planService.getMyPlan(userId)));
+    public ResponseEntity<RsData<PlanSummaryResponse>> getMyPlan(@AuthenticationPrincipal UUID userId) {
+        return ResponseEntity.ok(RsData.success(planSummaryService.getMySummary(userId)));
     }
 
     @Operation(summary = "계획 조회")

@@ -48,13 +48,6 @@ public class PlanService {
         return PlanResponse.from(planOwnershipReader.findOwnedPlan(userId, planId));
     }
 
-    // 로그인한 사용자가 자기 planId를 모를 때(로그인 직후 등) 조회
-    public PlanResponse getMyPlan(UUID userId) {
-        Plan plan = planRepository.findByUser_UserId(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.PLAN_NOT_FOUND));
-        return PlanResponse.from(plan);
-    }
-
     @Transactional
     public PlanResponse deactivate(UUID userId, UUID planId) {
         Plan plan = planOwnershipReader.findOwnedPlan(userId, planId);
