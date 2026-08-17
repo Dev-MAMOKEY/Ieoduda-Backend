@@ -16,7 +16,7 @@ public enum ErrorCode {
     // 계획 / 삶의 구역 / AI 구조화 관련 예외 (400)
     INVALID_WAITING_PERIOD(HttpStatus.BAD_REQUEST, "INVALID_WAITING_PERIOD", "대기 기간은 7일 이상 30일 이하여야 합니다."),
     CONSENT_REQUIRED(HttpStatus.BAD_REQUEST, "CONSENT_REQUIRED", "사후 인계 조건과 안전 범위를 확인해 주세요."),
-    SUSPECTED_CREDENTIAL_INPUT(HttpStatus.BAD_REQUEST, "SUSPECTED_CREDENTIAL_INPUT", "비밀번호 등 자격증명으로 의심되는 내용은 저장할 수 없습니다."),
+    SUSPECTED_CREDENTIAL_INPUT(HttpStatus.BAD_REQUEST, "SUSPECTED_CREDENTIAL_INPUT", "비밀번호·PIN·OTP·복구 코드로 보이는 내용은 저장할 수 없습니다. 위치 유형만 적어 주세요."),
     UNGROUNDED_ITEM_NOT_APPROVABLE(HttpStatus.BAD_REQUEST, "UNGROUNDED_ITEM_NOT_APPROVABLE", "원문 근거가 없는 항목은 승인할 수 없습니다."),
     ITEM_NOT_APPROVED(HttpStatus.BAD_REQUEST, "ITEM_NOT_APPROVED", "승인되지 않은 항목에는 담당자를 등록할 수 없습니다."),
     PROHIBITED_ACTION_DETECTED(HttpStatus.BAD_REQUEST, "PROHIBITED_ACTION_DETECTED", "AI가 처리할 수 없는 금지 행동이 포함되어 있습니다."),

@@ -27,6 +27,7 @@ import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.openai.component.OpenAIClient;
 import com.mamoki.ieojuda.global.openai.dto.OpenAIMessageDto;
 import com.mamoki.ieojuda.global.openai.dto.OpenAIResponse;
+import com.mamoki.ieojuda.global.validation.CredentialDetector;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -86,6 +87,11 @@ public class ConversationService {
         Conversation conversation = findConversation(userId, planId, conversationId);
         Plan plan = conversation.getPlan();
 
+        // issue #91 1차 방어 - 자격증명 의심 입력은 저장도, AI 전송도 하지 않는다 (명세서 "삶의 구역 작성" 예외 처리)
+        if (CredentialDetector.containsCredential(userContent)) {
+            throw new CustomException(ErrorCode.SUSPECTED_CREDENTIAL_INPUT);
+        }
+
         // step 1. 이 세션 안에서 지금까지의 대화 이력 로드
         List<LifeAreaMessage> history = lifeAreaMessageRepository
                 .findByConversation_ConversationIdOrderByMessageIdAsc(conversation.getConversationId());
@@ -105,6 +111,13 @@ public class ConversationService {
             openAiHistory.add(new OpenAIMessageDto(toOpenAiRole(message.getRole()), message.getContent()));
         }
         openAiHistory.add(new OpenAIMessageDto(toOpenAiRole(MessageRole.USER), userMessage.getContent()));
+
+        // issue #91 2차 방어 - 1차 방어가 생기기 전에 저장된 과거 이력에 자격증명이 남아있을 가능성에 대비해
+        // OpenAI로 나가기 직전 전체 이력을 다시 검사한다. 여기서 걸리면 트랜잭션이 롤백되어 방금 저장한
+        // 사용자 메세지도 함께 취소된다.
+        if (openAiHistory.stream().anyMatch(message -> CredentialDetector.containsCredential(message.content()))) {
+            throw new CustomException(ErrorCode.SUSPECTED_CREDENTIAL_INPUT);
+        }
 
         // step 4. OpenAI 호출 - 계획 만들기 폼이 없어졌으므로 별도 seedContext 없이 대화 이력만으로 판단
         OpenAIResponse response = openAIClient.getChatCompletion(openAiHistory);
