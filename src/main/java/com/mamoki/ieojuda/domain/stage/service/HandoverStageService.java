@@ -75,7 +75,7 @@ public class HandoverStageService {
         }
 
         stage.fallbackTo(backup);
-        sendHandoffInvite(stage, backup);
+        sendHandoffInvite(stage, backup, InviteKind.FALLBACK);
 
         return HandoverStageResponse.from(stage);
     }
@@ -98,7 +98,7 @@ public class HandoverStageService {
 
         if (!stages.isEmpty()) {
             HandoverStage firstStage = stages.get(0);
-            sendHandoffInvite(firstStage, firstStage.getRecipient());
+            sendHandoffInvite(firstStage, firstStage.getRecipient(), InviteKind.INITIAL);
         }
     }
 
@@ -135,22 +135,31 @@ public class HandoverStageService {
             stage.getReleaseCase().complete();
             return;
         }
-        sendHandoffInvite(next, next.getRecipient());
+        // 정상적으로 자기 순서가 돌아온 것이지 대체 담당자로 전환된 게 아니므로 INITIAL
+        sendHandoffInvite(next, next.getRecipient(), InviteKind.INITIAL);
     }
 
-    private void sendHandoffInvite(HandoverStage stage, Recipient recipient) {
+    // issue #79 - 최초 발송(INITIAL)과 대체 담당자 전환(FALLBACK)은 문구가 달라야 한다.
+    // 링크도 생전 역할 수락 화면이 아니라 사후 인증 화면(/posthumous-access/{token}, issue #76)을 가리킨다.
+    private void sendHandoffInvite(HandoverStage stage, Recipient recipient, InviteKind kind) {
         String plainToken = TokenProvider.generatePlainToken();
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
         recipient.issueInviteToken(TokenProvider.hashToken(plainToken), expiresAt);
 
-        String secureLink = appProperties.getBaseUrl() + "/recipient-acceptances/" + plainToken;
-        EmailContent content = EmailBuilder.build(
-                "사후 인계 안내 (대체 담당자)",
-                "이전 담당자가 응답하지 않아 대체 담당자로 지정되었습니다. 역할 수락 여부를 확인해 주세요.",
-                expiresAt.atZone(ZoneId.systemDefault()),
-                secureLink,
-                appProperties.getContactEmail()
-        );
+        String secureLink = appProperties.getBaseUrl() + "/posthumous-access/" + plainToken;
+        EmailContent content = kind == InviteKind.INITIAL
+                ? EmailBuilder.build(
+                        "사후 인계 안내",
+                        recipient.getRoleType().label() + " 역할로 전달드릴 내용이 있습니다. 본인 확인 후 확인해 주세요.",
+                        expiresAt.atZone(ZoneId.systemDefault()),
+                        secureLink,
+                        appProperties.getContactEmail())
+                : EmailBuilder.build(
+                        "사후 인계 안내 (대체 담당자)",
+                        "이전 담당자가 응답하지 않아 대체 담당자로 지정되었습니다. 역할 수락 여부를 확인해 주세요.",
+                        expiresAt.atZone(ZoneId.systemDefault()),
+                        secureLink,
+                        appProperties.getContactEmail());
         EmailSendResult result = emailSender.send(recipient.getEmail(), content);
 
         emailLogRepository.save(EmailLog.builder()
