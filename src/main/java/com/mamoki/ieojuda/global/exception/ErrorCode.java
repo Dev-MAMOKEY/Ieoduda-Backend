@@ -23,12 +23,16 @@ public enum ErrorCode {
     PACKAGE_SEAL_BLOCKED(HttpStatus.BAD_REQUEST, "PACKAGE_SEAL_BLOCKED", "금지 정보나 근거 없는 항목이 있어 패키지를 봉인할 수 없습니다."),
     CIRCULAR_DEPENDENCY_DETECTED(HttpStatus.BAD_REQUEST, "CIRCULAR_DEPENDENCY_DETECTED", "발송 단계에 순환 의존 관계가 존재합니다."),
     PLAN_NOT_SEALED(HttpStatus.BAD_REQUEST, "PLAN_NOT_SEALED", "봉인된 계획만 인계 점검을 보낼 수 있습니다."),
+    PLAN_NOT_READY(HttpStatus.BAD_REQUEST, "PLAN_NOT_READY", "준비(봉인)되지 않았거나 비활성화된 계획에서는 사후 사건을 생성할 수 없습니다."),
+    WAITING_PERIOD_NOT_SET(HttpStatus.BAD_REQUEST, "WAITING_PERIOD_NOT_SET", "대기 기간이 설정되지 않아 사후 사건을 생성할 수 없습니다."),
+    SELF_WARNING_EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "SELF_WARNING_EMAIL_NOT_VERIFIED", "본인 경고 이메일 인증이 완료되지 않아 사후 사건을 생성할 수 없습니다."),
 
     // 담당자 / 확인자 / 이의 제기 연락처 관련 예외 (400)
     INSUFFICIENT_CONFIRMERS(HttpStatus.BAD_REQUEST, "INSUFFICIENT_CONFIRMERS", "수락을 완료한 지정 확인자가 2명 미만이라 계획을 봉인할 수 없습니다."),
     RECIPIENT_NOT_ACCEPTED(HttpStatus.BAD_REQUEST, "RECIPIENT_NOT_ACCEPTED", "역할을 수락하지 않은 담당자는 발송 단계에 포함할 수 없습니다."),
     FALLBACK_RECIPIENT_MISSING(HttpStatus.BAD_REQUEST, "FALLBACK_RECIPIENT_MISSING", "대체 담당자가 없어 다음 단계를 진행할 수 없습니다."),
     DISPUTE_CONTACT_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "DISPUTE_CONTACT_NOT_VERIFIED", "이메일 인증이 완료되지 않은 이의 제기 연락처는 활성화할 수 없습니다."),
+    ITEM_ASSIGNEE_MISSING(HttpStatus.BAD_REQUEST, "ITEM_ASSIGNEE_MISSING", "담당자가 지정되지 않은 항목이 있어 사후 사건을 생성할 수 없습니다."),
 
     // 사망 신고 / 증빙 관련 예외 (400)
     DEATH_REPORT_MISMATCH(HttpStatus.BAD_REQUEST, "DEATH_REPORT_MISMATCH", "두 확인자의 신고 내용이 일치하지 않아 절차를 중지합니다."),

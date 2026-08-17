@@ -1,7 +1,9 @@
 package com.mamoki.ieojuda.global.email.outbox;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.UUID;
 import java.util.List;
@@ -17,4 +19,10 @@ public interface EmailOutboxRepository extends JpaRepository<EmailOutbox, UUID> 
             "LIMIT 100 " +
             "FOR UPDATE SKIP LOCKED", nativeQuery = true)
     List<EmailOutbox> findPendingForUpdateSkipLocked();
+
+    // 테스트 정리용 - EmailLog 삭제 전, 그 로그를 참조하는 아웃박스 행을 먼저 지운다. body가 @Lob이라
+    // find+delete로 엔티티를 로드하면 별도 트랜잭션에서 lob stream에 접근할 수 없어 실패하므로 벌크 삭제로 처리한다.
+    @Modifying
+    @Query("DELETE FROM EmailOutbox eo WHERE eo.emailLog.logId = :logId")
+    void deleteByEmailLog_LogId(@Param("logId") UUID logId);
 }
