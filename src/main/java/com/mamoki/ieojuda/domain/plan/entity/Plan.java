@@ -77,6 +77,11 @@ public class Plan extends BaseCreatedAtEntity {
         this.selfWarningEmailVerified = true;
     }
 
+    // issue #82 - 로그인 이메일이 바뀌면(계정 탈취 대응과 같은 이유) 본인 경고 이메일도 다시 검증이 필요하다
+    public void invalidateSelfWarningEmailVerification() {
+        this.selfWarningEmailVerified = false;
+    }
+
     // 순서 충돌이 없을 때만 서비스에서 호출 - 실행 순서를 확정
     public void confirmOrder() {
         this.orderConfirmedAt = LocalDateTime.now();

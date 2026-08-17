@@ -139,6 +139,28 @@ class UserServiceTest {
         assertThat(confirmer.getInviteToken()).isNull();
         verify(disputeContact).invalidateInviteToken();
         verify(sessionRevocationService).revokeAllSessions(user);
+        // issue #82 - 로그인 이메일이 바뀌면 본인 경고 이메일도 재검증 대상이 된다
+        verify(plan).invalidateSelfWarningEmailVerification();
+    }
+
+    // issue #82 완료 조건 - "진행 중 사후 사건이 있을 때의 동작이 정의되어 있다" (계정 삭제와 동일하게 차단)
+    @Test
+    void updateProfile_whenEmailChangesAndActiveCaseExists_isBlockedAndDoesNotChangeEmail() {
+        User user = User.builder().email("old@test.com").password("hash").name("A").build();
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.existsByEmailAndUserIdNot("new@test.com", 1L)).thenReturn(false);
+
+        Plan plan = mock(Plan.class);
+        when(plan.getPlanId()).thenReturn(10L);
+        when(planRepository.findByUser_UserId(1L)).thenReturn(Optional.of(plan));
+        when(releaseCaseGuardService.freezeIfActiveCaseExists(10L)).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.updateProfile(1L, new UserUpdateRequest("new@test.com", "A")))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACTIVE_RELEASE_CASE_EXISTS));
+
+        assertThat(user.getEmail()).isEqualTo("old@test.com"); // 변경되지 않아야 한다
+        verifyNoInteractions(recipientRepository, confirmerRepository, disputeContactRepository, sessionRevocationService);
     }
 
     @Test
