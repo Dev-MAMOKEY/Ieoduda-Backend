@@ -79,6 +79,15 @@ public class UserService {
             throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
         }
 
+        // issue #82 - 명세서 "마이페이지" 예외 처리: 진행 중인 사후 사건이 있으면 삭제와 마찬가지로
+        // 이메일 변경도 차단하고 사건을 동결해 운영 검토 대상으로 넘긴다.
+        if (emailChanged) {
+            Long planId = planRepository.findByUser_UserId(userId).map(Plan::getPlanId).orElse(null);
+            if (planId != null && releaseCaseGuardService.freezeIfActiveCaseExists(planId)) {
+                throw new CustomException(ErrorCode.ACTIVE_RELEASE_CASE_EXISTS);
+            }
+        }
+
         user.updateProfile(request.email(), request.name());
 
         // 위 존재 여부 검사와 실제 반영 사이의 경쟁 조건은 DB 유니크 제약이 최종 방어선이다 -
@@ -95,7 +104,12 @@ public class UserService {
         // 기존 초대 토큰을 전부 무효화하고(#48), 이 계정 자신의 세션도 전부 폐기한다(#56) -
         // 공격자가 이미 로그인해 있던 상태였다면 이메일 변경 직후 그 세션도 끊어내기 위함.
         if (emailChanged) {
-            planRepository.findByUser_UserId(userId).ifPresent(plan -> invalidatePlanInviteTokens(plan.getPlanId()));
+            planRepository.findByUser_UserId(userId).ifPresent(plan -> {
+                invalidatePlanInviteTokens(plan.getPlanId());
+                // issue #82 - 본인 경고 이메일은 로그인 이메일과 별개로 검증되지만, 로그인 계정이
+                // 바뀌었다면 그 주소가 여전히 본인 소유인지 다시 확인이 필요하다고 보고 초기화한다.
+                plan.invalidateSelfWarningEmailVerification();
+            });
             sessionRevocationService.revokeAllSessions(user);
         }
 
