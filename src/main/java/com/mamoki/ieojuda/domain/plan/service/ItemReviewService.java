@@ -9,12 +9,15 @@ import com.mamoki.ieojuda.domain.plan.entity.DisclosureScope;
 import com.mamoki.ieojuda.domain.plan.entity.Item;
 import com.mamoki.ieojuda.domain.plan.entity.ItemActionType;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
+import com.mamoki.ieojuda.domain.plan.entity.ItemStatus;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.validation.CredentialDetector;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 // 명세서 "AI 구조화 결과 검토" 화면 - AI가 만든 항목을 사용자가 직접 승인/수정/삭제
 @Service
@@ -28,6 +31,14 @@ public class ItemReviewService {
     // 항목 단건 조회
     public ItemResponse getItem(UUID userId, UUID planId, UUID itemId) {
         return ItemResponse.from(findItem(userId, planId, itemId));
+    }
+
+    // issue #86 - 항목 목록 조회. status/disclosureScope 필터는 선택적, sortOrder 기준 정렬
+    public List<ItemResponse> getItems(UUID userId, UUID planId, ItemStatus status, DisclosureScope disclosureScope) {
+        planOwnershipReader.findOwnedPlan(userId, planId);
+        return itemRepository.findByPlanIdAndFilters(planId, status, disclosureScope).stream()
+                .map(ItemResponse::from)
+                .toList();
     }
 
     @Transactional

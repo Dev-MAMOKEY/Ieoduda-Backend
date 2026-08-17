@@ -1,8 +1,11 @@
 package com.mamoki.ieojuda.domain.plan.repository;
 
+import com.mamoki.ieojuda.domain.plan.entity.DisclosureScope;
 import com.mamoki.ieojuda.domain.plan.entity.Item;
 import com.mamoki.ieojuda.domain.plan.entity.ItemStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.UUID;
 import java.util.List;
@@ -21,4 +24,13 @@ public interface ItemRepository extends JpaRepository<Item, UUID> {
 
     // "실행 순서 점검" 화면 - 담당자가 배정된(=발송 대상이 확정된) 항목만 순서 점검 대상
     List<Item> findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(UUID planId);
+
+    // issue #86 - "AI 구조화 결과 검토" 화면 새로고침용 목록 조회. status/disclosureScope는 없으면(null) 필터링하지 않음
+    @Query("SELECT i FROM Item i WHERE i.lifeArea.plan.planId = :planId " +
+            "AND (:status IS NULL OR i.status = :status) " +
+            "AND (:disclosureScope IS NULL OR i.disclosureScope = :disclosureScope) " +
+            "ORDER BY i.sortOrder ASC, i.itemId ASC")
+    List<Item> findByPlanIdAndFilters(@Param("planId") UUID planId,
+                                       @Param("status") ItemStatus status,
+                                       @Param("disclosureScope") DisclosureScope disclosureScope);
 }

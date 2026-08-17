@@ -3,7 +3,11 @@ package com.mamoki.ieojuda.domain.plan.service;
 import java.util.UUID;
 
 import com.mamoki.ieojuda.domain.plan.dto.ItemReviewRequest;
+import com.mamoki.ieojuda.domain.plan.dto.ItemResponse;
 import com.mamoki.ieojuda.domain.plan.dto.ItemUpdateRequest;
+import com.mamoki.ieojuda.domain.plan.entity.DisclosureScope;
+import com.mamoki.ieojuda.domain.plan.entity.ItemStatus;
+import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
 import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
@@ -11,11 +15,13 @@ import com.mamoki.ieojuda.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -73,5 +79,24 @@ class ItemReviewServiceBolaTest {
                 .isInstanceOfSatisfying(CustomException.class,
                         exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PLAN_NOT_FOUND));
         verifyNoInteractions(itemRepository);
+    }
+
+    @Test
+    void getItemsRejectsNonOwnerAndDoesNotTouchItemRepository() {
+        assertThatThrownBy(() -> itemReviewService.getItems(ATTACKER_ID, PLAN_ID, null, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        exception -> assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PLAN_NOT_FOUND));
+        verifyNoInteractions(itemRepository);
+    }
+
+    @Test
+    void getItemsPassesStatusAndDisclosureScopeFiltersThroughToTheRepository() {
+        when(planRepository.findByPlanIdAndUser_UserId(PLAN_ID, OWNER_ID)).thenReturn(Optional.of(mock(Plan.class)));
+        when(itemRepository.findByPlanIdAndFilters(PLAN_ID, ItemStatus.PROPOSED, DisclosureScope.FAMILY)).thenReturn(List.of());
+
+        List<ItemResponse> result = itemReviewService.getItems(OWNER_ID, PLAN_ID, ItemStatus.PROPOSED, DisclosureScope.FAMILY);
+
+        assertThat(result).isEmpty();
+        verify(itemRepository).findByPlanIdAndFilters(PLAN_ID, ItemStatus.PROPOSED, DisclosureScope.FAMILY);
     }
 }

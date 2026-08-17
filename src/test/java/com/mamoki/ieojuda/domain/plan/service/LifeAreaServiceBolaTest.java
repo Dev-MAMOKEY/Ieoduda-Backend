@@ -49,7 +49,7 @@ class LifeAreaServiceBolaTest {
     void getLifeAreasReturnsItemsForTheOwner() {
         when(planRepository.findByPlanIdAndUser_UserId(PLAN_ID, OWNER_ID))
                 .thenReturn(Optional.of(mock(com.mamoki.ieojuda.domain.plan.entity.Plan.class)));
-        when(itemRepository.findByLifeArea_Plan_PlanIdOrderByItemIdAsc(PLAN_ID)).thenReturn(List.of());
+        when(itemRepository.findByPlanIdAndFilters(PLAN_ID, null, null)).thenReturn(List.of());
 
         assertThat(lifeAreaService.getLifeAreas(OWNER_ID, PLAN_ID)).isNotEmpty();
     }
