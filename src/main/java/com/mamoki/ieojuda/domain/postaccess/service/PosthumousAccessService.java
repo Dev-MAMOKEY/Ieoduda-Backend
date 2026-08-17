@@ -10,7 +10,6 @@ import com.mamoki.ieojuda.domain.postaccess.dto.PosthumousAccessResponse;
 import com.mamoki.ieojuda.domain.postaccess.entity.AccessToken;
 import com.mamoki.ieojuda.domain.postaccess.repository.AccessTokenRepository;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
-import com.mamoki.ieojuda.domain.stage.entity.HandoverStage;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStageStatus;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
@@ -120,20 +119,6 @@ public class PosthumousAccessService {
         LocalDateTime sessionExpiresAt = accessToken.getVerifiedAt().plusMinutes(SESSION_TTL_MINUTES);
 
         return new OtpVerifyResponse(plainToken, sessionExpiresAt);
-    }
-
-    // 발송 단계가 활성화될 때 호출 - AccessToken을 발급하고 평문 토큰을 반환한다.
-    // (링크 문구·주소 교체는 별도 이슈에서 이 메서드를 호출하도록 연결한다)
-    @Transactional
-    public String issueAccessToken(HandoverStage stage) {
-        String plainToken = TokenProvider.generatePlainToken();
-        LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
-        accessTokenRepository.save(AccessToken.builder()
-                .handoverStage(stage)
-                .tokenHash(TokenProvider.hashToken(plainToken))
-                .expiresAt(expiresAt)
-                .build());
-        return plainToken;
     }
 
     private AccessToken findByToken(String plainToken) {
