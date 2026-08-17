@@ -91,6 +91,7 @@ public enum ErrorCode {
     BACKUP_RECIPIENT_EMAIL_DUPLICATED(HttpStatus.CONFLICT, "BACKUP_RECIPIENT_EMAIL_DUPLICATED", "대체 담당자 이메일은 주 담당자와 같을 수 없습니다."),
     RECIPIENT_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "RECIPIENT_RESEND_NOT_ALLOWED", "현재 수락 상태에서는 수락 요청을 다시 보낼 수 없습니다."),
     CONFIRMER_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "CONFIRMER_RESEND_NOT_ALLOWED", "현재 수락 상태에서는 수락 요청을 다시 보낼 수 없습니다."),
+    DISPUTE_CONTACT_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "DISPUTE_CONTACT_RESEND_NOT_ALLOWED", "이미 검증이 완료된 연락처에는 검증 메일을 다시 보낼 수 없습니다."),
     ITEM_ORDER_CONFLICT(HttpStatus.CONFLICT, "ITEM_ORDER_CONFLICT", "순서 충돌이 있어 확정할 수 없습니다."),
     PARTNER_NOT_ASSIGNED(HttpStatus.CONFLICT, "PARTNER_NOT_ASSIGNED", "이 사건에는 아직 담당 파트너사가 배정되지 않았습니다."),
     EVIDENCE_ALREADY_DELETED(HttpStatus.CONFLICT, "EVIDENCE_ALREADY_DELETED", "이미 삭제된 증빙입니다."),

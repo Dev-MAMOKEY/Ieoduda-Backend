@@ -57,4 +57,13 @@ public class DisputeContactController {
         disputeContactService.verify(token);
         return ResponseEntity.ok(RsData.success(null));
     }
+
+    @Operation(summary = "이의 제기 연락처 검증 메일 다시 보내기", description = "첫 검증 메일을 놓쳤을 때 새 검증 메일을 보냅니다. 이전 검증 링크는 무효화됩니다. 이미 검증이 완료된 연락처에는 보낼 수 없습니다.")
+    @PostMapping("/dispute-contacts/{contactId}/verification-email")
+    public ResponseEntity<RsData<DisputeContactResponse>> resendVerificationEmail(
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "이의 제기 연락처 ID") @PathVariable UUID contactId
+    ) {
+        return ResponseEntity.ok(RsData.success(disputeContactService.resendVerificationEmail(userId, contactId)));
+    }
 }

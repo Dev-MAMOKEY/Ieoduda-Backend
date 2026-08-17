@@ -87,6 +87,7 @@ public class SecurityConfig {
                 new RateLimitRule("evidence-submit", "/api/release-cases/*/evidence/submit", "POST", 10, Duration.ofHours(1)),
                 new RateLimitRule("objection", "/api/release-cases/*/disputes", "POST", 10, Duration.ofHours(1)),
                 new RateLimitRule("dispute-verify", "/api/dispute-contacts/*/verify", null, 20, Duration.ofHours(1)),
+                new RateLimitRule("dispute-contact-resend", "/api/dispute-contacts/*/verification-email", "POST", 5, Duration.ofHours(1)),
                 new RateLimitRule("self-warning-email", "/api/self-warning-email/**", null, 20, Duration.ofHours(1)),
                 new RateLimitRule("posthumous-otp", "/api/posthumous-access/*/otp", "POST", 5, Duration.ofHours(1)),
                 new RateLimitRule("posthumous-verify", "/api/posthumous-access/*/verify", "POST", 10, Duration.ofHours(1)),
