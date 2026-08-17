@@ -172,17 +172,30 @@ class InputSizeConstraintTest {
         assertThat(validator.validate(withoutName)).isEmpty();
     }
 
+    // issue #54 이후 이 세 값은 하드코딩이 아니라 환경변수(MULTIPART_MAX_FILE_SIZE 등)로 외부화됐다.
+    // application.properties에는 "${MULTIPART_MAX_FILE_SIZE}" 같은 미해석 플레이스홀더만 있어 그 파일을
+    // 그대로 읽으면 항상 실패한다 - 대신 (1) application.properties가 올바른 환경변수 이름을 가리키는지,
+    // (2) 커밋된 기본값 문서인 .env.example이 여전히 50MB/55MB/60MB 계약을 명시하는지 두 가지로 검증한다.
     @Test
     void multipartLimitsAreFiftyAndFiftyFiveMegabytes() throws IOException {
-        Properties properties = new Properties();
+        Properties appProperties = new Properties();
         try (InputStream input = getClass().getResourceAsStream("/application.properties")) {
             assertThat(input).isNotNull();
-            properties.load(input);
+            appProperties.load(input);
         }
 
-        assertThat(properties.getProperty("spring.servlet.multipart.max-file-size")).isEqualTo("50MB");
-        assertThat(properties.getProperty("spring.servlet.multipart.max-request-size")).isEqualTo("55MB");
-        assertThat(properties.getProperty("server.tomcat.max-swallow-size")).isEqualTo("60MB");
+        assertThat(appProperties.getProperty("spring.servlet.multipart.max-file-size")).isEqualTo("${MULTIPART_MAX_FILE_SIZE}");
+        assertThat(appProperties.getProperty("spring.servlet.multipart.max-request-size")).isEqualTo("${MULTIPART_MAX_REQUEST_SIZE}");
+        assertThat(appProperties.getProperty("server.tomcat.max-swallow-size")).isEqualTo("${TOMCAT_MAX_SWALLOW_SIZE}");
+
+        Properties envExample = new Properties();
+        try (InputStream input = java.nio.file.Files.newInputStream(java.nio.file.Path.of(".env.example"))) {
+            envExample.load(input);
+        }
+
+        assertThat(envExample.getProperty("MULTIPART_MAX_FILE_SIZE")).isEqualTo("50MB");
+        assertThat(envExample.getProperty("MULTIPART_MAX_REQUEST_SIZE")).isEqualTo("55MB");
+        assertThat(envExample.getProperty("TOMCAT_MAX_SWALLOW_SIZE")).isEqualTo("60MB");
     }
 
     @Test

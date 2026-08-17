@@ -9,7 +9,6 @@ import com.mamoki.ieojuda.domain.audit.entity.AdminActionType;
 import com.mamoki.ieojuda.domain.audit.service.AdminActionAuditService;
 import com.mamoki.ieojuda.domain.confirmer.entity.ReportStatus;
 import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
-import com.mamoki.ieojuda.domain.confirmer.service.DisputeContactService;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceDownloadToken;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceReviewStatus;
@@ -22,6 +21,7 @@ import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewResponse;
 import com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer;
 import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
+import com.mamoki.ieojuda.domain.releasecase.service.ReleaseCaseWarningService;
 import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
 import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.email.token.TokenProvider;
@@ -59,7 +59,7 @@ public class PartnerReviewService {
     private final AdminActionAuditService adminActionAuditService;
     private final IdempotencyGuard idempotencyGuard;
     private final SecurityTokenService securityTokenService;
-    private final DisputeContactService disputeContactService;
+    private final ReleaseCaseWarningService releaseCaseWarningService;
 
     public PartnerReviewResponse getReview(UUID userId, UUID reviewId) {
         permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
@@ -162,10 +162,9 @@ public class PartnerReviewService {
                         releaseCase.getPlan().getPlanId(), ReportStatus.MATCHED).size();
 
                 if (alreadyApprovedCount + 1 >= requiredCount) {
-                    releaseCase.approveEvidenceAndStartWaiting(evidence.getPlan().getWaitingDays());
-                    // issue #41 - 증빙 제출 단계가 끝났으므로 UPLOAD_EVIDENCE 토큰은 더 이상 필요 없다
-                    securityTokenService.revokeAllForCase(releaseCase, SecurityTokenPurpose.UPLOAD_EVIDENCE);
-                    disputeContactService.notifyVerifiedContactsOfObjectionWindow(releaseCase);
+                    // 이의 제기 연락처 전원에게 경고를 보내 발송이 확인된 뒤에만 WAITING으로 전이한다
+                    // (UPLOAD_EVIDENCE 토큰 폐기도 이 메서드 안에서 함께 처리됨) - 발송 실패 시 전이하지 않고 동결한다.
+                    releaseCaseWarningService.sendDisputeWarningsAndStartWaiting(releaseCase, evidence.getPlan().getWaitingDays());
                 } else {
                     releaseCase.markEvidencePartiallyApproved();
                 }

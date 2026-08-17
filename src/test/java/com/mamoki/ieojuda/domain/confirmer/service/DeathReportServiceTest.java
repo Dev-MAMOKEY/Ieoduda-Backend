@@ -16,6 +16,7 @@ import com.mamoki.ieojuda.domain.plan.repository.PlanVersionRepository;
 import com.mamoki.ieojuda.domain.plan.service.PlanReadinessValidator;
 import com.mamoki.ieojuda.domain.plan.service.PlanSnapshotService;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
+import com.mamoki.ieojuda.domain.releasecase.service.ReleaseCaseWarningService;
 import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityToken;
 import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
 import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
@@ -59,6 +60,7 @@ class DeathReportServiceTest {
     private EmailOutboxService emailOutboxService;
     private AppProperties appProperties;
     private PlanReadinessValidator planReadinessValidator;
+    private ReleaseCaseWarningService releaseCaseWarningService;
     private DeathReportService deathReportService;
 
     @BeforeEach
@@ -72,10 +74,11 @@ class DeathReportServiceTest {
         emailOutboxService = mock(EmailOutboxService.class);
         appProperties = mock(AppProperties.class);
         planReadinessValidator = mock(PlanReadinessValidator.class);
+        releaseCaseWarningService = mock(ReleaseCaseWarningService.class);
         deathReportService = new DeathReportService(
                 confirmerRepository, releaseCaseRepository, planVersionRepository,
                 planSnapshotService, idempotencyGuard, securityTokenService, emailOutboxService, appProperties,
-                planReadinessValidator);
+                planReadinessValidator, releaseCaseWarningService);
 
         when(appProperties.getBaseUrl()).thenReturn("https://ieoduda.example.com");
         when(appProperties.getContactEmail()).thenReturn("support@ieoduda.example.com");
@@ -130,6 +133,43 @@ class DeathReportServiceTest {
 
         assertThat(reporting.getReportStatus()).isEqualTo(ReportStatus.MATCHED);
         assertThat(sibling.getReportStatus()).isEqualTo(ReportStatus.MATCHED);
+        // 사건 생성 직후 작성자에게 취소 경고 메일 발송을 시도했는지 확인
+        verify(releaseCaseWarningService).sendAuthorCancelWarningOrFreeze(any());
+    }
+
+    // 작성자 경고 메일 발송이 실패해도(운영 검토로 동결될 뿐) report() 자체는 정상 응답해야 한다 -
+    // 이미 성사된 두 확인자의 신고 매칭까지 되돌릴 이유가 없다.
+    @Test
+    void report_whenAuthorWarningSendFails_stillReturnsSuccessResponse() {
+        Plan plan = mock(Plan.class);
+        when(plan.getPlanId()).thenReturn(PLAN_ID);
+
+        Confirmer reporting = confirmerAcceptedOn(plan, "A", "a@test.com");
+        SecurityToken reportDeathToken = mock(SecurityToken.class);
+        when(reportDeathToken.getConfirmer()).thenReturn(reporting);
+        when(securityTokenService.resolve(eq("token-a"), eq(SecurityTokenPurpose.REPORT_DEATH))).thenReturn(reportDeathToken);
+        when(securityTokenService.issueForConfirmer(eq(SecurityTokenPurpose.UPLOAD_EVIDENCE), any(), any(), any()))
+                .thenReturn("evidence-token");
+        when(releaseCaseWarningService.sendAuthorCancelWarningOrFreeze(any())).thenReturn(false);
+
+        Confirmer sibling = confirmerAcceptedOn(plan, "B", "b@test.com");
+        sibling.report(LocalDate.of(2026, 8, 15));
+        when(confirmerRepository.findByPlan_PlanIdAndConfirmIdNotAndReportStatus(PLAN_ID, null, ReportStatus.REPORTED))
+                .thenReturn(List.of(sibling));
+
+        when(releaseCaseRepository.findFirstByPlan_PlanIdOrderByCaseIdDesc(PLAN_ID)).thenReturn(Optional.empty());
+        when(planVersionRepository.countByPlan_PlanId(PLAN_ID)).thenReturn(0L);
+        PlanSnapshotDto snapshot = new PlanSnapshotDto(PLAN_ID, 7, List.of(), List.of());
+        when(planSnapshotService.buildSnapshot(plan)).thenReturn(snapshot);
+        when(planSnapshotService.serialize(snapshot)).thenReturn("{}");
+        when(planSnapshotService.hash("{}")).thenReturn("hash");
+        when(planVersionRepository.save(any(PlanVersion.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(releaseCaseRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = deathReportService.report("token-a", new DeathReportRequest(LocalDate.of(2026, 8, 15)), null);
+
+        assertThat(response).isNotNull();
+        verify(releaseCaseWarningService).sendAuthorCancelWarningOrFreeze(any());
     }
 
     // 정책 변경 회귀 테스트 - 한쪽만 사망일을 모르는 경우 더 이상 자동 일치로 처리하지 않는다
@@ -241,7 +281,7 @@ class DeathReportServiceTest {
         deathReportService = new DeathReportService(
                 confirmerRepository, releaseCaseRepository, planVersionRepository,
                 planSnapshotService, idempotencyGuard, securityTokenService, emailOutboxService, appProperties,
-                realValidator);
+                realValidator, releaseCaseWarningService);
 
         Plan plan = mock(Plan.class);
         when(plan.getPlanId()).thenReturn(PLAN_ID);

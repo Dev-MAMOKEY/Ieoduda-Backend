@@ -66,6 +66,19 @@ public class SecurityTokenService {
         return plainToken;
     }
 
+    // 작성자는 계획당 1명이라 별도 대상 필드 없이 releaseCase 바인딩만으로 충분히 특정된다 (예: CANCEL_CASE)
+    @Transactional
+    public String issueForCase(SecurityTokenPurpose purpose, ReleaseCase releaseCase, LocalDateTime expiresAt) {
+        String plainToken = TokenProvider.generatePlainToken();
+        securityTokenRepository.save(SecurityToken.builder()
+                .tokenHash(TokenProvider.hashToken(plainToken))
+                .purpose(purpose)
+                .releaseCase(releaseCase)
+                .expiresAt(expiresAt)
+                .build());
+        return plainToken;
+    }
+
     // 조회 + 만료·사용·폐기·목적 불일치 검증 (아직 소비하지 않음 - 실제 처리가 성공한 뒤 consume()을 별도 호출)
     public SecurityToken resolve(String plainToken, SecurityTokenPurpose expectedPurpose) {
         SecurityToken token = tokenLookupGuard.resolve(plainToken,
