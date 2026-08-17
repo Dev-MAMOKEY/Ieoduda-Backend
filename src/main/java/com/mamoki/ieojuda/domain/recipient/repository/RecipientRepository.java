@@ -17,7 +17,4 @@ public interface RecipientRepository extends JpaRepository<Recipient, UUID> {
 
     // "단계 완료 / 대체 담당자" 화면 - 주 담당자에 대해 등록된 대체 담당자 조회
     Optional<Recipient> findByBackupFor_AssigneeId(UUID primaryRecipientId);
-
-    // "역할 수락 이메일" 화면 진입 - 초대 링크의 토큰으로 담당자를 찾기 위한 조회
-    Optional<Recipient> findByInviteToken(String inviteToken);
 }

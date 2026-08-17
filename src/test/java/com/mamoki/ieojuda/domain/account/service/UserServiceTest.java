@@ -29,6 +29,8 @@ import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
 import com.mamoki.ieojuda.domain.releasecase.repository.ObjectionRepository;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.domain.releasecase.service.ReleaseCaseGuardService;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.domain.stage.repository.HandoverStageRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
@@ -77,6 +79,7 @@ class UserServiceTest {
     private SessionRevocationService sessionRevocationService;
     private RefreshSessionRepository refreshSessionRepository;
     private PartnerReviewerRepository partnerReviewerRepository;
+    private SecurityTokenService securityTokenService;
     private UserService userService;
 
     @BeforeEach
@@ -104,6 +107,7 @@ class UserServiceTest {
         sessionRevocationService = mock(SessionRevocationService.class);
         refreshSessionRepository = mock(RefreshSessionRepository.class);
         partnerReviewerRepository = mock(PartnerReviewerRepository.class);
+        securityTokenService = mock(SecurityTokenService.class);
 
         userService = new UserService(
                 userRepository, planRepository, conversationRepository, lifeAreaRepository, lifeAreaMessageRepository,
@@ -111,7 +115,7 @@ class UserServiceTest {
                 releaseCaseRepository, planVersionRepository, evidenceRepository, emailLogRepository,
                 handoverStageRepository, objectionRepository, handoffCheckRepository, handoffCheckResponseRepository,
                 packageIssueRepository, evidenceStorageClient, releaseCaseGuardService,
-                sessionRevocationService, refreshSessionRepository, partnerReviewerRepository);
+                sessionRevocationService, refreshSessionRepository, partnerReviewerRepository, securityTokenService);
     }
 
     @Test
@@ -139,7 +143,6 @@ class UserServiceTest {
         when(recipientRepository.findByPlan_PlanId(PLAN_ID)).thenReturn(List.of(recipient));
 
         Confirmer confirmer = Confirmer.builder().plan(plan).name("B").relationship(Relationship.FRIEND).email("b@test.com").build();
-        confirmer.issueInviteToken("some-hash", null);
         when(confirmerRepository.findByPlan_PlanIdOrderByConfirmIdAsc(PLAN_ID)).thenReturn(List.of(confirmer));
 
         DisputeContact disputeContact = mock(DisputeContact.class);
@@ -148,9 +151,12 @@ class UserServiceTest {
         userService.updateProfile(USER_ID, new UserUpdateRequest("new@test.com", "A"));
 
         assertThat(user.getEmail()).isEqualTo("new@test.com");
-        verify(recipient).invalidateInviteToken();
-        assertThat(confirmer.getInviteToken()).isNull();
+        verify(securityTokenService).revokeAllForRecipient(recipient, SecurityTokenPurpose.ACCEPT_ROLE);
+        verify(securityTokenService).revokeAllForConfirmer(confirmer, SecurityTokenPurpose.ACCEPT_ROLE);
+        verify(securityTokenService).revokeAllForConfirmer(confirmer, SecurityTokenPurpose.REPORT_DEATH);
+        verify(securityTokenService).revokeAllForConfirmer(confirmer, SecurityTokenPurpose.UPLOAD_EVIDENCE);
         verify(disputeContact).invalidateInviteToken();
+        verify(securityTokenService).revokeAllForDisputeContact(disputeContact, SecurityTokenPurpose.RAISE_OBJECTION);
         verify(sessionRevocationService).revokeAllSessions(user);
         // issue #82 - 로그인 이메일이 바뀌면 본인 경고 이메일도 재검증 대상이 된다
         verify(plan).invalidateSelfWarningEmailVerification();

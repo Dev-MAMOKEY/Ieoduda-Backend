@@ -5,6 +5,7 @@ import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.audit.entity.AdminActionType;
 import com.mamoki.ieojuda.domain.audit.service.AdminActionAuditService;
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
+import com.mamoki.ieojuda.domain.confirmer.service.DisputeContactService;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceReviewStatus;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceType;
@@ -15,6 +16,7 @@ import com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer;
 import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.idempotency.service.IdempotencyGuard;
@@ -53,6 +55,8 @@ class PartnerReviewServiceTest {
     private ReauthGuard reauthGuard;
     private AdminActionAuditService adminActionAuditService;
     private IdempotencyGuard idempotencyGuard;
+    private SecurityTokenService securityTokenService;
+    private DisputeContactService disputeContactService;
     private PartnerReviewService partnerReviewService;
 
     private User actor;
@@ -70,9 +74,12 @@ class PartnerReviewServiceTest {
         reauthGuard = mock(ReauthGuard.class);
         adminActionAuditService = mock(AdminActionAuditService.class);
         idempotencyGuard = mock(IdempotencyGuard.class);
+        securityTokenService = mock(SecurityTokenService.class);
+        disputeContactService = mock(DisputeContactService.class);
         partnerReviewService = new PartnerReviewService(
                 evidenceRepository, partnerReviewerRepository, evidenceStorageClient,
-                permissionGuard, reauthGuard, adminActionAuditService, idempotencyGuard);
+                permissionGuard, reauthGuard, adminActionAuditService, idempotencyGuard,
+                securityTokenService, disputeContactService);
 
         actor = mock(User.class);
         when(permissionGuard.require(USER_ID, AdminPermission.EVIDENCE_REVIEW)).thenReturn(actor);

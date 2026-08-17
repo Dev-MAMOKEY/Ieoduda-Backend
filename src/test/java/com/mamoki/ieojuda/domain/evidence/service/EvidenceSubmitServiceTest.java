@@ -1,7 +1,6 @@
 package com.mamoki.ieojuda.domain.evidence.service;
 
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
-import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
@@ -10,11 +9,13 @@ import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceType;
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityToken;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.idempotency.service.IdempotencyGuard;
 import com.mamoki.ieojuda.global.ratelimit.PublicLinkAuditor;
-import com.mamoki.ieojuda.global.ratelimit.TokenLookupGuard;
 import com.mamoki.ieojuda.global.scan.MalwareScanner;
 import com.mamoki.ieojuda.global.scan.ScanResult;
 import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
@@ -30,7 +31,6 @@ import org.springframework.transaction.support.TransactionSynchronizationUtils;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -50,15 +50,14 @@ class EvidenceSubmitServiceTest {
     private static final UUID PLAN_ID = UUID.randomUUID();
     private static final UUID CASE_ID = UUID.randomUUID();
 
-    private ConfirmerRepository confirmerRepository;
     private ReleaseCaseRepository releaseCaseRepository;
     private EvidenceRepository evidenceRepository;
     private EvidenceStorageClient evidenceStorageClient;
-    private TokenLookupGuard tokenLookupGuard;
     private PublicLinkAuditor publicLinkAuditor;
     private IdempotencyGuard idempotencyGuard;
     private MalwareScanner malwareScanner;
     private EvidenceOrphanCleanupService evidenceOrphanCleanupService;
+    private SecurityTokenService securityTokenService;
     private EvidenceSubmitService evidenceSubmitService;
 
     private Confirmer confirmer;
@@ -67,32 +66,23 @@ class EvidenceSubmitServiceTest {
 
     @BeforeEach
     void setUp() {
-        confirmerRepository = mock(ConfirmerRepository.class);
         releaseCaseRepository = mock(ReleaseCaseRepository.class);
         evidenceRepository = mock(EvidenceRepository.class);
         evidenceStorageClient = mock(EvidenceStorageClient.class);
-        tokenLookupGuard = mock(TokenLookupGuard.class);
         publicLinkAuditor = mock(PublicLinkAuditor.class);
         idempotencyGuard = mock(IdempotencyGuard.class);
         malwareScanner = mock(MalwareScanner.class);
         evidenceOrphanCleanupService = mock(EvidenceOrphanCleanupService.class);
+        securityTokenService = mock(SecurityTokenService.class);
         evidenceSubmitService = new EvidenceSubmitService(
-                confirmerRepository, releaseCaseRepository, evidenceRepository, evidenceStorageClient,
-                tokenLookupGuard, publicLinkAuditor, idempotencyGuard, malwareScanner, evidenceOrphanCleanupService);
-
-        // TokenLookupGuard는 실제 구현처럼 supplier를 그대로 실행해 confirmerRepository 목 설정이
-        // 기존과 동일하게 동작하도록 위임한다.
-        when(tokenLookupGuard.resolve(anyString(), any())).thenAnswer(invocation -> {
-            Supplier<Optional<?>> lookup = invocation.getArgument(1);
-            return lookup.get().orElseThrow(() -> new CustomException(ErrorCode.TOKEN_INVALID));
-        });
+                releaseCaseRepository, evidenceRepository, evidenceStorageClient,
+                publicLinkAuditor, idempotencyGuard, malwareScanner, evidenceOrphanCleanupService, securityTokenService);
 
         confirmer = mock(Confirmer.class);
         when(confirmer.getAcceptanceStatus()).thenReturn(AcceptanceStatus.ACCEPTED);
         plan = mock(Plan.class);
         when(plan.getPlanId()).thenReturn(PLAN_ID);
         when(confirmer.getPlan()).thenReturn(plan);
-        when(confirmerRepository.findByInviteToken(any())).thenReturn(Optional.of(confirmer));
 
         releaseCase = mock(ReleaseCase.class);
         when(releaseCase.getCaseId()).thenReturn(CASE_ID);
@@ -100,6 +90,13 @@ class EvidenceSubmitServiceTest {
         when(releaseCase.getPlan()).thenReturn(plan);
         when(releaseCaseRepository.findFirstByPlan_PlanIdOrderByCaseIdDesc(PLAN_ID)).thenReturn(Optional.of(releaseCase));
         when(releaseCaseRepository.findByIdForUpdate(CASE_ID)).thenReturn(Optional.of(releaseCase));
+
+        // UPLOAD_EVIDENCE 토큰은 이 확인자·이 사건에 바인딩된 것으로 취급한다
+        SecurityToken uploadEvidenceToken = mock(SecurityToken.class);
+        when(uploadEvidenceToken.getConfirmer()).thenReturn(confirmer);
+        when(uploadEvidenceToken.getReleaseCase()).thenReturn(releaseCase);
+        when(securityTokenService.resolve(anyString(), eq(SecurityTokenPurpose.UPLOAD_EVIDENCE)))
+                .thenReturn(uploadEvidenceToken);
 
         when(evidenceRepository.countByReleaseCase_CaseId(CASE_ID)).thenReturn(0L);
         when(evidenceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));

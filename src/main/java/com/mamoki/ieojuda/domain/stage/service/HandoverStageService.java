@@ -10,6 +10,8 @@ import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.domain.stage.dto.HandoverStageResponse;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStage;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStageStatus;
@@ -47,6 +49,7 @@ public class HandoverStageService {
     private final PermissionGuard permissionGuard;
     private final PackageActionCompletionRepository packageActionCompletionRepository;
     private final AccessTokenRepository accessTokenRepository;
+    private final SecurityTokenService securityTokenService;
 
     public HandoverStageResponse getStage(UUID userId, UUID caseId, UUID stageId) {
         permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
@@ -133,7 +136,10 @@ public class HandoverStageService {
                         stage.getReleaseCase().getCaseId(), stage.getStageOrder())
                 .orElse(null);
         if (next == null) {
-            stage.getReleaseCase().complete();
+            ReleaseCase releaseCase = stage.getReleaseCase();
+            releaseCase.complete();
+            // issue #41 - 사건 종료(완료) 시 이의 제기 창구로 쓰이던 토큰을 폐기한다
+            securityTokenService.revokeAllForCase(releaseCase, SecurityTokenPurpose.RAISE_OBJECTION);
             return;
         }
         // 정상적으로 자기 순서가 돌아온 것이지 대체 담당자로 전환된 게 아니므로 INITIAL

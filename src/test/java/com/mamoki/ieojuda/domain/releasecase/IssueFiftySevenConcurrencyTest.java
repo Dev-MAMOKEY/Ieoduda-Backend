@@ -16,7 +16,9 @@ import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.domain.plan.repository.PlanVersionRepository;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
-import com.mamoki.ieojuda.global.email.token.TokenProvider;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.repository.SecurityTokenRepository;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
@@ -71,6 +73,10 @@ class IssueFiftySevenConcurrencyTest {
     private EvidenceRepository evidenceRepository;
     @Autowired
     private EvidenceSubmitService evidenceSubmitService;
+    @Autowired
+    private SecurityTokenService securityTokenService;
+    @Autowired
+    private SecurityTokenRepository securityTokenRepository;
     @Autowired
     private PlatformTransactionManager transactionManager;
 
@@ -186,10 +192,10 @@ class IssueFiftySevenConcurrencyTest {
 
         Confirmer confirmer = Confirmer.builder().plan(plan).name("확인자").relationship(Relationship.FRIEND)
                 .email("confirmer-" + UUID.randomUUID() + "@test.com").build();
-        String plainToken = "evidence-race-token-" + UUID.randomUUID();
-        confirmer.issueInviteToken(TokenProvider.hashToken(plainToken), LocalDateTime.now().plusHours(1));
         confirmer.accept(null);
-        confirmerRepository.saveAndFlush(confirmer);
+        confirmer = confirmerRepository.saveAndFlush(confirmer);
+        String plainToken = securityTokenService.issueForConfirmer(
+                SecurityTokenPurpose.UPLOAD_EVIDENCE, confirmer, releaseCase, LocalDateTime.now().plusHours(1));
 
         int attempts = 5;
         CountDownLatch ready = new CountDownLatch(attempts);
@@ -238,6 +244,8 @@ class IssueFiftySevenConcurrencyTest {
         } finally {
             pool.shutdown();
             evidenceRepository.findByPlan_PlanId(plan.getPlanId()).forEach(evidenceRepository::delete);
+            new TransactionTemplate(transactionManager).executeWithoutResult(
+                    status -> securityTokenRepository.deleteByReleaseCase_CaseId(releaseCase.getCaseId()));
             releaseCaseRepository.delete(releaseCase);
             confirmerRepository.delete(confirmer);
             planVersionRepository.delete(version);

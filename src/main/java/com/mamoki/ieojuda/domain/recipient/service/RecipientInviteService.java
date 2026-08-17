@@ -7,40 +7,37 @@ import com.mamoki.ieojuda.domain.recipient.dto.RecipientInviteTaskResponse;
 import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
-import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityToken;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.config.AppProperties;
-import com.mamoki.ieojuda.global.email.token.TokenProvider;
-import com.mamoki.ieojuda.global.email.token.TokenValidator;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.ratelimit.PublicLinkAuditor;
-import com.mamoki.ieojuda.global.ratelimit.TokenLookupGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.UUID;
 import java.util.List;
 
 // 명세서 "역할 수락 이메일/화면" - 담당자가 초대 링크로 진입해 역할을 확인하고 수락/거절 (로그인 불필요, 토큰이 곧 인증)
+// issue #41 - 수락/거절은 ACCEPT_ROLE 목적 토큰으로만 처리한다.
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class RecipientInviteService {
 
-    private final RecipientRepository recipientRepository;
     private final ItemRepository itemRepository;
     private final AppProperties appProperties;
-    private final TokenLookupGuard tokenLookupGuard;
     private final PublicLinkAuditor publicLinkAuditor;
+    private final SecurityTokenService securityTokenService;
 
-    // 초대 조회 - 만료된 링크는 상태를 EXPIRED로 반영하고 차단, 이미 수락/거절한 경우는 현재 상태를 그대로 보여준다
+    // 초대 조회 - 만료·사용·폐기·목적 불일치 링크는 차단
     @Transactional
     public RecipientInviteResponse getInvite(String plainToken) {
-        Recipient recipient = findByToken(plainToken);
-        checkNotExpired(recipient);
+        SecurityToken token = resolveAcceptToken(plainToken);
+        Recipient recipient = token.getRecipient();
 
         UUID itemOwnerId = Boolean.TRUE.equals(recipient.getIsBackup()) && recipient.getBackupFor() != null
                 ? recipient.getBackupFor().getAssigneeId()
@@ -50,28 +47,30 @@ public class RecipientInviteService {
                 .toList();
 
         String ownerName = recipient.getPlan().getUser().getName();
-        return RecipientInviteResponse.of(recipient, ownerName, tasks, appProperties.getContactEmail());
+        return RecipientInviteResponse.of(recipient, ownerName, tasks, token.getExpiresAt(), appProperties.getContactEmail());
     }
 
     // 역할 수락
     @Transactional
     public RecipientInviteDecisionResponse accept(String plainToken, RecipientInviteDecisionRequest request) {
-        Recipient recipient = findByToken(plainToken);
-        checkNotExpired(recipient);
+        SecurityToken token = resolveAcceptToken(plainToken);
+        Recipient recipient = token.getRecipient();
         checkPending(recipient);
 
         recipient.accept(inquiryOf(request));
+        securityTokenService.consume(token);
         return RecipientInviteDecisionResponse.from(recipient);
     }
 
     // 역할 거절
     @Transactional
     public RecipientInviteDecisionResponse decline(String plainToken, RecipientInviteDecisionRequest request) {
-        Recipient recipient = findByToken(plainToken);
-        checkNotExpired(recipient);
+        SecurityToken token = resolveAcceptToken(plainToken);
+        Recipient recipient = token.getRecipient();
         checkPending(recipient);
 
         recipient.decline(inquiryOf(request));
+        securityTokenService.consume(token);
         return RecipientInviteDecisionResponse.from(recipient);
     }
 
@@ -80,20 +79,8 @@ public class RecipientInviteService {
         return request == null ? null : request.inquiry();
     }
 
-    private Recipient findByToken(String plainToken) {
-        return tokenLookupGuard.resolve(plainToken,
-                () -> recipientRepository.findByInviteToken(TokenProvider.hashToken(plainToken)));
-    }
-
-    private void checkNotExpired(Recipient recipient) {
-        Instant expiresAt = recipient.getInviteTokenExpiresAt() == null
-                ? null
-                : recipient.getInviteTokenExpiresAt().atZone(ZoneId.systemDefault()).toInstant();
-        if (TokenValidator.isExpired(expiresAt, Instant.now())) {
-            recipient.expire();
-            publicLinkAuditor.recordStateFailure(ErrorCode.ACCESS_LINK_EXPIRED);
-            throw new CustomException(ErrorCode.ACCESS_LINK_EXPIRED);
-        }
+    private SecurityToken resolveAcceptToken(String plainToken) {
+        return securityTokenService.resolve(plainToken, SecurityTokenPurpose.ACCEPT_ROLE);
     }
 
     // 수락/거절은 대기 중(PENDING) 상태에서만 가능 - 이미 처리된 링크의 재사용을 차단

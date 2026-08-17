@@ -7,6 +7,9 @@ import com.mamoki.ieojuda.domain.confirmer.entity.DisputeContact;
 import com.mamoki.ieojuda.domain.confirmer.repository.DisputeContactRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.service.PlanOwnershipReader;
+import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
 import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
@@ -22,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -38,6 +42,7 @@ public class DisputeContactService {
     private final AppProperties appProperties;
     private final TokenLookupGuard tokenLookupGuard;
     private final PublicLinkAuditor publicLinkAuditor;
+    private final SecurityTokenService securityTokenService;
 
     @Transactional
     public DisputeContactResponse register(UUID userId, UUID planId, DisputeContactRegisterRequest request) {
@@ -66,6 +71,8 @@ public class DisputeContactService {
         if (emailChanged) {
             contact.resetVerification();
             emailSent = issueTokenAndSendVerificationEmail(contact);
+            // issue #41 - 연락처가 바뀌면 예전 연락처로 나간 이의 제기 토큰도 함께 폐기한다
+            securityTokenService.revokeAllForDisputeContact(contact, SecurityTokenPurpose.RAISE_OBJECTION);
         }
 
         return DisputeContactResponse.of(contact, emailSent);
@@ -134,5 +141,33 @@ public class DisputeContactService {
         }
 
         contact.verify();
+    }
+
+    // issue #41 - 사건이 대기(WAITING) 상태로 전환되는 시점에, 검증을 마친 이의 제기 연락처에게
+    // 이의 제기 전용 토큰(RAISE_OBJECTION, 사건 바인딩)을 발급해 안내 메일을 보낸다. 검증에 쓴 토큰을
+    // 이의 제기까지 재사용하지 않기 위함이다 - PartnerReviewService가 증빙을 승인할 때 호출한다.
+    @Transactional
+    public void notifyVerifiedContactsOfObjectionWindow(ReleaseCase releaseCase) {
+        List<DisputeContact> contacts = disputeContactRepository.findByPlan_PlanId(releaseCase.getPlan().getPlanId());
+        for (DisputeContact contact : contacts) {
+            if (!Boolean.TRUE.equals(contact.getIsVerified())) {
+                continue;
+            }
+            LocalDateTime expiresAt = releaseCase.getWaitingEndsAt() != null
+                    ? releaseCase.getWaitingEndsAt()
+                    : LocalDateTime.now().plusDays(appProperties.getActiveTokenTtlDays());
+            String plainToken = securityTokenService.issueForDisputeContact(
+                    SecurityTokenPurpose.RAISE_OBJECTION, contact, releaseCase, expiresAt);
+
+            String secureLink = appProperties.getBaseUrl() + "/release-cases/" + releaseCase.getCaseId() + "/disputes/" + plainToken;
+            EmailContent content = EmailBuilder.build(
+                    "이의 제기 가능 기간 안내",
+                    "잘못된 점이 있다면 링크로 들어가 이의를 제기해 주세요.",
+                    expiresAt.atZone(ZoneId.systemDefault()),
+                    secureLink,
+                    appProperties.getContactEmail()
+            );
+            emailOutboxService.enqueue(contact.getPlan(), null, EmailType.OBJECTION_WINDOW_NOTICE, contact.getEmail(), content);
+        }
     }
 }

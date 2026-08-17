@@ -6,6 +6,7 @@ import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
 import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.audit.entity.AdminActionType;
 import com.mamoki.ieojuda.domain.audit.service.AdminActionAuditService;
+import com.mamoki.ieojuda.domain.confirmer.service.DisputeContactService;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewDecisionRequest;
@@ -13,6 +14,8 @@ import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewResponse;
 import com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer;
 import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.idempotency.service.IdempotencyGuard;
@@ -38,6 +41,8 @@ public class PartnerReviewService {
     private final ReauthGuard reauthGuard;
     private final AdminActionAuditService adminActionAuditService;
     private final IdempotencyGuard idempotencyGuard;
+    private final SecurityTokenService securityTokenService;
+    private final DisputeContactService disputeContactService;
 
     public PartnerReviewResponse getReview(UUID userId, UUID reviewId) {
         permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
@@ -83,14 +88,20 @@ public class PartnerReviewService {
             // 승인되면 계획에 설정된 대기 기간만큼 발송을 미루는 대기 상태로 사건을 전이시킨다
             case APPROVE -> {
                 evidence.approve();
-                evidence.getReleaseCase().approveEvidenceAndStartWaiting(evidence.getPlan().getWaitingDays());
+                ReleaseCase releaseCase = evidence.getReleaseCase();
+                releaseCase.approveEvidenceAndStartWaiting(evidence.getPlan().getWaitingDays());
+                // issue #41 - 증빙 제출 단계가 끝났으므로 UPLOAD_EVIDENCE 토큰은 더 이상 필요 없다
+                securityTokenService.revokeAllForCase(releaseCase, SecurityTokenPurpose.UPLOAD_EVIDENCE);
+                disputeContactService.notifyVerifiedContactsOfObjectionWindow(releaseCase);
             }
             case REJECT -> {
                 if (request.failureReason() == null || request.failureReason().isBlank()) {
                     throw new CustomException(ErrorCode.INVALID_INPUT);
                 }
                 evidence.reject(request.failureReason());
-                evidence.getReleaseCase().rejectEvidence();
+                ReleaseCase releaseCase = evidence.getReleaseCase();
+                releaseCase.rejectEvidence();
+                securityTokenService.revokeAllForCase(releaseCase, SecurityTokenPurpose.UPLOAD_EVIDENCE);
             }
             case ADDITIONAL_INFO_REQUESTED -> evidence.reAdditionalInfo();
         }

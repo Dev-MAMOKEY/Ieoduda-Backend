@@ -8,8 +8,6 @@ import com.mamoki.ieojuda.domain.account.dto.UserUpdateRequest;
 import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.account.repository.RefreshSessionRepository;
 import com.mamoki.ieojuda.domain.account.repository.UserRepository;
-import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
-import com.mamoki.ieojuda.domain.confirmer.entity.DisputeContact;
 import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
 import com.mamoki.ieojuda.domain.confirmer.repository.DisputeContactRepository;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
@@ -26,11 +24,12 @@ import com.mamoki.ieojuda.domain.plan.repository.LifeAreaRepository;
 import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.domain.plan.repository.PlanVersionRepository;
 import com.mamoki.ieojuda.domain.postaccess.repository.PackageIssueRepository;
-import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
 import com.mamoki.ieojuda.domain.releasecase.repository.ObjectionRepository;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.domain.releasecase.service.ReleaseCaseGuardService;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.domain.stage.repository.HandoverStageRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
@@ -69,6 +68,7 @@ public class UserService {
     private final SessionRevocationService sessionRevocationService;
     private final RefreshSessionRepository refreshSessionRepository;
     private final PartnerReviewerRepository partnerReviewerRepository;
+    private final SecurityTokenService securityTokenService;
 
     @Transactional
     public UserResponse updateProfile(UUID userId, UserUpdateRequest request) {
@@ -116,10 +116,19 @@ public class UserService {
         return UserResponse.from(user);
     }
 
+    // issue #41 - 로그인 이메일이 바뀌면(계정 탈취 대응) 이 계획에 걸린 모든 목적의 미사용 보안 토큰을 폐기한다
     private void invalidatePlanInviteTokens(UUID planId) {
-        recipientRepository.findByPlan_PlanId(planId).forEach(Recipient::invalidateInviteToken);
-        confirmerRepository.findByPlan_PlanIdOrderByConfirmIdAsc(planId).forEach(Confirmer::invalidateInviteToken);
-        disputeContactRepository.findByPlan_PlanId(planId).forEach(DisputeContact::invalidateInviteToken);
+        recipientRepository.findByPlan_PlanId(planId).forEach(
+                recipient -> securityTokenService.revokeAllForRecipient(recipient, SecurityTokenPurpose.ACCEPT_ROLE));
+        confirmerRepository.findByPlan_PlanIdOrderByConfirmIdAsc(planId).forEach(confirmer -> {
+            securityTokenService.revokeAllForConfirmer(confirmer, SecurityTokenPurpose.ACCEPT_ROLE);
+            securityTokenService.revokeAllForConfirmer(confirmer, SecurityTokenPurpose.REPORT_DEATH);
+            securityTokenService.revokeAllForConfirmer(confirmer, SecurityTokenPurpose.UPLOAD_EVIDENCE);
+        });
+        disputeContactRepository.findByPlan_PlanId(planId).forEach(contact -> {
+            contact.invalidateInviteToken();
+            securityTokenService.revokeAllForDisputeContact(contact, SecurityTokenPurpose.RAISE_OBJECTION);
+        });
     }
 
     public UserResponse getMe(UUID userId) {

@@ -5,6 +5,8 @@ import java.util.UUID;
 import com.mamoki.ieojuda.domain.releasecase.dto.ReleaseStatusResponse;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReleaseStatusService {
 
     private final ReleaseCaseRepository releaseCaseRepository;
+    private final SecurityTokenService securityTokenService;
 
     public ReleaseStatusResponse getStatus(UUID userId, UUID caseId) {
         ReleaseCase releaseCase = findOwnedCase(userId, caseId);
@@ -29,6 +32,9 @@ public class ReleaseStatusService {
     public ReleaseStatusResponse cancel(UUID userId, UUID caseId) {
         ReleaseCase releaseCase = findOwnedCase(userId, caseId);
         releaseCase.cancel();
+        // issue #41 - 사건 종료(취소) 시 이 사건에 묶인 미사용 토큰을 전부 폐기한다
+        securityTokenService.revokeAllForCase(releaseCase, SecurityTokenPurpose.UPLOAD_EVIDENCE);
+        securityTokenService.revokeAllForCase(releaseCase, SecurityTokenPurpose.RAISE_OBJECTION);
         return ReleaseStatusResponse.of(releaseCase);
     }
 

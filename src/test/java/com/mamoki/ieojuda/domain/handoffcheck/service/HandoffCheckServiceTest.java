@@ -201,7 +201,7 @@ class HandoffCheckServiceTest {
         when(r1.getIsBackup()).thenReturn(false);
         when(r1.getBackupFor()).thenReturn(null);
         when(r1.getAcceptanceStatus()).thenReturn(AcceptanceStatus.ACCEPTED);
-        when(r1.getInviteToken()).thenReturn("hash");
+        when(r1.getInviteSent()).thenReturn(true);
         when(r1.getInquiry()).thenReturn(null);
         when(recipientRepository.findByPlan_PlanId(PLAN_ID)).thenReturn(List.of(r1));
         when(confirmerRepository.findByPlan_PlanIdOrderByConfirmIdAsc(PLAN_ID)).thenReturn(List.of());

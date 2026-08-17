@@ -13,6 +13,7 @@ import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCaseStatus;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStage;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStageStatus;
 import com.mamoki.ieojuda.domain.stage.repository.HandoverStageRepository;
@@ -59,6 +60,7 @@ class HandoverStageServiceTest {
     private PermissionGuard permissionGuard;
     private PackageActionCompletionRepository packageActionCompletionRepository;
     private AccessTokenRepository accessTokenRepository;
+    private SecurityTokenService securityTokenService;
     private HandoverStageService handoverStageService;
 
     private ReleaseCase releaseCase;
@@ -74,9 +76,11 @@ class HandoverStageServiceTest {
         permissionGuard = mock(PermissionGuard.class);
         packageActionCompletionRepository = mock(PackageActionCompletionRepository.class);
         accessTokenRepository = mock(AccessTokenRepository.class);
+        securityTokenService = mock(SecurityTokenService.class);
         handoverStageService = new HandoverStageService(
                 releaseCaseRepository, handoverStageRepository, recipientRepository, emailOutboxService,
-                appProperties, permissionGuard, packageActionCompletionRepository, accessTokenRepository);
+                appProperties, permissionGuard, packageActionCompletionRepository, accessTokenRepository,
+                securityTokenService);
 
         when(appProperties.getContactEmail()).thenReturn("support@ieoduda.example");
         when(appProperties.getInviteTokenTtlHours()).thenReturn(72L);

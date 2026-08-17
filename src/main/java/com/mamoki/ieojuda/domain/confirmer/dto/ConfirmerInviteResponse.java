@@ -14,13 +14,13 @@ public record ConfirmerInviteResponse(
         @Schema(description = "초대 링크 만료 시각") LocalDateTime expiresAt,
         @Schema(description = "문의 주소") String contactEmail
 ) {
-    public static ConfirmerInviteResponse of(Confirmer confirmer, String ownerName, String contactEmail) {
+    public static ConfirmerInviteResponse of(Confirmer confirmer, String ownerName, LocalDateTime expiresAt, String contactEmail) {
         return new ConfirmerInviteResponse(
                 confirmer.getName(),
                 ownerName,
                 confirmer.getAcceptanceStatus().name(),
                 confirmer.getEmail(),
-                confirmer.getInviteTokenExpiresAt(),
+                expiresAt,
                 contactEmail
         );
     }
