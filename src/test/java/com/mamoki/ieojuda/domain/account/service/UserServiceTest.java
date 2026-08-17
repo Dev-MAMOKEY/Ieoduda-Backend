@@ -69,6 +69,7 @@ class UserServiceTest {
     private DependencyRepository dependencyRepository;
     private EvidenceStorageClient evidenceStorageClient;
     private ReleaseCaseGuardService releaseCaseGuardService;
+    private SessionRevocationService sessionRevocationService;
     private UserService userService;
 
     @BeforeEach
@@ -94,13 +95,15 @@ class UserServiceTest {
         dependencyRepository = mock(DependencyRepository.class);
         evidenceStorageClient = mock(EvidenceStorageClient.class);
         releaseCaseGuardService = mock(ReleaseCaseGuardService.class);
+        sessionRevocationService = mock(SessionRevocationService.class);
 
         userService = new UserService(
                 userRepository, planRepository, conversationRepository, lifeAreaRepository, lifeAreaMessageRepository,
                 itemRepository, recipientRepository, disputeContactRepository, confirmerRepository,
                 releaseCaseRepository, planVersionRepository, evidenceRepository, emailLogRepository,
                 handoverStageRepository, objectionRepository, handoffCheckRepository, handoffCheckResponseRepository,
-                packageIssueRepository, dependencyRepository, evidenceStorageClient, releaseCaseGuardService);
+                packageIssueRepository, dependencyRepository, evidenceStorageClient, releaseCaseGuardService,
+                sessionRevocationService);
     }
 
     @Test
@@ -129,6 +132,7 @@ class UserServiceTest {
         verify(recipient).invalidateInviteToken();
         assertThat(confirmer.getInviteToken()).isNull();
         verify(disputeContact).invalidateInviteToken();
+        verify(sessionRevocationService).revokeAllSessions(user);
     }
 
     @Test
@@ -139,7 +143,8 @@ class UserServiceTest {
         userService.updateProfile(1L, new UserUpdateRequest("same@test.com", "New Name"));
 
         assertThat(user.getName()).isEqualTo("New Name");
-        verifyNoInteractions(planRepository, recipientRepository, confirmerRepository, disputeContactRepository);
+        verifyNoInteractions(planRepository, recipientRepository, confirmerRepository, disputeContactRepository,
+                sessionRevocationService);
     }
 
     @Test
