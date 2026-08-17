@@ -1,6 +1,5 @@
 package com.mamoki.ieojuda.domain.releasecase.entity;
 
-import com.mamoki.ieojuda.domain.partner.entity.ExternalPartner;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.entity.PlanVersion;
 import com.mamoki.ieojuda.global.exception.CustomException;
@@ -60,12 +59,6 @@ public class ReleaseCase {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
-    // issue #59 - 이 사건의 증빙 검토를 담당하는 외부 파트너사. 운영자가 수동으로 배정하며(#59 시점 기준
-    // 조직/업무 자동 배정 규칙은 기획에 없음), 배정 전까지는 어떤 파트너 검토자도 이 사건을 조작할 수 없다.
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "assigned_partner_id")
-    private ExternalPartner assignedPartner;
-
     // 동시에 여러 요청(파트너 승인, 스케줄러 등)이 같은 사건 상태를 전이시키려 할 때 뒤늦은 쪽을 밀어내기 위한 낙관적 잠금
     @Version
     @Column(name = "version")
@@ -82,11 +75,6 @@ public class ReleaseCase {
     // "이메일 발송 감사" 화면 - 운영자가 발송 절차 전체를 동결 (status 전이표와 별개인 보조 플래그)
     public void freeze() {
         this.frozen = true;
-    }
-
-    // issue #59 - 이 사건의 증빙 검토를 특정 외부 파트너사에 배정(운영자 수동 배정)
-    public void assignPartner(ExternalPartner partner) {
-        this.assignedPartner = partner;
     }
 
     public void unfreeze() {

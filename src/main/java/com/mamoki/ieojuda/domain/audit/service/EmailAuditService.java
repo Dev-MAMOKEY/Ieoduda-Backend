@@ -6,8 +6,6 @@ import com.mamoki.ieojuda.domain.audit.dto.EmailDeliveryResponse;
 import com.mamoki.ieojuda.domain.audit.entity.AdminActionType;
 import com.mamoki.ieojuda.domain.audit.entity.EmailLog;
 import com.mamoki.ieojuda.domain.audit.repository.EmailLogRepository;
-import com.mamoki.ieojuda.domain.partner.entity.ExternalPartner;
-import com.mamoki.ieojuda.domain.partner.repository.ExternalPartnerRepository;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
@@ -32,7 +30,7 @@ import java.util.UUID;
 import java.util.List;
 
 // 명세서 "이메일 발송 감사" 화면 - 서비스 운영자가 발송·반송·열람 이력을 조회하고 재시도/동결만 수행 (본문·패키지 내용은 접근 불가)
-// issue #59 - CASE_SUPERVISE 세부 권한 검사, 사건 동결은 재인증 필요 + 감사 기록. 파트너사 배정도 여기서 담당.
+// issue #59 - CASE_SUPERVISE 세부 권한 검사, 사건 동결은 재인증 필요 + 감사 기록.
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -40,7 +38,6 @@ public class EmailAuditService {
 
     private final ReleaseCaseRepository releaseCaseRepository;
     private final EmailLogRepository emailLogRepository;
-    private final ExternalPartnerRepository externalPartnerRepository;
     private final EmailOutboxService emailOutboxService;
     private final AppProperties appProperties;
     private final PermissionGuard permissionGuard;
@@ -104,19 +101,6 @@ public class EmailAuditService {
 
         findCase(caseId).freeze();
         adminActionAuditService.record(actor, AdminActionType.CASE_FREEZE, caseId, true, null);
-    }
-
-    // issue #59 - 사건의 증빙 검토를 담당할 외부 파트너사를 운영자가 수동으로 배정
-    @Transactional
-    public void assignPartner(UUID userId, UUID caseId, UUID partnerId) {
-        User actor = permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
-        ReleaseCase releaseCase = findCase(caseId);
-        ExternalPartner partner = externalPartnerRepository.findById(partnerId)
-                .orElseThrow(() -> new CustomException(ErrorCode.EXTERNAL_PARTNER_NOT_FOUND));
-
-        releaseCase.assignPartner(partner);
-        adminActionAuditService.record(actor, AdminActionType.CASE_ASSIGN_PARTNER, caseId, true,
-                "partnerId=" + partnerId);
     }
 
     private ReleaseCase findCase(UUID caseId) {

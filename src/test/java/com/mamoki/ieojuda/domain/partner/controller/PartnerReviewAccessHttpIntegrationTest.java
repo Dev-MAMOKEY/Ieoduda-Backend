@@ -12,10 +12,7 @@ import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceType;
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceDownloadTokenRepository;
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
-import com.mamoki.ieojuda.domain.partner.entity.ExternalPartner;
 import com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer;
-import com.mamoki.ieojuda.domain.partner.entity.PartnerType;
-import com.mamoki.ieojuda.domain.partner.repository.ExternalPartnerRepository;
 import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.entity.PlanVersion;
@@ -48,12 +45,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-// issue #43 완료 조건 통합 검증 - 접근 경계는 조직(소속 파트너사) 단위까지다(개별 검토자 사전 지정은
-// 별도 브랜치에서 다룬다). 그래서 "지정되지 않은 파트너는 접근할 수 없다"는 여기서는 "배정 안 된 사건
-// 또는 다른 조직의 파트너는 접근할 수 없다"로, "다른 조직의 파트너는 판정을 변경할 수 없다"는 그대로
-// 검증하고, 같은 조직의 어떤 활성 검토자든 접근할 수 있음도 함께 확인한다.
+// issue #43 완료 조건 통합 검증 - 배정/소속 개념이 없으므로 EVIDENCE_REVIEW 권한을 가진 활성 검토자는
+// 누구든 접근할 수 있다. 여기서는 그중 판정을 1회 상태 전이로 제한하는 것과, 원본 다운로드가 1회성
+// 토큰을 소비해야 하고 호출자 기준으로 감사되는 것을 실제 HTTP 컨트롤러/재인증 체인 포함해 검증한다.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class PartnerReviewOrgAccessHttpIntegrationTest {
+class PartnerReviewAccessHttpIntegrationTest {
 
     @LocalServerPort
     private int port;
@@ -66,8 +62,6 @@ class PartnerReviewOrgAccessHttpIntegrationTest {
     private PlanVersionRepository planVersionRepository;
     @Autowired
     private ReleaseCaseRepository releaseCaseRepository;
-    @Autowired
-    private ExternalPartnerRepository externalPartnerRepository;
     @Autowired
     private PartnerReviewerRepository partnerReviewerRepository;
     @Autowired
@@ -92,19 +86,14 @@ class PartnerReviewOrgAccessHttpIntegrationTest {
     private Plan plan;
     private PlanVersion planVersion;
     private ReleaseCase releaseCase;
-    private ExternalPartner partnerOrg;
-    private ExternalPartner otherPartnerOrg;
     private Confirmer confirmer;
     private Evidence evidence;
 
     private User reviewerAUser;
     private String reviewerAToken;
 
-    private User reviewerBUser; // 같은 조직, 개별 사전 배정은 없지만 접근은 가능해야 함
+    private User reviewerBUser; // 배정/소속이 없으므로 reviewerA와 마찬가지로 접근 가능해야 함
     private String reviewerBToken;
-
-    private User otherOrgReviewerUser;
-    private String otherOrgReviewerToken;
 
     @BeforeEach
     void setUp() {
@@ -117,11 +106,6 @@ class PartnerReviewOrgAccessHttpIntegrationTest {
                 PlanVersion.builder().plan(plan).versionNum(1).snapshotData("{}").build());
         releaseCase = releaseCaseRepository.saveAndFlush(ReleaseCase.builder().plan(plan).planVersion(planVersion).build());
 
-        partnerOrg = externalPartnerRepository.saveAndFlush(
-                ExternalPartner.builder().name("파트너A").partnerType(PartnerType.LEGAL).contactInfo("contact-a").build());
-        otherPartnerOrg = externalPartnerRepository.saveAndFlush(
-                ExternalPartner.builder().name("파트너B").partnerType(PartnerType.LEGAL).contactInfo("contact-b").build());
-        releaseCase.assignPartner(partnerOrg);
         // issue #45 - approveEvidenceAndStartWaiting()이 EVIDENCE_REVIEWING/EVIDENCE_APPROVED에서만
         // 허용되므로, 판정 API를 호출하기 전에 사건을 그 상태까지 진행시켜둬야 한다.
         releaseCase.confirmReport();
@@ -133,26 +117,21 @@ class PartnerReviewOrgAccessHttpIntegrationTest {
 
         confirmer = confirmerRepository.saveAndFlush(Confirmer.builder()
                 .plan(plan).name("확인자").relationship(Relationship.FRIEND)
-                .email("confirmer-org-access-" + UUID.randomUUID() + "@test.com").build());
+                .email("confirmer-access-" + UUID.randomUUID() + "@test.com").build());
         evidence = evidenceRepository.saveAndFlush(Evidence.builder()
                 .confirmer(confirmer).plan(plan).releaseCase(releaseCase)
-                .storageKey("evidence/org-access-test/key").fileName("proof.pdf").mimeType("application/pdf")
+                .storageKey("evidence/access-test/key").fileName("proof.pdf").mimeType("application/pdf")
                 .integrityHash("hash").evidenceType(EvidenceType.DEATH_CERTIFICATE).build());
 
         reviewerAUser = createUser(UserRole.EXTERNAL, Set.of(AdminPermission.EVIDENCE_REVIEW));
         reviewerAToken = issueToken(reviewerAUser);
         partnerReviewerRepository.saveAndFlush(PartnerReviewer.builder()
-                .partner(partnerOrg).user(reviewerAUser).name("검토자A").email(reviewerAUser.getEmail()).build());
+                .user(reviewerAUser).name("검토자A").email(reviewerAUser.getEmail()).build());
 
         reviewerBUser = createUser(UserRole.EXTERNAL, Set.of(AdminPermission.EVIDENCE_REVIEW));
         reviewerBToken = issueToken(reviewerBUser);
         partnerReviewerRepository.saveAndFlush(PartnerReviewer.builder()
-                .partner(partnerOrg).user(reviewerBUser).name("검토자B").email(reviewerBUser.getEmail()).build());
-
-        otherOrgReviewerUser = createUser(UserRole.EXTERNAL, Set.of(AdminPermission.EVIDENCE_REVIEW));
-        otherOrgReviewerToken = issueToken(otherOrgReviewerUser);
-        partnerReviewerRepository.saveAndFlush(PartnerReviewer.builder()
-                .partner(otherPartnerOrg).user(otherOrgReviewerUser).name("타조직 검토자").email(otherOrgReviewerUser.getEmail()).build());
+                .user(reviewerBUser).name("검토자B").email(reviewerBUser.getEmail()).build());
     }
 
     // 재인증(ReauthGuard)이 실제 BCrypt 비교를 하므로, "hash"라는 원문 비밀번호를 인코딩해서 저장해둔다
@@ -175,31 +154,20 @@ class PartnerReviewOrgAccessHttpIntegrationTest {
         evidenceRepository.deleteById(evidence.getEvidenceId());
         confirmerRepository.deleteById(confirmer.getConfirmId());
         partnerReviewerRepository.deleteAll(partnerReviewerRepository.findAll().stream()
-                .filter(r -> r.getPartner().getPartnerId().equals(partnerOrg.getPartnerId())
-                        || r.getPartner().getPartnerId().equals(otherPartnerOrg.getPartnerId()))
+                .filter(r -> r.getUser().getUserId().equals(reviewerAUser.getUserId())
+                        || r.getUser().getUserId().equals(reviewerBUser.getUserId()))
                 .toList());
         releaseCaseRepository.deleteById(releaseCase.getCaseId());
         planVersionRepository.delete(planVersion);
         planRepository.delete(plan);
-        externalPartnerRepository.delete(partnerOrg);
-        externalPartnerRepository.delete(otherPartnerOrg);
         userRepository.delete(owner);
         userRepository.delete(reviewerAUser);
         userRepository.delete(reviewerBUser);
-        userRepository.delete(otherOrgReviewerUser);
     }
 
+    // issue #120 - 배정/소속 개념이 없다. EVIDENCE_REVIEW 권한을 가진 활성 검토자는 누구든 접근할 수 있다.
     @Test
-    void reviewerFromDifferentOrg_cannotViewOrDownloadOrDecide() throws Exception {
-        assertThat(get("/api/partner/reviews/" + evidence.getEvidenceId(), otherOrgReviewerToken).statusCode()).isEqualTo(403);
-        assertThat(post("/api/partner/reviews/" + evidence.getEvidenceId() + "/file", otherOrgReviewerToken, null).statusCode()).isEqualTo(403);
-        assertThat(post("/api/partner/reviews/" + evidence.getEvidenceId() + "/decision", otherOrgReviewerToken,
-                "{\"decision\":\"APPROVE\",\"password\":\"hash\"}").statusCode()).isEqualTo(403);
-    }
-
-    // issue #43 - 개별 사전 배정은 없다. 같은 조직 소속이면 어떤 활성 검토자든 접근할 수 있어야 한다.
-    @Test
-    void anyActiveReviewerInAssignedOrg_canViewMetadata() throws Exception {
+    void anyActiveReviewerWithPermission_canViewMetadata() throws Exception {
         assertThat(get("/api/partner/reviews/" + evidence.getEvidenceId(), reviewerAToken).statusCode()).isEqualTo(200);
         assertThat(get("/api/partner/reviews/" + evidence.getEvidenceId(), reviewerBToken).statusCode()).isEqualTo(200);
     }

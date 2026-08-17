@@ -20,10 +20,6 @@ public class PartnerReviewer {
     @Column(name = "reviewer_id")
     private UUID reviewerId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "partner_id", nullable = false)
-    private ExternalPartner partner;
-
     // 이 검토자로 로그인하는 계정(role=EXTERNAL). DB에서 role을 승격시킬 때 같이 연결해줘야 한다.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
@@ -39,8 +35,7 @@ public class PartnerReviewer {
     private Boolean isActive;
 
     @Builder
-    public PartnerReviewer(ExternalPartner partner, User user, String name, String email) {
-        this.partner = partner;
+    public PartnerReviewer(User user, String name, String email) {
         this.user = user;
         this.name = name;
         this.email = email;

@@ -39,10 +39,8 @@ import java.util.List;
 
 // 명세서 "외부 파트너 증빙 검토" 화면 - 외부 법무·장례 파트너 전용. 역할별 패키지(계획 내용)는 절대 노출하지 않는다.
 // reviewId는 evidenceId와 1:1로 취급한다(증빙 1건 = 검토 1건).
-// issue #59 - EVIDENCE_REVIEW 세부 권한 + 소속 파트너사가 배정된 사건만 조작 가능(조직 경계) + 판정은 재인증 필요
-// issue #43 - 접근 경계는 조직(소속 파트너사) 단위까지다 - 개별 검토자 사전 지정은 두지 않는다(목록·개인별
-// 배정 UX는 별도 브랜치에서 다룬다). 다만 판정은 1회 상태 전이로 제한하고, 원본 다운로드는 짧은 수명의
-// 1회성 토큰을 소비해야 하며, 다운로드·판정 이력은 호출자(actor) 기준으로 감사된다.
+// issue #59 - EVIDENCE_REVIEW 세부 권한 + 판정은 재인증 필요. 배정/소속 개념은 폐지되어 EVIDENCE_REVIEW
+// 권한만 있으면 모든 증빙을 조회·다운로드·판정할 수 있다.
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -66,12 +64,11 @@ public class PartnerReviewService {
     public PartnerReviewResponse getReview(UUID userId, UUID reviewId) {
         permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
         Evidence evidence = findEvidence(reviewId);
-        requireAssignedPartner(findActiveReviewerByUser(userId), evidence);
+        findActiveReviewerByUser(userId);
         return PartnerReviewResponse.from(evidence);
     }
 
-    // issue #87 - 목록은 배정된 파트너와 무관하게 EVIDENCE_REVIEW 권한만 있으면 전체를 조회한다.
-    // (getReview/downloadFile/decide의 조직 경계 검사는 그대로 유지, 목록에는 적용하지 않는다)
+    // issue #87 - EVIDENCE_REVIEW 권한만 있으면 전체를 조회한다.
     public List<PartnerReviewListItemResponse> getReviews(UUID userId, EvidenceReviewStatus status) {
         permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
         return evidenceRepository.findAllByReviewStatus(status)
@@ -87,7 +84,6 @@ public class PartnerReviewService {
         permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
         Evidence evidence = findEvidence(reviewId);
         PartnerReviewer reviewer = findActiveReviewerByUser(userId);
-        requireAssignedPartner(reviewer, evidence);
 
         String plainToken = TokenProvider.generatePlainToken();
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(DOWNLOAD_TOKEN_TTL_MINUTES);
@@ -106,8 +102,7 @@ public class PartnerReviewService {
     public byte[] downloadFile(UUID userId, UUID reviewId, String plainToken) {
         User actor = permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
         Evidence evidence = findEvidence(reviewId);
-        PartnerReviewer reviewer = findActiveReviewerByUser(userId);
-        requireAssignedPartner(reviewer, evidence);
+        findActiveReviewerByUser(userId);
 
         EvidenceDownloadToken token = evidenceDownloadTokenRepository.findByTokenHash(TokenProvider.hashToken(plainToken))
                 .orElseThrow(() -> new CustomException(ErrorCode.TOKEN_INVALID));
@@ -132,7 +127,6 @@ public class PartnerReviewService {
         User actor = permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
         Evidence evidence = findEvidence(reviewId);
         PartnerReviewer reviewer = findActiveReviewerByUser(userId);
-        requireAssignedPartner(reviewer, evidence);
 
         // issue #43 - 판정을 1회 상태 전이로 제한한다. APPROVED/REJECTED는 종결 상태라 다시 판정할 수 없다
         // (ADDITIONAL_INFO_REQUESTED는 종결이 아니라 추가 자료를 받은 뒤 다시 판정할 수 있어야 한다).
@@ -152,8 +146,8 @@ public class PartnerReviewService {
         // 정상적인 재시도까지 막는 일이 없다.
         idempotencyGuard.claim("partner-review-decision", idempotencyKey);
 
-        // 개별 사전 배정이 없는 조직 단위 접근이므로, 실제로 판정을 내린 사람이 누구인지는
-        // 판정 시점에만 기록할 수 있다(표시·감사용 - 접근 제어에는 쓰지 않는다).
+        // 배정/소속 개념이 없으므로, 실제로 판정을 내린 사람이 누구인지는 판정 시점에만 기록한다
+        // (표시·감사용 - 접근 제어에는 쓰지 않는다).
         evidence.assignReviewer(reviewer);
 
         switch (request.decision()) {
@@ -193,20 +187,7 @@ public class PartnerReviewService {
         return PartnerReviewResponse.from(evidence);
     }
 
-    // issue #59 - 검토자 소속 파트너사와 사건에 배정된 파트너사가 같아야만 조작 가능. 아직 배정되지 않은
-    // 사건은 어떤 검토자도 손댈 수 없다(운영자 배정이 먼저 있어야 함). issue #43 - 접근 경계는 이 조직
-    // 단위까지고, 그 안에서 어떤 활성 검토자가 처리하는지는 제한하지 않는다(목록·개인별 배정은 별도 브랜치).
-    private void requireAssignedPartner(PartnerReviewer reviewer, Evidence evidence) {
-        ReleaseCase releaseCase = evidence.getReleaseCase();
-        if (releaseCase.getAssignedPartner() == null) {
-            throw new CustomException(ErrorCode.PARTNER_NOT_ASSIGNED);
-        }
-        if (!releaseCase.getAssignedPartner().getPartnerId().equals(reviewer.getPartner().getPartnerId())) {
-            throw new CustomException(ErrorCode.PARTNER_SCOPE_DENIED);
-        }
-    }
-
-    // getReview/getFile/decide 세 경로가 모두 이 메서드를 거치므로, 원본이 이미 삭제된 증빙을
+    // getReview/downloadFile/decide 세 경로가 모두 이 메서드를 거치므로, 원본이 이미 삭제된 증빙을
     // 여기서 한 번에 막는다. 원본 삭제 후 승인/반려를 허용하면 존재하지 않는 파일을 판정하는
     // 정합성 결함이 생기고, 다운로드는 지금까지 S3까지 갔다가 404로 새고 있었다.
     private Evidence findEvidence(UUID reviewId) {

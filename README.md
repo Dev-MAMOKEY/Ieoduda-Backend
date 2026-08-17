@@ -66,9 +66,7 @@ domain/
 │
 ├── partner/                              ← 외부 법무·장례 파트너 검토
 │   └── entity/
-│       ├── ExternalPartner.java         
-│       ├── PartnerReviewer.java         
-│       └── PartnerType.java             m
+│       └── PartnerReviewer.java         
 │
 ├── postaccess/                           ← 사후 인계 인증 · 패키지 문제 신고
 │   └── entity/

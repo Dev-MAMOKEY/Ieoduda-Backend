@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public record PartnerReviewResponse(
         @Schema(description = "검토 ID (증빙 ID와 동일)") UUID reviewId,
         @Schema(description = "사망 확인 대상자(계획 작성자) 이름") String targetName,
+        @Schema(description = "증빙을 제출한 지정확인자 이름") String confirmerName,
         @Schema(description = "증빙 파일명") String fileName,
         @Schema(description = "증빙 MIME 타입") String mimeType,
         @Schema(description = "증빙 종류", example = "DEATH_CERTIFICATE", allowableValues = {"DEATH_CERTIFICATE", "DEATH_REPORT", "POSTMORTEM_REPORT"}) String evidenceType,
@@ -25,6 +26,7 @@ public record PartnerReviewResponse(
         return new PartnerReviewResponse(
                 evidence.getEvidenceId(),
                 evidence.getPlan().getUser().getName(),
+                evidence.getConfirmer().getName(),
                 evidence.getFileName(),
                 evidence.getMimeType(),
                 evidence.getEvidenceType().name(),
