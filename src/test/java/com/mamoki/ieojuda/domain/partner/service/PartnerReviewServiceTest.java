@@ -10,6 +10,7 @@ import com.mamoki.ieojuda.domain.evidence.entity.EvidenceReviewStatus;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceType;
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewDecisionRequest;
+import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewListItemResponse;
 import com.mamoki.ieojuda.domain.partner.entity.ExternalPartner;
 import com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer;
 import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
@@ -25,12 +26,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -199,5 +202,40 @@ class PartnerReviewServiceTest {
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EVIDENCE_ALREADY_DELETED));
         verify(evidence, never()).approve();
+    }
+
+    // issue #87 - 목록 조회는 getReview/getFile/decide와 달리 배정된 파트너 조직 경계를 검사하지 않는다.
+    // (다른 파트너 소속 검토자여도 EVIDENCE_REVIEW 권한만 있으면 전체가 조회되어야 한다는 요구사항)
+    @Test
+    void getReviews_returnsAllEvidencesRegardlessOfAssignedPartner() {
+        when(evidence.getEvidenceId()).thenReturn(REVIEW_ID);
+        when(evidenceRepository.findAllByReviewStatus(EvidenceReviewStatus.PENDING))
+                .thenReturn(List.of(evidence));
+
+        List<PartnerReviewListItemResponse> result = partnerReviewService.getReviews(USER_ID, EvidenceReviewStatus.PENDING);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).reviewId()).isEqualTo(REVIEW_ID);
+        verify(releaseCase, never()).getAssignedPartner();
+    }
+
+    @Test
+    void getReviews_passesNullStatusThrough_whenNoFilterGiven() {
+        when(evidenceRepository.findAllByReviewStatus(isNull())).thenReturn(List.of());
+
+        partnerReviewService.getReviews(USER_ID, null);
+
+        verify(evidenceRepository).findAllByReviewStatus(isNull());
+    }
+
+    @Test
+    void getReviews_whenUserLacksEvidenceReviewPermission_isBlockedBeforeAnyLookup() {
+        when(permissionGuard.require(USER_ID, AdminPermission.EVIDENCE_REVIEW))
+                .thenThrow(new CustomException(ErrorCode.INSUFFICIENT_PERMISSION));
+
+        assertThatThrownBy(() -> partnerReviewService.getReviews(USER_ID, EvidenceReviewStatus.PENDING))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INSUFFICIENT_PERMISSION));
+        verify(evidenceRepository, never()).findAllByReviewStatus(any());
     }
 }
