@@ -54,6 +54,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 // issue #78 - HandoverStage.complete()가 호출되지 않아 발송 체인이 1단계에서 영구히 멈추던 버그의
@@ -213,6 +214,13 @@ class StageDispatchHttpIntegrationTest {
         assertThat(reloadedStage2.getStatus()).isEqualTo(HandoverStageStatus.SENT);
         assertThat(emailLogRepository.findByPlan_PlanIdOrderBySentAtDesc(plan.getPlanId()))
                 .anyMatch(log -> log.getHandoverStage().getStageId().equals(stage2.getStageId()));
+
+        // issue #79 - 2단계는 정상적으로 자기 순서가 온 것이지 대체 담당자 전환이 아니므로 최초 발송 문구를 받아야 한다
+        org.mockito.ArgumentCaptor<EmailContent> stage2EmailCaptor = org.mockito.ArgumentCaptor.forClass(EmailContent.class);
+        verify(emailSender).send(org.mockito.ArgumentMatchers.eq(recipient2.getEmail()), stage2EmailCaptor.capture());
+        assertThat(stage2EmailCaptor.getValue().body()).doesNotContain("대체 담당자로 지정되었습니다");
+        assertThat(stage2EmailCaptor.getValue().body()).contains("/posthumous-access/");
+        assertThat(stage2EmailCaptor.getValue().body()).doesNotContain("/recipient-acceptances/");
 
         ReleaseCase reloadedCase = releaseCaseRepository.findById(releaseCase.getCaseId()).orElseThrow();
         assertThat(reloadedCase.getStatus()).isNotEqualTo(ReleaseCaseStatus.COMPLETED); // 아직 2단계가 안 끝남
