@@ -15,6 +15,13 @@ public interface EvidenceRepository extends JpaRepository<Evidence, UUID> {
     // "공식 증빙 자료 제출" 화면 - 사건당 최대 3개 제한 검증용
     long countByReleaseCase_CaseId(UUID caseId);
 
+    // issue #45 - "이 확인자가 이 사건에 이미 냈는지" 중복 제출 방지용
+    boolean existsByReleaseCase_CaseIdAndConfirmer_ConfirmId(UUID caseId, UUID confirmId);
+
+    // issue #45 - "여러 증빙의 승인 정책" - 이 사건에서 승인된 증빙이 몇 건인지 세어, 매칭된 확인자 수와
+    // 비교해 전부 승인됐는지 판단한다.
+    long countByReleaseCase_CaseIdAndReviewStatus(UUID caseId, EvidenceReviewStatus reviewStatus);
+
     // 계정 삭제 시 이 계획에 제출된 증빙을 전부 지우기 위한 조회 (S3 원본도 같이 정리해야 함)
     List<Evidence> findByPlan_PlanId(UUID planId);
 

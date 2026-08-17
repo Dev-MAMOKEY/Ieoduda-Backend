@@ -92,6 +92,13 @@ class HandoverStageServiceTest {
         PlanVersion planVersion = mock(PlanVersion.class);
         releaseCase = ReleaseCase.builder().plan(plan).planVersion(planVersion).build();
         setId(releaseCase, "caseId", CASE_ID);
+        // issue #45 - ReleaseCase.complete()는 RELEASING에서만 허용되므로, 발송 단계 완료 흐름을
+        // 검증하려면 사건을 실제로 그 상태까지 진행시켜둬야 한다(이 테스트의 관심사는 아니지만 전제 조건).
+        releaseCase.confirmReport();
+        releaseCase.awaitEvidence();
+        releaseCase.startEvidenceReview();
+        releaseCase.approveEvidenceAndStartWaiting(7);
+        releaseCase.startReleasing();
 
         Recipient recipient = mock(Recipient.class);
         when(recipient.getEmail()).thenReturn("target@test.com");

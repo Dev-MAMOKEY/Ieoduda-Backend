@@ -122,6 +122,11 @@ class PartnerReviewOrgAccessHttpIntegrationTest {
         otherPartnerOrg = externalPartnerRepository.saveAndFlush(
                 ExternalPartner.builder().name("파트너B").partnerType(PartnerType.LEGAL).contactInfo("contact-b").build());
         releaseCase.assignPartner(partnerOrg);
+        // issue #45 - approveEvidenceAndStartWaiting()이 EVIDENCE_REVIEWING/EVIDENCE_APPROVED에서만
+        // 허용되므로, 판정 API를 호출하기 전에 사건을 그 상태까지 진행시켜둬야 한다.
+        releaseCase.confirmReport();
+        releaseCase.awaitEvidence();
+        releaseCase.startEvidenceReview();
         // saveAndFlush(detached entity)는 merge()라서 새 관리 인스턴스를 반환한다 - 반드시 재할당해야
         // 이후 delete에서 최신 version을 참조해 낙관적 잠금 충돌이 나지 않는다.
         releaseCase = releaseCaseRepository.saveAndFlush(releaseCase);
