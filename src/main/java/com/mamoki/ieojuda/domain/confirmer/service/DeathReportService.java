@@ -1,5 +1,6 @@
 package com.mamoki.ieojuda.domain.confirmer.service;
 
+import com.mamoki.ieojuda.domain.audit.entity.EmailType;
 import com.mamoki.ieojuda.domain.confirmer.dto.DeathReportRequest;
 import com.mamoki.ieojuda.domain.confirmer.dto.DeathReportResponse;
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
@@ -14,12 +15,16 @@ import com.mamoki.ieojuda.domain.plan.service.PlanSnapshotService;
 import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
-import com.mamoki.ieojuda.global.email.token.TokenProvider;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityToken;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
+import com.mamoki.ieojuda.global.config.AppProperties;
+import com.mamoki.ieojuda.global.email.contract.EmailContent;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
+import com.mamoki.ieojuda.global.email.template.EmailBuilder;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.idempotency.service.IdempotencyGuard;
-import com.mamoki.ieojuda.global.ratelimit.PublicLinkAuditor;
-import com.mamoki.ieojuda.global.ratelimit.TokenLookupGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -27,41 +32,47 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 
-// 명세서 "사망 신고 이메일" 화면 - 지정 확인자가 사망 사실을 신고한다 (로그인 불필요, 초대 토큰이 곧 인증).
-// 수락 시 발급된 초대 토큰은 "수락 대기" 창구용 만료시각이 있지만, 이미 수락한 확인자에게는
-// 이 토큰이 이후 언제든 다시 찾아와 신고할 수 있는 개인 접근키 역할도 겸한다 - 그래서 여기서는 만료 검사를 하지 않는다.
+// 명세서 "사망 신고 이메일" 화면 - 지정 확인자가 사망 사실을 신고한다 (로그인 불필요, REPORT_DEATH 토큰이 곧 인증).
+// issue #41 - 수락 시 발급된 ACCEPT_ROLE 토큰과는 별개인 REPORT_DEATH 전용 토큰만 여기서 받는다
+// (역할 수락 토큰이 사망 신고의 영구 접근키로 재사용되지 않도록).
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class DeathReportService {
 
+    // issue #41 - 증빙 제출은 사건 생성 시점부터 일정 기간 내에 이뤄져야 하므로, 사망신고 토큰보다 짧게 둔다
+    private static final long EVIDENCE_TOKEN_TTL_DAYS = 30;
+
     private final ConfirmerRepository confirmerRepository;
     private final ReleaseCaseRepository releaseCaseRepository;
     private final PlanVersionRepository planVersionRepository;
-    private final TokenLookupGuard tokenLookupGuard;
-    private final PublicLinkAuditor publicLinkAuditor;
     private final PlanSnapshotService planSnapshotService;
     private final IdempotencyGuard idempotencyGuard;
+    private final SecurityTokenService securityTokenService;
+    private final EmailOutboxService emailOutboxService;
+    private final AppProperties appProperties;
 
     @Transactional
     public DeathReportResponse report(String plainToken, DeathReportRequest request, String idempotencyKey) {
-        Confirmer confirmer = findByToken(plainToken);
+        SecurityToken token = securityTokenService.resolve(plainToken, SecurityTokenPurpose.REPORT_DEATH);
+        Confirmer confirmer = token.getConfirmer();
 
         if (confirmer.getAcceptanceStatus() != AcceptanceStatus.ACCEPTED) {
-            publicLinkAuditor.recordStateFailure(ErrorCode.FORBIDDEN);
             throw new CustomException(ErrorCode.FORBIDDEN);
         }
         if (confirmer.getReportStatus() != ReportStatus.NOT_REPORTED) {
-            publicLinkAuditor.recordStateFailure(ErrorCode.ACCESS_LINK_ALREADY_USED);
             throw new CustomException(ErrorCode.ACCESS_LINK_ALREADY_USED);
         }
         idempotencyGuard.claim("death-report", idempotencyKey);
 
         confirmer.report(request == null ? null : request.deathDate());
+        securityTokenService.consume(token);
 
         List<Confirmer> siblings = confirmerRepository.findByPlan_PlanIdAndConfirmIdNotAndReportStatus(
                 confirmer.getPlan().getPlanId(), confirmer.getConfirmId(), ReportStatus.REPORTED);
@@ -71,7 +82,9 @@ public class DeathReportService {
             if (datesAgree(confirmer.getReportedDeathDate(), sibling.getReportedDeathDate())) {
                 confirmer.markMatched();
                 sibling.markMatched();
-                createReleaseCase(confirmer.getPlan());
+                ReleaseCase releaseCase = createReleaseCase(confirmer.getPlan());
+                issueEvidenceUploadTokenAndSend(confirmer, releaseCase);
+                issueEvidenceUploadTokenAndSend(sibling, releaseCase);
             } else {
                 confirmer.markMismatched();
                 sibling.markMismatched();
@@ -79,6 +92,24 @@ public class DeathReportService {
         }
 
         return DeathReportResponse.from(confirmer);
+    }
+
+    // issue #41 - 증빙 제출은 노션 명세서상 "제출 안내 이메일"을 통해서만 진입하므로, 사건이 열리는 즉시
+    // 매칭된 두 확인자 각각에게 자신만의 UPLOAD_EVIDENCE 토큰(사건 바인딩)을 발급해 이메일로 보낸다.
+    private void issueEvidenceUploadTokenAndSend(Confirmer confirmer, ReleaseCase releaseCase) {
+        LocalDateTime expiresAt = LocalDateTime.now().plusDays(EVIDENCE_TOKEN_TTL_DAYS);
+        String plainToken = securityTokenService.issueForConfirmer(
+                SecurityTokenPurpose.UPLOAD_EVIDENCE, confirmer, releaseCase, expiresAt);
+
+        String secureLink = appProperties.getBaseUrl() + "/evidence-submissions/" + releaseCase.getCaseId() + "/" + plainToken;
+        EmailContent content = EmailBuilder.build(
+                "공식 증빙 자료 제출",
+                "사망 관련 공식 증빙 자료(사망진단서 등)를 제출해 주세요.",
+                expiresAt.atZone(ZoneId.systemDefault()),
+                secureLink,
+                appProperties.getContactEmail()
+        );
+        emailOutboxService.enqueue(confirmer.getPlan(), null, EmailType.EVIDENCE_SUBMISSION_REQUEST, confirmer.getEmail(), content);
     }
 
     // 둘 다 모르는 경우, 둘 다 같은 날짜인 경우, 한쪽만 모르는 경우는 모두 일치로 본다 - 날짜가 서로 다를 때만 불일치
@@ -89,7 +120,7 @@ public class DeathReportService {
         return Objects.equals(a, b);
     }
 
-    private void createReleaseCase(Plan plan) {
+    private ReleaseCase createReleaseCase(Plan plan) {
         if (releaseCaseRepository.findFirstByPlan_PlanIdOrderByCaseIdDesc(plan.getPlanId())
                 .filter(existing -> existing.getCanceledAt() == null)
                 .isPresent()) {
@@ -123,10 +154,6 @@ public class DeathReportService {
         }
         releaseCase.confirmReport();
         releaseCase.awaitEvidence();
-    }
-
-    private Confirmer findByToken(String plainToken) {
-        return tokenLookupGuard.resolve(plainToken,
-                () -> confirmerRepository.findByInviteToken(TokenProvider.hashToken(plainToken)));
+        return releaseCase;
     }
 }

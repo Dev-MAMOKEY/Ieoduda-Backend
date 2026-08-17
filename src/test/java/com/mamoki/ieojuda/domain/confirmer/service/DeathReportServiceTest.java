@@ -11,10 +11,12 @@ import com.mamoki.ieojuda.domain.plan.entity.PlanVersion;
 import com.mamoki.ieojuda.domain.plan.repository.PlanVersionRepository;
 import com.mamoki.ieojuda.domain.plan.service.PlanSnapshotService;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
-import com.mamoki.ieojuda.global.email.token.TokenProvider;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityToken;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
+import com.mamoki.ieojuda.global.config.AppProperties;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.idempotency.service.IdempotencyGuard;
-import com.mamoki.ieojuda.global.ratelimit.PublicLinkAuditor;
-import com.mamoki.ieojuda.global.ratelimit.TokenLookupGuard;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -26,7 +28,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,34 +42,29 @@ class DeathReportServiceTest {
     private ConfirmerRepository confirmerRepository;
     private ReleaseCaseRepository releaseCaseRepository;
     private PlanVersionRepository planVersionRepository;
-    private TokenLookupGuard tokenLookupGuard;
-    private PublicLinkAuditor publicLinkAuditor;
     private PlanSnapshotService planSnapshotService;
     private IdempotencyGuard idempotencyGuard;
+    private SecurityTokenService securityTokenService;
+    private EmailOutboxService emailOutboxService;
+    private AppProperties appProperties;
     private DeathReportService deathReportService;
 
     @BeforeEach
-    @SuppressWarnings("unchecked")
     void setUp() {
         confirmerRepository = mock(ConfirmerRepository.class);
         releaseCaseRepository = mock(ReleaseCaseRepository.class);
         planVersionRepository = mock(PlanVersionRepository.class);
-        tokenLookupGuard = mock(TokenLookupGuard.class);
-        publicLinkAuditor = mock(PublicLinkAuditor.class);
         planSnapshotService = mock(PlanSnapshotService.class);
         idempotencyGuard = mock(IdempotencyGuard.class);
+        securityTokenService = mock(SecurityTokenService.class);
+        emailOutboxService = mock(EmailOutboxService.class);
+        appProperties = mock(AppProperties.class);
         deathReportService = new DeathReportService(
                 confirmerRepository, releaseCaseRepository, planVersionRepository,
-                tokenLookupGuard, publicLinkAuditor, planSnapshotService, idempotencyGuard);
+                planSnapshotService, idempotencyGuard, securityTokenService, emailOutboxService, appProperties);
 
-        // TokenLookupGuard는 issue #55에서 추가된 조회 래퍼 - 실제 구현처럼 supplier를 그대로 실행해
-        // confirmerRepository.findByInviteToken(...) 목 설정이 기존과 동일하게 동작하도록 위임한다.
-        when(tokenLookupGuard.resolve(anyString(), any())).thenAnswer(invocation -> {
-            java.util.function.Supplier<java.util.Optional<?>> lookup = invocation.getArgument(1);
-            return lookup.get().orElseThrow(() ->
-                    new com.mamoki.ieojuda.global.exception.CustomException(
-                            com.mamoki.ieojuda.global.exception.ErrorCode.TOKEN_INVALID));
-        });
+        when(appProperties.getBaseUrl()).thenReturn("https://ieoduda.example.com");
+        when(appProperties.getContactEmail()).thenReturn("support@ieoduda.example.com");
     }
 
     @Test
@@ -77,7 +74,11 @@ class DeathReportServiceTest {
 
         Confirmer reporting = Confirmer.builder().plan(plan).name("A").relationship(Relationship.FRIEND).email("a@test.com").build();
         reporting.accept(null);
-        when(confirmerRepository.findByInviteToken(TokenProvider.hashToken("token-a"))).thenReturn(Optional.of(reporting));
+        SecurityToken reportDeathToken = mock(SecurityToken.class);
+        when(reportDeathToken.getConfirmer()).thenReturn(reporting);
+        when(securityTokenService.resolve(eq("token-a"), eq(SecurityTokenPurpose.REPORT_DEATH))).thenReturn(reportDeathToken);
+        when(securityTokenService.issueForConfirmer(eq(SecurityTokenPurpose.UPLOAD_EVIDENCE), any(), any(), any()))
+                .thenReturn("evidence-token");
 
         Confirmer sibling = Confirmer.builder().plan(plan).name("B").relationship(Relationship.FRIEND).email("b@test.com").build();
         sibling.accept(null);

@@ -52,6 +52,8 @@ public enum ErrorCode {
     SESSION_REVOKED(HttpStatus.UNAUTHORIZED, "SESSION_REVOKED", "세션이 만료되었습니다. 다시 로그인해 주세요."),
     ACCESS_LINK_EXPIRED(HttpStatus.UNAUTHORIZED, "ACCESS_LINK_EXPIRED", "링크가 만료되었습니다."),
     ACCESS_LINK_ALREADY_USED(HttpStatus.UNAUTHORIZED, "ACCESS_LINK_ALREADY_USED", "이미 사용되었거나 재사용할 수 없는 링크입니다."),
+    TOKEN_REVOKED(HttpStatus.UNAUTHORIZED, "TOKEN_REVOKED", "폐기된 링크입니다. 최신 안내 메일의 링크를 사용해 주세요."),
+    TOKEN_PURPOSE_MISMATCH(HttpStatus.UNAUTHORIZED, "TOKEN_PURPOSE_MISMATCH", "이 작업에 사용할 수 없는 링크입니다."),
     OTP_VERIFICATION_FAILED(HttpStatus.UNAUTHORIZED, "OTP_VERIFICATION_FAILED", "OTP 인증에 실패했습니다."),
     ACCOUNT_TEMPORARILY_LOCKED(HttpStatus.TOO_MANY_REQUESTS, "ACCOUNT_TEMPORARILY_LOCKED", "로그인 실패 횟수가 많아 잠시 후 다시 시도해 주세요."),
     TOKEN_TEMPORARILY_LOCKED(HttpStatus.TOO_MANY_REQUESTS, "TOKEN_TEMPORARILY_LOCKED", "이 링크로 실패 횟수가 많아 잠시 후 다시 시도해 주세요."),

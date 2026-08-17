@@ -11,14 +11,18 @@ public record ConfirmerDecisionResponse(
         @Schema(description = "확인자 ID") UUID confirmId,
         @Schema(description = "수락 상태", example = "ACCEPTED", allowableValues = {"ACCEPTED", "DECLINED"}) String acceptanceStatus,
         @Schema(description = "수락 시각 (거절 시 null)") LocalDateTime acceptedAt,
-        @Schema(description = "문의 사항") String inquiry
+        @Schema(description = "문의 사항") String inquiry,
+        // issue #41 - 역할 수락 토큰과 분리된 사망 신고 전용 토큰. 수락 시에만 발급되며, 이 링크로
+        // 이후 언제든 "/api/confirmer-acceptances/{token}/death-report"를 호출해 신고할 수 있다.
+        @Schema(description = "사망 신고 전용 토큰 (수락 시에만 발급, 거절 시 null)") String reportDeathToken
 ) {
-    public static ConfirmerDecisionResponse from(Confirmer confirmer) {
+    public static ConfirmerDecisionResponse of(Confirmer confirmer, String reportDeathToken) {
         return new ConfirmerDecisionResponse(
                 confirmer.getConfirmId(),
                 confirmer.getAcceptanceStatus().name(),
                 confirmer.getAcceptedAt(),
-                confirmer.getInquiry()
+                confirmer.getInquiry(),
+                reportDeathToken
         );
     }
 }

@@ -16,8 +16,7 @@ public record HandoffCheckConfirmerResponse(
         @Schema(description = "준비 완료 여부 - 이메일 발송과 역할 수락이 모두 끝나면 true") boolean isReady
 ) {
     public static HandoffCheckConfirmerResponse from(Confirmer confirmer) {
-        // 초대 토큰이 발급됐다는 것은 수락 요청 이메일이 나갔다는 뜻 (별도 발송 이력 컬럼이 없음)
-        boolean isEmailSent = confirmer.getInviteToken() != null;
+        boolean isEmailSent = Boolean.TRUE.equals(confirmer.getInviteSent());
         boolean isRoleAccepted = confirmer.getAcceptanceStatus() == AcceptanceStatus.ACCEPTED;
 
         return new HandoffCheckConfirmerResponse(

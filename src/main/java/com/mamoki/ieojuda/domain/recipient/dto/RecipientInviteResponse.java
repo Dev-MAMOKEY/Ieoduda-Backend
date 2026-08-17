@@ -20,7 +20,7 @@ public record RecipientInviteResponse(
         @Schema(description = "문의 주소") String contactEmail
 ) {
     public static RecipientInviteResponse of(Recipient recipient, String ownerName,
-                                              List<RecipientInviteTaskResponse> tasks, String contactEmail) {
+                                              List<RecipientInviteTaskResponse> tasks, LocalDateTime expiresAt, String contactEmail) {
         return new RecipientInviteResponse(
                 recipient.getName(),
                 ownerName,
@@ -30,7 +30,7 @@ public record RecipientInviteResponse(
                 Boolean.TRUE.equals(recipient.getIsBackup()),
                 recipient.getAcceptanceStatus().name(),
                 recipient.getEmail(),
-                recipient.getInviteTokenExpiresAt(),
+                expiresAt,
                 contactEmail
         );
     }

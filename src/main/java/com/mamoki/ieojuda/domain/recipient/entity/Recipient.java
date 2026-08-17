@@ -67,11 +67,9 @@ public class Recipient {
     @Column(name = "max_wait_hours")
     private Integer maxWaitHours;
 
-    @Column(name = "invite_token", length = 255)
-    private String inviteToken;
-
-    @Column(name = "invite_token_expires_at")
-    private LocalDateTime inviteTokenExpiresAt;
+    // issue #41 - 초대 이메일 발송 여부만 표시 (실제 토큰은 SecurityToken이 목적별로 별도 보관)
+    @Column(name = "invite_sent")
+    private Boolean inviteSent;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "backup_for_id")
@@ -98,16 +96,9 @@ public class Recipient {
         this.acceptanceStatus = AcceptanceStatus.PENDING;
     }
 
-    // 초대 이메일 토큰 저장 (평문이 아닌 해시값만 저장, 만료 시각 함께 기록)
-    public void issueInviteToken(String inviteTokenHash, LocalDateTime expiresAt) {
-        this.inviteToken = inviteTokenHash;
-        this.inviteTokenExpiresAt = expiresAt;
-    }
-
-    // 계정 이메일 변경 등 계정 탈취 대응 - 기존 초대 토큰으로는 더 이상 아무것도 할 수 없게 만든다
-    public void invalidateInviteToken() {
-        this.inviteToken = null;
-        this.inviteTokenExpiresAt = null;
+    // issue #41 - 초대 이메일 발송 완료 표시 (토큰 자체는 SecurityToken이 목적별로 별도 보관)
+    public void markInviteSent() {
+        this.inviteSent = true;
     }
 
     // 담당자 수락
@@ -126,15 +117,6 @@ public class Recipient {
     // 초대 링크 만료
     public void expire() {
         this.acceptanceStatus = AcceptanceStatus.EXPIRED;
-    }
-
-    //이메일 변경 시 기존 수락 무효화 후 재검증 (명세서 "역할 수락 이메일/화면" 예외 처리)
-    public void ReVerification(String newEmail) {
-        this.email = newEmail;
-        this.acceptanceStatus = AcceptanceStatus.PENDING;
-        this.acceptedAt = null;
-        this.inviteToken = null;
-        this.inviteTokenExpiresAt = null;
     }
 
     // 사후 인계 단계에서 담당자에게 이메일을 보낸 시간 기록
@@ -156,8 +138,6 @@ public class Recipient {
             this.email = email;
             this.acceptanceStatus = AcceptanceStatus.PENDING;
             this.acceptedAt = null;
-            this.inviteToken = null;
-            this.inviteTokenExpiresAt = null;
         }
         return emailChanged;
     }

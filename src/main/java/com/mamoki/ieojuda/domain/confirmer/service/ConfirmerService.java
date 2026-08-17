@@ -14,11 +14,12 @@ import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.service.PlanOwnershipReader;
 import com.mamoki.ieojuda.domain.audit.entity.EmailType;
 import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
 import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.email.template.EmailBuilder;
-import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class ConfirmerService {
     private final ConfirmerRepository confirmerRepository;
     private final EmailOutboxService emailOutboxService;
     private final AppProperties appProperties;
+    private final SecurityTokenService securityTokenService;
 
     @Transactional
     // 특정 계획에 여러 명의 확인자를 한번에 등록하는 함수
@@ -86,10 +88,12 @@ public class ConfirmerService {
         return ConfirmerRegisterResponse.of(confirmer, true, null);
     }
 
+    // issue #41 - 재발급 시 이전에 발급됐던 미사용 ACCEPT_ROLE 토큰은 먼저 폐기한다(재발급·연락처변경 시 기존 토큰 폐기)
     private void issueInviteAndSend(Confirmer confirmer) {
-        String plainToken = TokenProvider.generatePlainToken();
+        securityTokenService.revokeAllForConfirmer(confirmer, SecurityTokenPurpose.ACCEPT_ROLE);
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
-        confirmer.issueInviteToken(TokenProvider.hashToken(plainToken), expiresAt);
+        String plainToken = securityTokenService.issueForConfirmer(SecurityTokenPurpose.ACCEPT_ROLE, confirmer, null, expiresAt);
+        confirmer.markInviteSent();
         sendAcceptanceEmail(confirmer, plainToken, expiresAt);
     }
 
@@ -139,6 +143,8 @@ public class ConfirmerService {
 
         boolean emailChanged = confirmer.updateContact(request.name(), request.email());
         if (emailChanged) {
+            // issue #41 - 이메일 변경은 계정 탈취 대응 시나리오이므로, 이미 발급된 사망신고 토큰도 함께 폐기한다
+            securityTokenService.revokeAllForConfirmer(confirmer, SecurityTokenPurpose.REPORT_DEATH);
             issueInviteAndSend(confirmer);
         }
 

@@ -3,7 +3,6 @@ package com.mamoki.ieojuda.domain.evidence.service;
 import java.util.UUID;
 
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
-import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
 import com.mamoki.ieojuda.domain.evidence.dto.EvidenceSubmitResponse;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceType;
@@ -13,12 +12,13 @@ import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCaseStatus;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
-import com.mamoki.ieojuda.global.email.token.TokenProvider;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityToken;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.idempotency.service.IdempotencyGuard;
 import com.mamoki.ieojuda.global.ratelimit.PublicLinkAuditor;
-import com.mamoki.ieojuda.global.ratelimit.TokenLookupGuard;
 import com.mamoki.ieojuda.global.scan.FileSignatureDetector;
 import com.mamoki.ieojuda.global.scan.MalwareScanner;
 import com.mamoki.ieojuda.global.scan.ScanResult;
@@ -51,20 +51,29 @@ public class EvidenceSubmitService {
     private static final long MAX_FILE_COUNT = 3;
     private static final int HEADER_LENGTH = 16;
 
-    private final ConfirmerRepository confirmerRepository;
     private final ReleaseCaseRepository releaseCaseRepository;
     private final EvidenceRepository evidenceRepository;
     private final EvidenceStorageClient evidenceStorageClient;
-    private final TokenLookupGuard tokenLookupGuard;
     private final PublicLinkAuditor publicLinkAuditor;
     private final IdempotencyGuard idempotencyGuard;
     private final MalwareScanner malwareScanner;
     private final EvidenceOrphanCleanupService evidenceOrphanCleanupService;
+    private final SecurityTokenService securityTokenService;
 
+    // issue #41 - UPLOAD_EVIDENCE 토큰은 사건당 최대 3개 파일을 나눠 낼 수 있어야 하므로(한 번 쓰고 버리는
+    // 단일 사용이 아니라 사건 종료 시 폐기되는 세션형 자격), 여기서는 소비(consume)하지 않고 매 호출마다
+    // 목적·만료·폐기 여부만 검증한다.
     @Transactional
     public EvidenceSubmitResponse submit(UUID caseId, String plainToken, MultipartFile file, EvidenceType evidenceType, String idempotencyKey) {
-        Confirmer confirmer = findByToken(plainToken);
+        SecurityToken token = securityTokenService.resolve(plainToken, SecurityTokenPurpose.UPLOAD_EVIDENCE);
+        Confirmer confirmer = token.getConfirmer();
         if (confirmer.getAcceptanceStatus() != AcceptanceStatus.ACCEPTED) {
+            publicLinkAuditor.recordStateFailure(ErrorCode.FORBIDDEN);
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+        // URL의 caseId가 토큰 발급 시 묶인 사건과 실제로 같은지 검증 - 토큰은 유효하지만
+        // 다른 사건의 caseId를 끼워 넣는 시도를 막는다 (증빙이 엉뚱한 사건에 붙는 것을 방지).
+        if (token.getReleaseCase() == null || !token.getReleaseCase().getCaseId().equals(caseId)) {
             publicLinkAuditor.recordStateFailure(ErrorCode.FORBIDDEN);
             throw new CustomException(ErrorCode.FORBIDDEN);
         }
@@ -76,13 +85,6 @@ public class EvidenceSubmitService {
         // 같은 사건에 대한 다른 증빙 제출을 사건 행 잠금으로 직렬화한다.
         ReleaseCase releaseCase = releaseCaseRepository.findByIdForUpdate(caseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RELEASE_CASE_NOT_FOUND));
-
-        // URL의 caseId가 토큰이 가리키는 확인자의 사건과 실제로 같은지 검증 - 토큰은 유효하지만
-        // 다른 사건의 caseId를 끼워 넣는 시도를 막는다 (증빙이 엉뚱한 사건에 붙는 것을 방지).
-        if (!releaseCase.getPlan().getPlanId().equals(plan.getPlanId())) {
-            publicLinkAuditor.recordStateFailure(ErrorCode.FORBIDDEN);
-            throw new CustomException(ErrorCode.FORBIDDEN);
-        }
 
         validateBasics(file);
         InspectionResult inspection = inspect(file);
@@ -205,11 +207,6 @@ public class EvidenceSubmitService {
                 }
             }
         });
-    }
-
-    private Confirmer findByToken(String plainToken) {
-        return tokenLookupGuard.resolve(plainToken,
-                () -> confirmerRepository.findByInviteToken(TokenProvider.hashToken(plainToken)));
     }
 
     private record InspectionResult(boolean accepted, String mimeType, String integrityHash, String reason) {

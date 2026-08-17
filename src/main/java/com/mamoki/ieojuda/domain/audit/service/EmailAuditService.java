@@ -11,12 +11,13 @@ import com.mamoki.ieojuda.domain.partner.repository.ExternalPartnerRepository;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.domain.stage.entity.HandoverStage;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
 import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.email.template.EmailBuilder;
-import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.security.PermissionGuard;
@@ -45,6 +46,7 @@ public class EmailAuditService {
     private final PermissionGuard permissionGuard;
     private final ReauthGuard reauthGuard;
     private final AdminActionAuditService adminActionAuditService;
+    private final SecurityTokenService securityTokenService;
 
     public List<EmailDeliveryResponse> getDeliveries(UUID userId, UUID caseId) {
         permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
@@ -71,9 +73,9 @@ public class EmailAuditService {
         }
 
         Recipient recipient = stage.getRecipient();
-        String plainToken = TokenProvider.generatePlainToken();
+        securityTokenService.revokeAllForRecipient(recipient, SecurityTokenPurpose.ACCEPT_ROLE);
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
-        recipient.issueInviteToken(TokenProvider.hashToken(plainToken), expiresAt);
+        String plainToken = securityTokenService.issueForRecipient(SecurityTokenPurpose.ACCEPT_ROLE, recipient, expiresAt);
 
         String secureLink = appProperties.getBaseUrl() + "/recipient-acceptances/" + plainToken;
         EmailContent content = EmailBuilder.build(

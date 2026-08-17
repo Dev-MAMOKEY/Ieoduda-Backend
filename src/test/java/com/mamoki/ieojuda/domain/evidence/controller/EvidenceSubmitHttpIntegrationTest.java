@@ -13,7 +13,9 @@ import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.domain.plan.repository.PlanVersionRepository;
 import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
-import com.mamoki.ieojuda.global.email.token.TokenProvider;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.repository.SecurityTokenRepository;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
 import com.mamoki.ieojuda.global.storage.contract.StoredEvidence;
 import org.junit.jupiter.api.AfterEach;
@@ -23,6 +25,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -59,6 +63,12 @@ class EvidenceSubmitHttpIntegrationTest {
     private ConfirmerRepository confirmerRepository;
     @Autowired
     private EvidenceRepository evidenceRepository;
+    @Autowired
+    private SecurityTokenService securityTokenService;
+    @Autowired
+    private SecurityTokenRepository securityTokenRepository;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @MockitoBean
     private EvidenceStorageClient evidenceStorageClient;
@@ -90,15 +100,17 @@ class EvidenceSubmitHttpIntegrationTest {
 
         confirmer = Confirmer.builder().plan(plan).name("확인자").relationship(Relationship.FRIEND)
                 .email("evidence-confirmer-" + UUID.randomUUID() + "@test.com").build();
-        plainToken = "evidence-type-token-" + UUID.randomUUID();
-        confirmer.issueInviteToken(TokenProvider.hashToken(plainToken), LocalDateTime.now().plusHours(1));
         confirmer.accept(null);
         confirmer = confirmerRepository.saveAndFlush(confirmer);
+        plainToken = securityTokenService.issueForConfirmer(
+                SecurityTokenPurpose.UPLOAD_EVIDENCE, confirmer, releaseCase, LocalDateTime.now().plusHours(1));
     }
 
     @AfterEach
     void tearDown() {
         evidenceRepository.findByPlan_PlanId(plan.getPlanId()).forEach(evidenceRepository::delete);
+        new TransactionTemplate(transactionManager).executeWithoutResult(
+                status -> securityTokenRepository.deleteByReleaseCase_CaseId(releaseCase.getCaseId()));
         confirmerRepository.deleteById(confirmer.getConfirmId());
         releaseCaseRepository.deleteById(releaseCase.getCaseId());
         planVersionRepository.delete(planVersion);

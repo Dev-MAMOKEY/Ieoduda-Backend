@@ -35,8 +35,7 @@ public record HandoffCheckAssigneeResponse(
         @Schema(description = "[인계 점검] 응답 시각 - 아직 응답 전이면 null") LocalDateTime checkRespondedAt
 ) {
     public static HandoffCheckAssigneeResponse of(Recipient recipient, Recipient backup, HandoffCheckResponse latestCheck) {
-        // 초대 토큰이 발급됐다는 것은 수락 요청 이메일이 나갔다는 뜻 (별도 발송 이력 컬럼이 없음)
-        boolean isEmailSent = recipient.getInviteToken() != null;
+        boolean isEmailSent = Boolean.TRUE.equals(recipient.getInviteSent());
         boolean isRoleAccepted = recipient.getAcceptanceStatus() == AcceptanceStatus.ACCEPTED;
         boolean isBackupAccepted = backup != null && backup.getAcceptanceStatus() == AcceptanceStatus.ACCEPTED;
         // 대체 담당자는 필수가 아니므로 없으면 판정에서 제외하고, 있으면 그 수락 여부까지 조건에 포함한다

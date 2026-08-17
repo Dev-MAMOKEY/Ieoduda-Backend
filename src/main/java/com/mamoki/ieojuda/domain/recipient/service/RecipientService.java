@@ -23,11 +23,12 @@ import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.entity.RoleType;
 import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.contract.EmailContent;
 import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.email.template.EmailBuilder;
-import com.mamoki.ieojuda.global.email.token.TokenProvider;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +57,7 @@ public class RecipientService {
     private final PlanOwnershipReader planOwnershipReader;
     private final EmailOutboxService emailOutboxService;
     private final AppProperties appProperties;
+    private final SecurityTokenService securityTokenService;
 
     @Transactional
     public RecipientBulkRegisterResponse registerAll(UUID userId, UUID planId, RecipientBulkRegisterRequest request) {
@@ -154,10 +156,12 @@ public class RecipientService {
         return BackupRegisterResponse.of(backup, true, null);
     }
 
+    // issue #41 - 재발급 시 이전에 발급됐던 미사용 ACCEPT_ROLE 토큰은 먼저 폐기한다(재발급·연락처변경 시 기존 토큰 폐기)
     private void issueInviteAndSend(Recipient recipient, String roleName) {
-        String plainToken = TokenProvider.generatePlainToken();
+        securityTokenService.revokeAllForRecipient(recipient, SecurityTokenPurpose.ACCEPT_ROLE);
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
-        recipient.issueInviteToken(TokenProvider.hashToken(plainToken), expiresAt);
+        String plainToken = securityTokenService.issueForRecipient(SecurityTokenPurpose.ACCEPT_ROLE, recipient, expiresAt);
+        recipient.markInviteSent();
         sendAcceptanceEmail(recipient, roleName, plainToken, expiresAt);
     }
 

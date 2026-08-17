@@ -5,6 +5,7 @@ import com.mamoki.ieojuda.domain.confirmer.entity.DisputeContact;
 import com.mamoki.ieojuda.domain.confirmer.repository.DisputeContactRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.service.PlanOwnershipReader;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.exception.CustomException;
@@ -37,6 +38,7 @@ class DisputeContactServiceTest {
     private AppProperties appProperties;
     private TokenLookupGuard tokenLookupGuard;
     private PublicLinkAuditor publicLinkAuditor;
+    private SecurityTokenService securityTokenService;
     private DisputeContactService disputeContactService;
 
     private Plan plan;
@@ -49,8 +51,9 @@ class DisputeContactServiceTest {
         appProperties = mock(AppProperties.class);
         tokenLookupGuard = mock(TokenLookupGuard.class);
         publicLinkAuditor = mock(PublicLinkAuditor.class);
+        securityTokenService = mock(SecurityTokenService.class);
         disputeContactService = new DisputeContactService(planOwnershipReader, disputeContactRepository,
-                emailOutboxService, appProperties, tokenLookupGuard, publicLinkAuditor);
+                emailOutboxService, appProperties, tokenLookupGuard, publicLinkAuditor, securityTokenService);
 
         when(appProperties.getInviteTokenTtlHours()).thenReturn(48L);
         when(appProperties.getBaseUrl()).thenReturn("https://ieoduda.example.com");

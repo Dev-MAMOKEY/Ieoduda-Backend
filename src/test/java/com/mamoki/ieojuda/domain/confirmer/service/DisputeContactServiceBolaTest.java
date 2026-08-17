@@ -6,6 +6,7 @@ import com.mamoki.ieojuda.domain.confirmer.dto.DisputeContactRegisterRequest;
 import com.mamoki.ieojuda.domain.confirmer.repository.DisputeContactRepository;
 import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.domain.plan.service.PlanOwnershipReader;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.config.AppProperties;
 import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
 import com.mamoki.ieojuda.global.exception.CustomException;
@@ -48,7 +49,8 @@ class DisputeContactServiceBolaTest {
                 emailOutboxService,
                 mock(AppProperties.class),
                 mock(TokenLookupGuard.class),
-                mock(PublicLinkAuditor.class)
+                mock(PublicLinkAuditor.class),
+                mock(SecurityTokenService.class)
         );
         when(planRepository.findByPlanIdAndUser_UserId(PLAN_ID, ATTACKER_ID)).thenReturn(Optional.empty());
     }
