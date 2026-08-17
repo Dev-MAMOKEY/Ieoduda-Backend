@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
+import software.amazon.awssdk.http.ContentStreamProvider;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -28,10 +29,11 @@ public class S3EvidenceStorageClient implements EvidenceStorageClient {
 
     @Override
     public StoredEvidence store(Long caseId, EvidenceUpload upload) {
-        String integrityHash = IntegrityHasher.sha256Hex(upload.content());
-        String storageKey = StorageKeyGenerator.generate(caseId, upload.fileName());
+        String storageKey = StorageKeyGenerator.generate(caseId, upload.mimeType());
 
         try {
+            // Supplier로 감싼 스트림을 넘긴다 - 전송 실패로 SDK가 재시도할 때마다
+            // ContentStreamProvider가 새 스트림을 열어준다(멀티파트 임시 파일에서 다시 읽음).
             s3Client.putObject(
                     PutObjectRequest.builder()
                             .bucket(s3Properties.getBucket())
@@ -39,13 +41,16 @@ public class S3EvidenceStorageClient implements EvidenceStorageClient {
                             .contentType(upload.mimeType())
                             .serverSideEncryption(ServerSideEncryption.AES256)
                             .build(),
-                    RequestBody.fromBytes(upload.content()));
+                    RequestBody.fromContentProvider(
+                            ContentStreamProvider.fromInputStreamSupplier(upload.content()),
+                            upload.contentLength(),
+                            upload.mimeType()));
         } catch (SdkException e) {
             log.error("[Evidence Store Failed] caseId={}, cause={}", caseId, e.getMessage(), e);
             throw new CustomException(ErrorCode.EVIDENCE_STORAGE_FAILED);
         }
 
-        return new StoredEvidence(storageKey, integrityHash, upload.content().length);
+        return new StoredEvidence(storageKey, upload.contentLength());
     }
 
     @Override
