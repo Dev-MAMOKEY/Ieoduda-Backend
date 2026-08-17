@@ -2,6 +2,7 @@ package com.mamoki.ieojuda.domain.account.service;
 
 import com.mamoki.ieojuda.domain.account.dto.UserUpdateRequest;
 import com.mamoki.ieojuda.domain.account.entity.User;
+import com.mamoki.ieojuda.domain.account.repository.RefreshSessionRepository;
 import com.mamoki.ieojuda.domain.account.repository.UserRepository;
 import com.mamoki.ieojuda.domain.audit.repository.EmailLogRepository;
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
@@ -11,6 +12,7 @@ import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
 import com.mamoki.ieojuda.domain.confirmer.repository.DisputeContactRepository;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
+import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
 import com.mamoki.ieojuda.domain.handoffcheck.repository.HandoffCheckRepository;
 import com.mamoki.ieojuda.domain.handoffcheck.repository.HandoffCheckResponseRepository;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
@@ -70,6 +72,8 @@ class UserServiceTest {
     private EvidenceStorageClient evidenceStorageClient;
     private ReleaseCaseGuardService releaseCaseGuardService;
     private SessionRevocationService sessionRevocationService;
+    private RefreshSessionRepository refreshSessionRepository;
+    private PartnerReviewerRepository partnerReviewerRepository;
     private UserService userService;
 
     @BeforeEach
@@ -96,6 +100,8 @@ class UserServiceTest {
         evidenceStorageClient = mock(EvidenceStorageClient.class);
         releaseCaseGuardService = mock(ReleaseCaseGuardService.class);
         sessionRevocationService = mock(SessionRevocationService.class);
+        refreshSessionRepository = mock(RefreshSessionRepository.class);
+        partnerReviewerRepository = mock(PartnerReviewerRepository.class);
 
         userService = new UserService(
                 userRepository, planRepository, conversationRepository, lifeAreaRepository, lifeAreaMessageRepository,
@@ -103,7 +109,7 @@ class UserServiceTest {
                 releaseCaseRepository, planVersionRepository, evidenceRepository, emailLogRepository,
                 handoverStageRepository, objectionRepository, handoffCheckRepository, handoffCheckResponseRepository,
                 packageIssueRepository, dependencyRepository, evidenceStorageClient, releaseCaseGuardService,
-                sessionRevocationService);
+                sessionRevocationService, refreshSessionRepository, partnerReviewerRepository);
     }
 
     @Test
@@ -190,6 +196,30 @@ class UserServiceTest {
         verify(evidenceStorageClient).delete("evidence/10/real-file.pdf");
         verify(evidenceStorageClient, org.mockito.Mockito.times(1)).delete(org.mockito.ArgumentMatchers.anyString());
 
+        verify(userRepository).delete(user);
+    }
+
+    // #56이 도입한 RefreshSession/PartnerReviewer는 Plan이 아니라 User에 직접 딸린 행이라
+    // deletePlanData()의 Plan 하위 삭제만으로는 안 지워진다 - 지우지 않고 유저부터 지우면
+    // refresh_sessions.user_id FK 위반으로 실패한다(실제 운영 DB에서 재현됨).
+    @Test
+    void deleteAccount_deletesRefreshSessionsAndPartnerReviewerBeforeDeletingUser() {
+        User user = User.builder().email("owner@test.com").password("hash").name("A").build();
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(planRepository.findByUser_UserId(1L)).thenReturn(Optional.empty());
+
+        com.mamoki.ieojuda.domain.account.entity.RefreshSession session =
+                mock(com.mamoki.ieojuda.domain.account.entity.RefreshSession.class);
+        when(refreshSessionRepository.findByUser_UserId(1L)).thenReturn(List.of(session));
+
+        com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer reviewer =
+                mock(com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer.class);
+        when(partnerReviewerRepository.findByUser_UserId(1L)).thenReturn(Optional.of(reviewer));
+
+        userService.deleteAccount(1L);
+
+        verify(refreshSessionRepository).deleteAll(List.of(session));
+        verify(partnerReviewerRepository).delete(reviewer);
         verify(userRepository).delete(user);
     }
 }

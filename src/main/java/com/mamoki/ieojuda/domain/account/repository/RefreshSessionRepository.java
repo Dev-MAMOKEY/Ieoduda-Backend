@@ -10,6 +10,9 @@ public interface RefreshSessionRepository extends JpaRepository<RefreshSession, 
     // 로그아웃 / 이메일 변경 등 계정 전체 세션 폐기용
     List<RefreshSession> findByUser_UserIdAndRevokedAtIsNull(Long userId);
 
+    // 계정 삭제 시 FK 위반 방지용 - 폐기 여부와 무관하게 이 사용자의 세션 전부
+    List<RefreshSession> findByUser_UserId(Long userId);
+
     // 재사용 탐지 시 같은 lineage(family) 전체를 찾아 차단하기 위한 조회
     List<RefreshSession> findByFamilyIdAndRevokedAtIsNull(String familyId);
 }

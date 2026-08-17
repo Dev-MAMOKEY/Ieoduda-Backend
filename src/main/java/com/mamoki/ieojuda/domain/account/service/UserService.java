@@ -4,6 +4,7 @@ import com.mamoki.ieojuda.domain.account.dto.ConsentResponse;
 import com.mamoki.ieojuda.domain.account.dto.UserResponse;
 import com.mamoki.ieojuda.domain.account.dto.UserUpdateRequest;
 import com.mamoki.ieojuda.domain.account.entity.User;
+import com.mamoki.ieojuda.domain.account.repository.RefreshSessionRepository;
 import com.mamoki.ieojuda.domain.account.repository.UserRepository;
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
 import com.mamoki.ieojuda.domain.confirmer.entity.DisputeContact;
@@ -11,6 +12,7 @@ import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
 import com.mamoki.ieojuda.domain.confirmer.repository.DisputeContactRepository;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
+import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
 import com.mamoki.ieojuda.domain.audit.repository.EmailLogRepository;
 import com.mamoki.ieojuda.domain.handoffcheck.repository.HandoffCheckRepository;
 import com.mamoki.ieojuda.domain.handoffcheck.repository.HandoffCheckResponseRepository;
@@ -65,6 +67,8 @@ public class UserService {
     private final EvidenceStorageClient evidenceStorageClient;
     private final ReleaseCaseGuardService releaseCaseGuardService;
     private final SessionRevocationService sessionRevocationService;
+    private final RefreshSessionRepository refreshSessionRepository;
+    private final PartnerReviewerRepository partnerReviewerRepository;
 
     @Transactional
     public UserResponse updateProfile(Long userId, UserUpdateRequest request) {
@@ -128,6 +132,10 @@ public class UserService {
             }
             deletePlanData(plan);
         });
+
+        // Plan에 딸린 자식이 아니라 User에 직접 딸린 행들 - 계정 삭제 전에 먼저 지워야 FK 위반이 안 난다.
+        refreshSessionRepository.deleteAll(refreshSessionRepository.findByUser_UserId(userId));
+        partnerReviewerRepository.findByUser_UserId(userId).ifPresent(partnerReviewerRepository::delete);
 
         userRepository.delete(user);
     }
