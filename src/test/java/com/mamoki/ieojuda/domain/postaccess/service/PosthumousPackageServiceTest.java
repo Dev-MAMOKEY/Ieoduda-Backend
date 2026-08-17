@@ -145,6 +145,7 @@ class PosthumousPackageServiceTest {
         assertThat(response.notice()).contains("김나무");
         assertThat(response.actions()).hasSize(1);
         assertThat(response.actions().get(0).actionId()).isEqualTo(100L);
+        assertThat(response.actions().get(0).action()).isEqualTo("비공개 전환");
         assertThat(response.actions().get(0).status()).isEqualTo("PENDING");
     }
 

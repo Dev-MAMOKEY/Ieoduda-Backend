@@ -166,6 +166,7 @@ class PosthumousPackageHttpIntegrationTest {
         assertThat(response.body()).contains("\"roleLabel\":\"관계 정리 담당자\"");
         assertThat(response.body()).contains("\"totalCount\":1");
         assertThat(response.body()).contains("\"actionId\":" + item.getItemId());
+        assertThat(response.body()).contains("\"action\":\"비공개 전환\""); // 이슈/노션이 요구하는 "행동" 필드
         assertThat(response.body()).doesNotContain("근거"); // sourceExcerpt(원문 근거)는 응답에 없어야 함
     }
 
