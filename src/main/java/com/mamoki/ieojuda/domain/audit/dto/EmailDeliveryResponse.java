@@ -1,6 +1,7 @@
 package com.mamoki.ieojuda.domain.audit.dto;
 
 import com.mamoki.ieojuda.domain.audit.entity.EmailLog;
+import com.mamoki.ieojuda.global.util.EmailMasker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -20,7 +21,7 @@ public record EmailDeliveryResponse(
     public static EmailDeliveryResponse from(EmailLog log) {
         return new EmailDeliveryResponse(
                 log.getLogId(),
-                mask(log.getRecipientEmail()),
+                EmailMasker.mask(log.getRecipientEmail()),
                 log.getEmailType() == null ? null : log.getEmailType().name(),
                 log.getRetryCount(),
                 log.getMessageId(),
@@ -29,16 +30,5 @@ public record EmailDeliveryResponse(
                 log.getBouncedAt(),
                 log.getCanceledAt()
         );
-    }
-
-    // 로컬파트 앞 2글자만 남기고 나머지는 *** 처리 (예: jisoo@naver.com -> ji***@naver.com)
-    private static String mask(String email) {
-        if (email == null || !email.contains("@")) {
-            return email;
-        }
-        String[] parts = email.split("@", 2);
-        String local = parts[0];
-        String visible = local.length() <= 2 ? local : local.substring(0, 2);
-        return visible + "***@" + parts[1];
     }
 }
