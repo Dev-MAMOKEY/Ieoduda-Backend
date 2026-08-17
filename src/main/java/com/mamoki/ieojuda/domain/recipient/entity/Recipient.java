@@ -11,15 +11,17 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+// issue #62 - 테이블명 오탈자(role_assigness) 정리. 수동 마이그레이션(ALTER TABLE ... RENAME)으로
+// 기존 데이터를 보존한 채 테이블명만 바꿨다 - 컬럼명 assignee_id는 원래도 정상 표기라 그대로 둔다.
 @Entity
-@Table(name = "role_assigness")
+@Table(name = "role_assignees")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Recipient {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "assignee_id") // 오탈자 DB 그대로 유지 (올바른 표기: assignee_id)
+    @Column(name = "assignee_id")
     private Long assigneeId;
 
     @ManyToOne(fetch = FetchType.LAZY)

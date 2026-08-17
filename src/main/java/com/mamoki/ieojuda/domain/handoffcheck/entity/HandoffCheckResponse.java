@@ -37,7 +37,7 @@ public class HandoffCheckResponse {
     private HandoffCheck handoffCheck;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "assigne_id", nullable = false) // role_assigness.assigne_id 오탈자 그대로
+    @JoinColumn(name = "assignee_id", nullable = false) // issue #62 - role_assigness.assigne_id 오탈자 정리
     private Recipient recipient;
 
     @Builder

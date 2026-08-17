@@ -28,7 +28,7 @@ public class RetryPolicy {
 
     /**
      * 담당자가 최대 대기 시간을 초과했는지 판단.
-     * role_assigness.max_wait_hours(담당자 테이블 -> max_wait_hours 필드 기준.)
+     * role_assignees.max_wait_hours(담당자 테이블 -> max_wait_hours 필드 기준.)
      *
      * @param sentAt        이메일이 처음 발송된 시각
      * @param maxWaitHours  허용된 최대 대기 시간(시간 단위)
