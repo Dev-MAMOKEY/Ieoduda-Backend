@@ -85,7 +85,7 @@ class PlanPackageHttpIntegrationTest {
                 .roleType(RoleType.RELATIONSHIP_MANAGER).isBackup(false)
                 .disclosureScope(DisclosureScope.RELATIONSHIP).maxWaitHours(168).backupFor(null).build());
         item = itemRepository.saveAndFlush(Item.builder()
-                .lifeArea(lifeArea).targetName("이지수").locationType("인스타그램").action("정리")
+                .lifeArea(lifeArea).targetName("이지수").locationType("인스타그램").action("인스타그램 아이디로 SNS 계정을 정리해줘")
                 .title("SNS 계정 처리").content("비공개로 전환").precondition("")
                 .disclosureScope(DisclosureScope.RELATIONSHIP).sourceExcerpt("지수에게 SNS 정리를 부탁")
                 .sortOrder(0).actionType(ItemActionType.DELETE).build());
@@ -112,6 +112,7 @@ class PlanPackageHttpIntegrationTest {
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.body()).contains("\"recipientName\":\"이지수\"");
         assertThat(response.body()).contains("\"title\":\"SNS 계정 처리\"");
+        assertThat(response.body()).contains("\"action\":\"인스타그램 아이디로 SNS 계정을 정리해줘\"");
     }
 
     @Test

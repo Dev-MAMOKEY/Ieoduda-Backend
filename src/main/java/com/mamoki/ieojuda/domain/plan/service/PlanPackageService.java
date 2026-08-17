@@ -82,7 +82,8 @@ public class PlanPackageService {
     }
 
     private boolean containsCredential(Item item) {
-        return CredentialDetector.containsCredential(item.getTitle())
+        return CredentialDetector.containsCredential(item.getAction())
+                || CredentialDetector.containsCredential(item.getTitle())
                 || CredentialDetector.containsCredential(item.getContent())
                 || CredentialDetector.containsCredential(item.getPrecondition())
                 || CredentialDetector.containsCredential(item.getTargetName())

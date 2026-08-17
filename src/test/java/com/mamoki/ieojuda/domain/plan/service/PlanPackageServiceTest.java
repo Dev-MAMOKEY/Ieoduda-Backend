@@ -61,8 +61,12 @@ class PlanPackageServiceTest {
     }
 
     private Item buildItem(Recipient recipient, String title, String content, String precondition, String sourceExcerpt) {
+        return buildItem(recipient, "인스타그램 아이디로 SNS 계정을 정리해줘", title, content, precondition, sourceExcerpt);
+    }
+
+    private Item buildItem(Recipient recipient, String action, String title, String content, String precondition, String sourceExcerpt) {
         Item item = Item.builder()
-                .lifeArea(mock(LifeArea.class)).targetName("대상").locationType("위치").action("행동")
+                .lifeArea(mock(LifeArea.class)).targetName("대상").locationType("위치").action(action)
                 .title(title).content(content).precondition(precondition)
                 .disclosureScope(DisclosureScope.RELATIONSHIP).sourceExcerpt(sourceExcerpt)
                 .sortOrder(0).actionType(ItemActionType.OTHER).build();
@@ -106,7 +110,24 @@ class PlanPackageServiceTest {
         assertThat(response.packages().get(0).recipientName()).isEqualTo("이지수");
         assertThat(response.packages().get(0).actions()).hasSize(1);
         assertThat(response.packages().get(0).actions().get(0).title()).isEqualTo("SNS 정리");
+        // 노션 "역할별 패키지 미리보기" 표시 항목: 대상/위치유형/행동/선행조건/제외정보 - "행동"(action) 포함 확인
+        assertThat(response.packages().get(0).actions().get(0).action())
+                .isEqualTo("인스타그램 아이디로 SNS 계정을 정리해줘");
         assertThat(response.packages().get(0).excluded()).contains("다른 역할의 항목", "자격증명");
+    }
+
+    @Test
+    void seal_whenActionFieldContainsCredentialValue_throwsPackageSealBlocked() {
+        stubAcceptedConfirmers(2);
+        Recipient r1 = buildRecipient(1L, "이지수");
+        // title/content는 정상이지만 action(수행해야 할 행동 전체 설명)에 자격증명이 섞인 경우도 잡아야 한다
+        Item item = buildItem(r1, "인스타그램 비밀번호는 abcd1234야", "계정 정리", "비공개 전환", "", "근거");
+        when(itemRepository.findByLifeArea_Plan_PlanIdAndRecipientIsNotNullOrderBySortOrderAscItemIdAsc(PLAN_ID))
+                .thenReturn(List.of(item));
+
+        assertThatThrownBy(() -> planPackageService.seal(USER_ID, PLAN_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PACKAGE_SEAL_BLOCKED));
     }
 
     @Test
