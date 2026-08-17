@@ -7,6 +7,7 @@ import com.mamoki.ieojuda.domain.confirmer.entity.ReportStatus;
 import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
 import com.mamoki.ieojuda.domain.plan.dto.PlanSnapshotDto;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
+import com.mamoki.ieojuda.domain.plan.entity.PlanStatus;
 import com.mamoki.ieojuda.domain.plan.entity.PlanVersion;
 import com.mamoki.ieojuda.domain.plan.repository.PlanVersionRepository;
 import com.mamoki.ieojuda.domain.plan.service.PlanSnapshotService;
@@ -20,6 +21,7 @@ import com.mamoki.ieojuda.global.idempotency.service.IdempotencyGuard;
 import com.mamoki.ieojuda.global.ratelimit.PublicLinkAuditor;
 import com.mamoki.ieojuda.global.ratelimit.TokenLookupGuard;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,7 @@ import java.util.Objects;
 // 명세서 "사망 신고 이메일" 화면 - 지정 확인자가 사망 사실을 신고한다 (로그인 불필요, 초대 토큰이 곧 인증).
 // 수락 시 발급된 초대 토큰은 "수락 대기" 창구용 만료시각이 있지만, 이미 수락한 확인자에게는
 // 이 토큰이 이후 언제든 다시 찾아와 신고할 수 있는 개인 접근키 역할도 겸한다 - 그래서 여기서는 만료 검사를 하지 않는다.
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -91,6 +94,13 @@ public class DeathReportService {
                 .filter(existing -> existing.getCanceledAt() == null)
                 .isPresent()) {
             throw new CustomException(ErrorCode.ACTIVE_RELEASE_CASE_EXISTS);
+        }
+
+        // issue #81 - 작성자 봉인(Plan.status)과 사망 신고 시점 스냅샷 봉인(PlanVersion)은 독립적으로
+        // 유지한다(부록 결정 (a)). 작성자가 미리 검토·봉인하지 않았어도 발송 절차 자체는 막지 않되,
+        // 운영 가시성을 위해 남긴다.
+        if (plan.getStatus() != PlanStatus.SEALED) {
+            log.warn("[Plan Not Sealed] 작성자가 패키지를 봉인하지 않은 상태로 사후 사건이 열립니다. planId={}", plan.getPlanId());
         }
 
         int nextVersionNum = (int) planVersionRepository.countByPlan_PlanId(plan.getPlanId()) + 1;

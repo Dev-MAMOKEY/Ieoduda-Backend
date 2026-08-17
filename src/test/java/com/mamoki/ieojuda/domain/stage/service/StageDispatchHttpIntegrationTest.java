@@ -241,6 +241,18 @@ class StageDispatchHttpIntegrationTest {
         assertThat(stage2Outbox.getBody()).contains("/posthumous-access/");
         assertThat(stage2Outbox.getBody()).doesNotContain("/recipient-acceptances/");
 
+        // 버그 회귀 방지 - 메일 본문에 박힌 링크를 그대로 뽑아서 #76의 실제 인증 API를 호출해본다.
+        // (이전엔 링크 문자열만 /posthumous-access/로 바뀌고 토큰은 여전히 recipient.inviteToken에
+        // 저장되고 있어서, 이 호출이 전부 TOKEN_INVALID로 실패했었다 - 단위 테스트로는 못 잡던 버그)
+        java.util.regex.Matcher linkMatcher = java.util.regex.Pattern
+                .compile("/posthumous-access/([\\w-]+)").matcher(stage2EmailCaptor.getValue().body());
+        assertThat(linkMatcher.find()).as("메일 본문에 사후 인증 링크가 있어야 한다").isTrue();
+        String dispatchedPlainToken = linkMatcher.group(1);
+
+        HttpResponse<String> linkCheckResponse = get("/api/posthumous-access/" + dispatchedPlainToken);
+        assertThat(linkCheckResponse.statusCode()).isEqualTo(200);
+        assertThat(linkCheckResponse.body()).contains("\"recipientName\":\"담당자2\"");
+
         ReleaseCase reloadedCase = releaseCaseRepository.findById(releaseCase.getCaseId()).orElseThrow();
         assertThat(reloadedCase.getStatus()).isNotEqualTo(ReleaseCaseStatus.COMPLETED); // 아직 2단계가 안 끝남
 
@@ -285,6 +297,11 @@ class StageDispatchHttpIntegrationTest {
     private HttpResponse<String> post(String path) throws Exception {
         return httpClient.send(HttpRequest.newBuilder(uri(path))
                 .POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> get(String path) throws Exception {
+        return httpClient.send(HttpRequest.newBuilder(uri(path))
+                .GET().build(), HttpResponse.BodyHandlers.ofString());
     }
 
     private URI uri(String path) {

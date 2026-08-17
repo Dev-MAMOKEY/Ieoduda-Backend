@@ -2,6 +2,9 @@ package com.mamoki.ieojuda.domain.stage.service;
 
 import com.mamoki.ieojuda.domain.account.entity.AdminPermission;
 import com.mamoki.ieojuda.domain.audit.entity.EmailType;
+import com.mamoki.ieojuda.domain.audit.repository.EmailLogRepository;
+import com.mamoki.ieojuda.domain.postaccess.entity.AccessToken;
+import com.mamoki.ieojuda.domain.postaccess.repository.AccessTokenRepository;
 import com.mamoki.ieojuda.domain.postaccess.repository.PackageActionCompletionRepository;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
@@ -42,6 +45,7 @@ public class HandoverStageService {
     private final AppProperties appProperties;
     private final PermissionGuard permissionGuard;
     private final PackageActionCompletionRepository packageActionCompletionRepository;
+    private final AccessTokenRepository accessTokenRepository;
 
     public HandoverStageResponse getStage(Long userId, Long caseId, Long stageId) {
         permissionGuard.require(userId, AdminPermission.CASE_SUPERVISE);
@@ -136,11 +140,20 @@ public class HandoverStageService {
     }
 
     // issue #79 - 최초 발송(INITIAL)과 대체 담당자 전환(FALLBACK)은 문구가 달라야 한다.
-    // 링크도 생전 역할 수락 화면이 아니라 사후 인증 화면(/posthumous-access/{token}, issue #76)을 가리킨다.
+    // 링크도 생전 역할 수락 화면이 아니라 사후 인증 화면(/posthumous-access/{token})을 가리킨다.
+    //
+    // 버그 수정: 링크만 /posthumous-access/로 바꾸고 토큰은 여전히 recipient.issueInviteToken()
+    // (생전 역할수락용 role_assignees.invite_token)에 저장하고 있었다. issue #76의 검증 API는
+    // AccessToken 테이블(posthumouse_access_tokens)만 조회하므로, 그 상태로는 발송되는 링크가
+    // 전부 "토큰 없음"으로 실패했다 - AccessToken을 이 단계(stage)에 실제로 발급하도록 고쳤다.
     private void sendHandoffInvite(HandoverStage stage, Recipient recipient, InviteKind kind) {
         String plainToken = TokenProvider.generatePlainToken();
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
-        recipient.issueInviteToken(TokenProvider.hashToken(plainToken), expiresAt);
+        accessTokenRepository.save(AccessToken.builder()
+                .handoverStage(stage)
+                .tokenHash(TokenProvider.hashToken(plainToken))
+                .expiresAt(expiresAt)
+                .build());
 
         String secureLink = appProperties.getBaseUrl() + "/posthumous-access/" + plainToken;
         EmailContent content = kind == InviteKind.INITIAL
