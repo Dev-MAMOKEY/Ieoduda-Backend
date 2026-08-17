@@ -17,6 +17,7 @@ import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
 import com.mamoki.ieojuda.domain.partner.dto.EvidenceDownloadLinkResponse;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewDecisionRequest;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewListItemResponse;
+import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewListResponse;
 import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewResponse;
 import com.mamoki.ieojuda.domain.partner.entity.PartnerReviewer;
 import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
@@ -69,12 +70,13 @@ public class PartnerReviewService {
     }
 
     // issue #87 - EVIDENCE_REVIEW 권한만 있으면 전체를 조회한다.
-    public List<PartnerReviewListItemResponse> getReviews(UUID userId, EvidenceReviewStatus status) {
+    public PartnerReviewListResponse getReviews(UUID userId, EvidenceReviewStatus status) {
         permissionGuard.require(userId, AdminPermission.EVIDENCE_REVIEW);
-        return evidenceRepository.findAllByReviewStatus(status)
+        List<PartnerReviewListItemResponse> reviews = evidenceRepository.findAllByReviewStatus(status)
                 .stream()
                 .map(PartnerReviewListItemResponse::from)
                 .toList();
+        return new PartnerReviewListResponse(reviews);
     }
 
     // issue #43 - 원본을 직접 스트리밍하지 않고, 먼저 짧은 수명의 1회성 다운로드 토큰을 발급한다.

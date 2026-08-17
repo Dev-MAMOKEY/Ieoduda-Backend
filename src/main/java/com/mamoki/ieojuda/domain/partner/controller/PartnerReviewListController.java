@@ -1,10 +1,9 @@
 package com.mamoki.ieojuda.domain.partner.controller;
 
-import java.util.List;
 import java.util.UUID;
 
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceReviewStatus;
-import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewListItemResponse;
+import com.mamoki.ieojuda.domain.partner.dto.PartnerReviewListResponse;
 import com.mamoki.ieojuda.domain.partner.service.PartnerReviewService;
 import com.mamoki.ieojuda.global.rsdata.RsData;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,7 +29,7 @@ public class PartnerReviewListController {
 
     @Operation(summary = "검토 목록 조회", description = "EVIDENCE_REVIEW 권한을 가진 검토자가 전체 검토 대상을 상태별로 조회합니다. 역할별 패키지는 포함하지 않습니다.")
     @GetMapping
-    public ResponseEntity<RsData<List<PartnerReviewListItemResponse>>> getReviews(
+    public ResponseEntity<RsData<PartnerReviewListResponse>> getReviews(
             @AuthenticationPrincipal UUID userId,
             @Parameter(description = "검토 상태 필터") @RequestParam(required = false) EvidenceReviewStatus status
     ) {
