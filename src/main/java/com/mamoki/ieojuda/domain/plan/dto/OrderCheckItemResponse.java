@@ -15,7 +15,9 @@ public record OrderCheckItemResponse(
         @Schema(description = "담당자 이름") String recipientName,
         @Schema(description = "대기 기간(시간 단위)") Integer maxWaitHours,
         @Schema(description = "담당자 수락 상태", example = "PENDING", allowableValues = {"PENDING", "ACCEPTED", "DECLINED", "EXPIRED"}) String acceptanceStatus,
-        @Schema(description = "이 항목이 순서 충돌에 걸려 있는지 여부") boolean conflict,
-        @Schema(description = "충돌 사유 (충돌 없으면 null)") String conflictMessage
+        @Schema(description = "이 항목이 순서 충돌에 걸려 있는지 여부 (true면 확정 불가)") boolean conflict,
+        @Schema(description = "충돌 사유 (충돌 없으면 null)") String conflictMessage,
+        @Schema(description = "확정을 막지는 않지만 사용자에게 표시할 경고가 있는지 여부") boolean warning,
+        @Schema(description = "경고 사유 (없으면 null)") String warningMessage
 ) {
 }

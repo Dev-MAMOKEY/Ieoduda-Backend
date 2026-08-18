@@ -104,14 +104,17 @@ public class ItemOrderService {
 
     private List<OrderCheckItemResponse> buildItemResponses(UUID planId, List<Item> items) {
         Map<UUID, List<String>> conflictReasons = new HashMap<>();
+        Map<UUID, List<String>> warningReasons = new HashMap<>();
         checkSemanticPairRules(items, conflictReasons);
         checkMissingRecipient(items, conflictReasons);
-        checkMissingBackup(planId, items, conflictReasons);
+        checkMissingBackup(planId, items, warningReasons);
         checkAuthorityConcentration(items, conflictReasons);
 
         return items.stream().map(item -> {
             List<String> reasons = conflictReasons.get(item.getItemId());
             String message = reasons == null ? null : String.join(" ", reasons);
+            List<String> warnings = warningReasons.get(item.getItemId());
+            String warningMessage = warnings == null ? null : String.join(" ", warnings);
             Recipient recipient = item.getRecipient();
             return new OrderCheckItemResponse(
                     item.getItemId(),
@@ -123,7 +126,9 @@ public class ItemOrderService {
                     recipient == null ? null : recipient.getMaxWaitHours(),
                     recipient == null ? null : recipient.getAcceptanceStatus().name(),
                     message != null,
-                    message
+                    message,
+                    warningMessage != null,
+                    warningMessage
             );
         }).toList();
     }
@@ -165,8 +170,9 @@ public class ItemOrderService {
         }
     }
 
-    // 규칙 6 - 대체 담당자 부재. 대체 담당자 자신은 대상에서 제외한다(대체 담당자에게 또 대체 담당자가 필요한 건 아님)
-    private void checkMissingBackup(UUID planId, List<Item> items, Map<UUID, List<String>> conflictReasons) {
+    // 규칙 6 - 대체 담당자 부재 (경고 전용 - 확정을 막지 않는다). 대체 담당자 자신은 대상에서 제외한다
+    // (대체 담당자에게 또 대체 담당자가 필요한 건 아님)
+    private void checkMissingBackup(UUID planId, List<Item> items, Map<UUID, List<String>> warningReasons) {
         List<Recipient> planRecipients = recipientRepository.findByPlan_PlanId(planId);
         Set<UUID> primaryIdsWithBackup = planRecipients.stream()
                 .filter(r -> Boolean.TRUE.equals(r.getIsBackup()) && r.getBackupFor() != null)
@@ -179,7 +185,7 @@ public class ItemOrderService {
                 continue;
             }
             if (!primaryIdsWithBackup.contains(recipient.getAssigneeId())) {
-                addReason(conflictReasons, item.getItemId(), String.format(
+                addReason(warningReasons, item.getItemId(), String.format(
                         "%s의 대체 담당자가 없어요. 무응답 시 다음 단계가 막힐 수 있어요. 대체 담당자를 등록해 주세요.", recipient.getName()));
             }
         }

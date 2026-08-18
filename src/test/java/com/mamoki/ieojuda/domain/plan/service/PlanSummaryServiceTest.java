@@ -96,9 +96,9 @@ class PlanSummaryServiceTest {
                 List.of(acceptedAssignee, pendingAssignee), List.of(acceptedConfirmer, pendingConfirmer)));
 
         OrderCheckItemResponse conflicting = new OrderCheckItemResponse(
-                UUID.randomUUID(), 0, "삭제 항목", "DELETE", "CLOUD_DELETE", "담당자", 24, "ACCEPTED", true, "충돌 사유");
+                UUID.randomUUID(), 0, "삭제 항목", "DELETE", "CLOUD_DELETE", "담당자", 24, "ACCEPTED", true, "충돌 사유", false, null);
         OrderCheckItemResponse clean = new OrderCheckItemResponse(
-                UUID.randomUUID(), 1, "정상 항목", "OTHER", null, "담당자", 24, "ACCEPTED", false, null);
+                UUID.randomUUID(), 1, "정상 항목", "OTHER", null, "담당자", 24, "ACCEPTED", false, null, false, null);
         when(itemOrderService.getOrderCheck(USER_ID, PLAN_ID))
                 .thenReturn(OrderCheckResponse.of(List.of(conflicting, conflicting, clean)));
 

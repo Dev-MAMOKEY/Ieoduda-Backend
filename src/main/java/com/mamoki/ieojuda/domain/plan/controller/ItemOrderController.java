@@ -31,7 +31,7 @@ public class ItemOrderController {
 
     private final ItemOrderService itemOrderService;
 
-    @Operation(summary = "실행 순서 점검 목록 조회", description = "담당자가 배정된 항목을 실행 순서대로 조회합니다. 삭제형 항목이 인계형 항목보다 먼저 오면 충돌로 표시됩니다.")
+    @Operation(summary = "실행 순서 점검 목록 조회", description = "담당자가 배정된 항목을 실행 순서대로 조회합니다. 삭제형 항목이 인계형 항목보다 먼저 오면 충돌(conflict)로 표시됩니다. 대체 담당자 부재처럼 확정을 막지는 않는 사유는 경고(warning)로 별도 표시됩니다.")
     @GetMapping
     public ResponseEntity<RsData<OrderCheckResponse>> getOrderCheck(
             @AuthenticationPrincipal UUID userId,
@@ -50,7 +50,7 @@ public class ItemOrderController {
         return ResponseEntity.ok(RsData.success(itemOrderService.reorder(userId, planId, request)));
     }
 
-    @Operation(summary = "순서 확정하기", description = "충돌이 하나라도 남아있으면 확정할 수 없습니다.")
+    @Operation(summary = "순서 확정하기", description = "conflict=true인 항목이 하나라도 남아있으면 확정할 수 없습니다. 대체 담당자 부재(warning)는 확정을 막지 않고 경고로만 표시됩니다.")
     @PostMapping("/confirm")
     public ResponseEntity<RsData<OrderConfirmResponse>> confirm(
             @AuthenticationPrincipal UUID userId,
