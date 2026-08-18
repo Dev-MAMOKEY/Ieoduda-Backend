@@ -31,8 +31,8 @@ public class EmailOutboxScheduler {
     private final AppProperties appProperties;
     private final AdminActionAuditService adminActionAuditService;
 
-    // 10분마다 - EvidenceDeletionScheduler/ReleaseCaseScheduler와 같은 주기
-    @Scheduled(fixedRate = 600_000)
+    // 발송 주기 - app.email.outbox.dispatch-interval-ms (issue #51)
+    @Scheduled(fixedRateString = "${app.email.outbox.dispatch-interval-ms}")
     @Transactional
     public void dispatchPending() {
         List<EmailOutbox> pending = emailOutboxRepository.findPendingForUpdateSkipLocked();
