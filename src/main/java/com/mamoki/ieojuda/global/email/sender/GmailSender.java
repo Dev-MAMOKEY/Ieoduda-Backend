@@ -8,6 +8,7 @@ import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryRegistry;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
@@ -24,11 +25,14 @@ public class GmailSender implements EmailSender {
     private final JavaMailSender javaMailSender;
     private final Retry retry;
     private final CircuitBreaker circuitBreaker;
+    private final String fromAddress;
 
-    public GmailSender(JavaMailSender javaMailSender, RetryRegistry retryRegistry, CircuitBreakerRegistry circuitBreakerRegistry) {
+    public GmailSender(JavaMailSender javaMailSender, RetryRegistry retryRegistry, CircuitBreakerRegistry circuitBreakerRegistry,
+                        @Value("${spring.mail.username}") String fromAddress) {
         this.javaMailSender = javaMailSender;
         this.retry = retryRegistry.retry("emailSend");
         this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("emailSend");
+        this.fromAddress = fromAddress;
     }
 
     @Override
@@ -37,6 +41,7 @@ public class GmailSender implements EmailSender {
             MimeMessage message = javaMailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
 
+            helper.setFrom(fromAddress);
             helper.setTo(toEmail);
             helper.setSubject(content.subject());
             helper.setText(content.body(), false);

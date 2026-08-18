@@ -39,7 +39,7 @@ class GmailSenderTest {
                 RetryConfig.custom().maxAttempts(3).waitDuration(Duration.ofMillis(1)).build()));
         CircuitBreakerRegistry circuitBreakerRegistry = CircuitBreakerRegistry.of(Map.of("emailSend",
                 CircuitBreakerConfig.ofDefaults()));
-        gmailSender = new GmailSender(javaMailSender, retryRegistry, circuitBreakerRegistry);
+        gmailSender = new GmailSender(javaMailSender, retryRegistry, circuitBreakerRegistry, "sender@example.com");
     }
 
     @Test
