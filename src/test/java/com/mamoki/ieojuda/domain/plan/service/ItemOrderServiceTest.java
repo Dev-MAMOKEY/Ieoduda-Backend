@@ -190,9 +190,9 @@ class ItemOrderServiceTest {
         assertThat(assignedResult.conflict()).isFalse();
     }
 
-    // 규칙 6 - 대체 담당자 부재
+    // 규칙 6 - 대체 담당자 부재 (경고 전용 - 확정을 막지 않는다)
     @Test
-    void getOrderCheck_whenRecipientHasNoBackup_flagsMissingBackup() {
+    void getOrderCheck_whenRecipientHasNoBackup_flagsMissingBackupAsWarningOnly() {
         Recipient noBackupRecipient = buildRecipient("박서준");
         Recipient hasBackupRecipient = buildRecipient("최유진");
         Recipient backupOfHasBackup = buildBackupRecipient("대체최유진", hasBackupRecipient);
@@ -207,9 +207,14 @@ class ItemOrderServiceTest {
 
         var withoutBackupResult = response.items().stream().filter(i -> i.itemId().equals(withoutBackup.getItemId())).findFirst().orElseThrow();
         var withBackupResult = response.items().stream().filter(i -> i.itemId().equals(withBackup.getItemId())).findFirst().orElseThrow();
-        assertThat(withoutBackupResult.conflict()).isTrue();
-        assertThat(withoutBackupResult.conflictMessage()).contains("대체 담당자가 없어요");
+        // 확정을 막는 conflict는 아니다
+        assertThat(withoutBackupResult.conflict()).isFalse();
+        assertThat(withoutBackupResult.conflictMessage()).isNull();
+        // 대신 경고로만 표시된다
+        assertThat(withoutBackupResult.warning()).isTrue();
+        assertThat(withoutBackupResult.warningMessage()).contains("대체 담당자가 없어요");
         assertThat(withBackupResult.conflict()).isFalse();
+        assertThat(withBackupResult.warning()).isFalse();
     }
 
     // 규칙 5 - 권한 집중 (전체 항목의 과반을 한 담당자가 맡으면 경고)
@@ -253,6 +258,20 @@ class ItemOrderServiceTest {
         assertThatThrownBy(() -> itemOrderService.confirm(USER_ID, PLAN_ID))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ITEM_ORDER_CONFLICT));
+    }
+
+    // 대체 담당자 부재는 경고일 뿐이므로, 다른 충돌이 없다면 확정이 막혀서는 안 된다
+    @Test
+    void confirm_whenOnlyMissingBackupWarningExists_confirmsSuccessfully() {
+        Recipient noBackupRecipient = buildRecipient("박서준");
+        when(recipientRepository.findByPlan_PlanId(PLAN_ID)).thenReturn(List.of(noBackupRecipient));
+        Item withoutBackup = buildItem(noBackupRecipient, "인스타그램", ItemActionType.OTHER, null, 0);
+        stubItems(withoutBackup);
+
+        var response = itemOrderService.confirm(USER_ID, PLAN_ID);
+
+        assertThat(response).isNotNull();
+        org.mockito.Mockito.verify(plan).confirmOrder();
     }
 
     @Test
