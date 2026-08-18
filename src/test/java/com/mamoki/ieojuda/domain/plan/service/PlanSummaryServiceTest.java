@@ -75,10 +75,13 @@ class PlanSummaryServiceTest {
     @Test
     void getMySummary_aggregatesEveryCollaboratorResponse() {
         ItemResponse item = new ItemResponse(UUID.randomUUID(), "target", "location", "action", "title", "content",
+                "", "FAMILY", "excerpt", "APPROVED", 0, "OTHER", null);
+        ItemResponse proposedItem = new ItemResponse(UUID.randomUUID(), "target", "location", "action", "title", "content",
                 "", "FAMILY", "excerpt", "PROPOSED", 0, "OTHER", null);
         when(lifeAreaService.getLifeAreas(USER_ID, PLAN_ID)).thenReturn(List.of(
                 new LifeAreaResponse("FAMILY", List.of(item, item, item)),
-                new LifeAreaResponse("RELATIONSHIP_CLEANUP", List.of()),
+                // 아직 검토(승인) 안 된 항목만 있는 구역은 itemCount/isWritten에 반영되면 안 된다
+                new LifeAreaResponse("RELATIONSHIP_CLEANUP", List.of(proposedItem)),
                 new LifeAreaResponse("WORK_CONTINUITY", List.of(item))
         ));
 
