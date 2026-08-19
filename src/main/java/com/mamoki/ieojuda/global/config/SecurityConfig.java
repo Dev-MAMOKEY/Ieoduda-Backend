@@ -80,27 +80,28 @@ public class SecurityConfig {
     }
 
     // issue #55 - 경로별 rate limit 정책. 더 구체적인(민감한) 규칙을 넓은 catch-all 규칙보다 앞에 둔다.
+    // 테스트 단계: 이메일 링크로 진입하는 공개 화면 관련 규칙만 limit을 임시로 5배 완화함. 운영 전환 시 원복 필요.
     private List<RateLimitRule> rateLimitRules() {
         return List.of(
                 new RateLimitRule("signup", "/auth/signup", "POST", 5, Duration.ofHours(1)),
                 new RateLimitRule("login", "/auth/login", "POST", 10, Duration.ofMinutes(15)),
                 new RateLimitRule("refresh", "/auth/refresh", "POST", 20, Duration.ofMinutes(15)),
-                new RateLimitRule("death-report", "/api/confirmer-acceptances/*/death-report", "POST", 10, Duration.ofHours(1)),
-                new RateLimitRule("evidence-submit", "/api/release-cases/*/evidence/submit", "POST", 10, Duration.ofHours(1)),
-                new RateLimitRule("objection", "/api/release-cases/*/disputes", "POST", 10, Duration.ofHours(1)),
-                new RateLimitRule("case-cancellation", "/api/release-cases/*/cancellations", "POST", 10, Duration.ofHours(1)),
-                new RateLimitRule("dispute-verify", "/api/dispute-contacts/*/verify", null, 20, Duration.ofHours(1)),
-                new RateLimitRule("dispute-contact-resend", "/api/dispute-contacts/*/verification-email", "POST", 5, Duration.ofHours(1)),
-                new RateLimitRule("self-warning-email", "/api/self-warning-email/**", null, 20, Duration.ofHours(1)),
-                new RateLimitRule("posthumous-otp", "/api/posthumous-access/*/otp", "POST", 5, Duration.ofHours(1)),
-                new RateLimitRule("posthumous-verify", "/api/posthumous-access/*/verify", "POST", 10, Duration.ofHours(1)),
-                new RateLimitRule("posthumous-link", "/api/posthumous-access/**", null, 30, Duration.ofHours(1)),
-                new RateLimitRule("posthumous-package-complete", "/api/posthumous-packages/*/actions/*/complete", "POST", 20, Duration.ofHours(1)),
-                new RateLimitRule("posthumous-package-issue", "/api/posthumous-packages/*/issues", "POST", 10, Duration.ofHours(1)),
-                new RateLimitRule("posthumous-package", "/api/posthumous-packages/**", null, 60, Duration.ofHours(1)),
-                new RateLimitRule("confirmer-link", "/api/confirmer-acceptances/**", null, 30, Duration.ofHours(1)),
-                new RateLimitRule("recipient-link", "/api/recipient-acceptances/**", null, 30, Duration.ofHours(1)),
-                new RateLimitRule("handoff-check-link", "/api/handoff-checks/**", null, 30, Duration.ofHours(1))
+                new RateLimitRule("death-report", "/api/confirmer-acceptances/*/death-report", "POST", 50, Duration.ofHours(1)),
+                new RateLimitRule("evidence-submit", "/api/release-cases/*/evidence/submit", "POST", 50, Duration.ofHours(1)),
+                new RateLimitRule("objection", "/api/release-cases/*/disputes", "POST", 50, Duration.ofHours(1)),
+                new RateLimitRule("case-cancellation", "/api/release-cases/*/cancellations", "POST", 50, Duration.ofHours(1)),
+                new RateLimitRule("dispute-verify", "/api/dispute-contacts/*/verify", null, 100, Duration.ofHours(1)),
+                new RateLimitRule("dispute-contact-resend", "/api/dispute-contacts/*/verification-email", "POST", 25, Duration.ofHours(1)),
+                new RateLimitRule("self-warning-email", "/api/self-warning-email/**", null, 100, Duration.ofHours(1)),
+                new RateLimitRule("posthumous-otp", "/api/posthumous-access/*/otp", "POST", 25, Duration.ofHours(1)),
+                new RateLimitRule("posthumous-verify", "/api/posthumous-access/*/verify", "POST", 50, Duration.ofHours(1)),
+                new RateLimitRule("posthumous-link", "/api/posthumous-access/**", null, 150, Duration.ofHours(1)),
+                new RateLimitRule("posthumous-package-complete", "/api/posthumous-packages/*/actions/*/complete", "POST", 100, Duration.ofHours(1)),
+                new RateLimitRule("posthumous-package-issue", "/api/posthumous-packages/*/issues", "POST", 50, Duration.ofHours(1)),
+                new RateLimitRule("posthumous-package", "/api/posthumous-packages/**", null, 300, Duration.ofHours(1)),
+                new RateLimitRule("confirmer-link", "/api/confirmer-acceptances/**", null, 150, Duration.ofHours(1)),
+                new RateLimitRule("recipient-link", "/api/recipient-acceptances/**", null, 150, Duration.ofHours(1)),
+                new RateLimitRule("handoff-check-link", "/api/handoff-checks/**", null, 150, Duration.ofHours(1))
         );
     }
 
