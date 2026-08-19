@@ -162,7 +162,9 @@ public class RecipientService {
 
     private void sendAcceptanceEmail(Recipient recipient, String roleName,
                                       String plainToken, LocalDateTime expiresAt) {
-        String secureLink = appProperties.getBaseUrl() + "/recipient-acceptances/" + plainToken;
+        // 프론트 실제 경로 - 주 담당자와 대체 담당자는 서로 다른 화면으로 안내한다.
+        String path = Boolean.TRUE.equals(recipient.getIsBackup()) ? "/backup-accept" : "/role-acceptance";
+        String secureLink = appProperties.getBaseUrl() + path + "?token=" + plainToken;
         EmailContent content = EmailBuilder.build(
                 roleName,
                 "역할 수락 여부를 확인해 주세요.",

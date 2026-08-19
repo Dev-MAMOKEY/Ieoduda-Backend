@@ -246,14 +246,14 @@ class StageDispatchHttpIntegrationTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("2단계 담당자 앞으로 등록된 아웃박스 행이 없다"));
         assertThat(stage2Outbox.getBody()).doesNotContain("대체 담당자로 지정되었습니다");
-        assertThat(stage2Outbox.getBody()).contains("/posthumous-access/");
+        assertThat(stage2Outbox.getBody()).contains("/handoff-email?token=");
         assertThat(stage2Outbox.getBody()).doesNotContain("/recipient-acceptances/");
 
         // 메일 본문에 박힌 링크에서 토큰을 뽑아 둔다 (버그 회귀 방지 - #76의 실제 인증 API를 호출해볼 것이다.
         // 이전엔 링크 문자열만 /posthumous-access/로 바뀌고 토큰은 여전히 recipient.inviteToken에
         // 저장되고 있어서, 이 호출이 전부 TOKEN_INVALID로 실패했었다 - 단위 테스트로는 못 잡던 버그)
         java.util.regex.Matcher linkMatcher = java.util.regex.Pattern
-                .compile("/posthumous-access/([\\w-]+)").matcher(stage2Outbox.getBody());
+                .compile("/handoff-email\\?token=([\\w-]+)").matcher(stage2Outbox.getBody());
         assertThat(linkMatcher.find()).as("메일 본문에 사후 인증 링크가 있어야 한다").isTrue();
         String dispatchedPlainToken = linkMatcher.group(1);
 

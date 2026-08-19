@@ -83,7 +83,8 @@ public class EmailAuditService {
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
         String plainToken = securityTokenService.issueForRecipient(SecurityTokenPurpose.ACCEPT_ROLE, recipient, expiresAt);
 
-        String secureLink = appProperties.getBaseUrl() + "/recipient-acceptances/" + plainToken;
+        String path = Boolean.TRUE.equals(recipient.getIsBackup()) ? "/backup-accept" : "/role-acceptance";
+        String secureLink = appProperties.getBaseUrl() + path + "?token=" + plainToken;
         EmailContent content = EmailBuilder.build(
                 "사후 인계 안내",
                 "역할 수락 여부를 다시 확인해 주세요.",

@@ -125,8 +125,8 @@ class HandoverStageServiceTest {
     // 버그 회귀 방지(#79) - 이메일 링크에 박힌 평문 토큰이, 실제로 AccessToken 테이블에 그 해시로
     // 저장됐는지까지 끝까지 추적해서 확인한다. 링크 문자열만 바뀌고 발급처는 그대로였던 버그를 이 검증이 잡는다.
     private void assertLinkTokenWasIssuedAsAccessToken(EmailContent content) {
-        Matcher matcher = Pattern.compile("/posthumous-access/([\\w-]+)").matcher(content.body());
-        assertThat(matcher.find()).as("본문에 /posthumous-access/{token} 링크가 있어야 한다").isTrue();
+        Matcher matcher = Pattern.compile("/handoff-email\\?token=([\\w-]+)").matcher(content.body());
+        assertThat(matcher.find()).as("본문에 /handoff-email?token={token} 링크가 있어야 한다").isTrue();
         String plainToken = matcher.group(1);
         String expectedHash = TokenProvider.hashToken(plainToken);
 
@@ -206,7 +206,7 @@ class HandoverStageServiceTest {
         EmailContent content = captor.getValue();
         assertThat(content.body()).doesNotContain("대체 담당자로 지정되었습니다");
         assertThat(content.body()).contains("업무 담당자 역할로 전달드릴 내용이 있습니다");
-        assertThat(content.body()).contains("https://ieoduda.example/posthumous-access/");
+        assertThat(content.body()).contains("https://ieoduda.example/handoff-email?token=");
         assertThat(content.body()).doesNotContain("/recipient-acceptances/");
         assertLinkTokenWasIssuedAsAccessToken(content);
     }
@@ -266,7 +266,7 @@ class HandoverStageServiceTest {
         assertThat(content.subject()).doesNotContain("대체 담당자");
         assertThat(content.body()).doesNotContain("이전 담당자가 응답하지 않아");
         assertThat(content.body()).contains("가족 담당자 역할로 전달드릴 내용이 있습니다");
-        assertThat(content.body()).contains("/posthumous-access/");
+        assertThat(content.body()).contains("/handoff-email?token=");
         assertLinkTokenWasIssuedAsAccessToken(content);
     }
 
@@ -290,7 +290,7 @@ class HandoverStageServiceTest {
         EmailContent content = captor.getValue();
         assertThat(content.subject()).contains("대체 담당자");
         assertThat(content.body()).contains("이전 담당자가 응답하지 않아 대체 담당자로 지정되었습니다. 역할 수락 여부를 확인해 주세요.");
-        assertThat(content.body()).contains("/posthumous-access/");
+        assertThat(content.body()).contains("/handoff-email?token=");
         assertThat(content.body()).doesNotContain("/recipient-acceptances/");
         assertLinkTokenWasIssuedAsAccessToken(content);
         // issue #47 완료 조건 - "전환 대상과 사유를 감사 로그에서 확인할 수 있다"

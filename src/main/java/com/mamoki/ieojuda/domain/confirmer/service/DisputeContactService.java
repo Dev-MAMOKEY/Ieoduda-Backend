@@ -159,7 +159,7 @@ public class DisputeContactService {
             String plainToken = securityTokenService.issueForDisputeContact(
                     SecurityTokenPurpose.RAISE_OBJECTION, contact, releaseCase, expiresAt);
 
-            String secureLink = appProperties.getBaseUrl() + "/release-cases/" + releaseCase.getCaseId() + "/disputes/" + plainToken;
+            String secureLink = appProperties.getBaseUrl() + "/waiting?caseId=" + releaseCase.getCaseId() + "&token=" + plainToken;
             EmailContent content = EmailBuilder.build(
                     "이의 제기 가능 기간 안내",
                     "잘못된 점이 있다면 링크로 들어가 이의를 제기해 주세요.",

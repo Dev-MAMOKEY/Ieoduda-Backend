@@ -48,7 +48,7 @@ public class ReleaseCaseWarningService {
         LocalDateTime expiresAt = LocalDateTime.now().plusDays(CANCEL_TOKEN_TTL_DAYS);
         String plainToken = securityTokenService.issueForCase(SecurityTokenPurpose.CANCEL_CASE, releaseCase, expiresAt);
 
-        String secureLink = appProperties.getBaseUrl() + "/release-cases/" + releaseCase.getCaseId() + "/cancellations/" + plainToken;
+        String secureLink = appProperties.getBaseUrl() + "/waiting?caseId=" + releaseCase.getCaseId() + "&token=" + plainToken;
         EmailContent content = EmailBuilder.build(
                 "사후 절차 시작 및 취소 안내",
                 "본인이 아니거나 절차를 멈추고 싶다면 링크를 눌러 즉시 취소해 주세요.",
@@ -96,7 +96,7 @@ public class ReleaseCaseWarningService {
         String plainToken = securityTokenService.issueForDisputeContact(
                 SecurityTokenPurpose.RAISE_OBJECTION, contact, releaseCase, expiresAt);
 
-        String secureLink = appProperties.getBaseUrl() + "/release-cases/" + releaseCase.getCaseId() + "/disputes/" + plainToken;
+        String secureLink = appProperties.getBaseUrl() + "/waiting?caseId=" + releaseCase.getCaseId() + "&token=" + plainToken;
         EmailContent content = EmailBuilder.build(
                 "이의 제기 가능 기간 안내",
                 "잘못된 점이 있다면 링크로 들어가 이의를 제기해 주세요.",
