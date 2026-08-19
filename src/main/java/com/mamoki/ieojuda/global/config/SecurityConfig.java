@@ -119,13 +119,16 @@ public class SecurityConfig {
                 SecurityErrorResponseWriter.write(response, ErrorCode.FORBIDDEN);
     }
 
-    // 프론트엔드가 아직 정해진 도메인 없이 여러 환경(로컬/배포)에서 접근하는 개발 단계라 전체 origin을 허용.
-    // Authorization 헤더에 Bearer 토큰을 담아 보내는 방식이라 쿠키 기반 인증(allowCredentials)은 쓰지 않으므로
-    // origin을 "*"로 열어도 자격 증명 노출 문제가 없다.
+    // 프론트엔드 배포 도메인이 확정되어(Vercel) origin을 그 도메인으로 제한한다.
+    // 로컬 프론트 개발(Next.js 기본 포트)도 계속 동작하도록 함께 허용.
+    // Authorization 헤더에 Bearer 토큰을 담아 보내는 방식이라 쿠키 기반 인증(allowCredentials)은 쓰지 않는다.
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*"));
+        config.setAllowedOriginPatterns(List.of(
+                "https://ieoduda-frontend.vercel.app",
+                "http://localhost:3000"
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(false);
