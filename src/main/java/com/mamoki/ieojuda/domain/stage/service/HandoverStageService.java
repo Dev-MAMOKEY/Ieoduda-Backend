@@ -214,7 +214,7 @@ public class HandoverStageService {
                 .expiresAt(expiresAt)
                 .build());
 
-        String secureLink = appProperties.getBaseUrl() + "/posthumous-access/" + plainToken;
+        String secureLink = appProperties.getBaseUrl() + "/handoff-email?token=" + plainToken;
         EmailContent content = kind == InviteKind.INITIAL
                 ? EmailBuilder.build(
                         "사후 인계 안내",

@@ -101,7 +101,7 @@ public class DeathReportService {
         String plainToken = securityTokenService.issueForConfirmer(
                 SecurityTokenPurpose.UPLOAD_EVIDENCE, confirmer, releaseCase, expiresAt);
 
-        String secureLink = appProperties.getBaseUrl() + "/evidence-submissions/" + releaseCase.getCaseId() + "/" + plainToken;
+        String secureLink = appProperties.getBaseUrl() + "/death-report?token=" + plainToken + "&caseId=" + releaseCase.getCaseId();
         EmailContent content = EmailBuilder.build(
                 "공식 증빙 자료 제출",
                 "사망 관련 공식 증빙 자료(사망진단서 등)를 제출해 주세요.",

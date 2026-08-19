@@ -98,7 +98,7 @@ public class ConfirmerService {
     }
 
     private void sendAcceptanceEmail(Confirmer confirmer, String plainToken, LocalDateTime expiresAt) {
-        String secureLink = appProperties.getBaseUrl() + "/confirmer-acceptances/" + plainToken;
+        String secureLink = appProperties.getBaseUrl() + "/verifier-accept?token=" + plainToken;
         EmailContent content = EmailBuilder.build(
                 "지정 확인자",
                 "지정 확인자 역할 수락 여부를 확인해 주세요.",
