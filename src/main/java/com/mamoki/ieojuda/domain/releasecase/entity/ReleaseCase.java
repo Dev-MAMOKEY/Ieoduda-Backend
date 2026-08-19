@@ -81,7 +81,9 @@ public class ReleaseCase {
         this.frozen = false;
     }
 
-    // REPORT_PENDING → REPORT_CONFIRMED : 두 확인자의 신고 내용이 일치해 사건이 생성된 직후
+    // REPORT_PENDING → REPORT_CONFIRMED : 첫 확인자의 사망 신고가 접수되어 사건이 생성된 직후
+    // (issue #41 재설계 - 매칭 여부와 무관하게 첫 신고 즉시 전이한다. 매칭 판정은 두 확인자 모두
+    // 증빙까지 제출을 마친 뒤 별도로 이뤄진다)
     public void confirmReport() {
         ensureTransitionAllowed(EnumSet.of(ReleaseCaseStatus.REPORT_PENDING));
         this.confirmedAt = LocalDateTime.now();

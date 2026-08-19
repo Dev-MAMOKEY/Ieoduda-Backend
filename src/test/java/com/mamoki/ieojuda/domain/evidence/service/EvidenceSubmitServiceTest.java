@@ -29,6 +29,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -49,6 +50,7 @@ class EvidenceSubmitServiceTest {
 
     private static final UUID PLAN_ID = UUID.randomUUID();
     private static final UUID CASE_ID = UUID.randomUUID();
+    private static final UUID CONFIRM_ID = UUID.randomUUID();
 
     private ReleaseCaseRepository releaseCaseRepository;
     private EvidenceRepository evidenceRepository;
@@ -80,6 +82,7 @@ class EvidenceSubmitServiceTest {
 
         confirmer = mock(Confirmer.class);
         when(confirmer.getAcceptanceStatus()).thenReturn(AcceptanceStatus.ACCEPTED);
+        when(confirmer.getConfirmId()).thenReturn(CONFIRM_ID);
         plan = mock(Plan.class);
         when(plan.getPlanId()).thenReturn(PLAN_ID);
         when(confirmer.getPlan()).thenReturn(plan);
@@ -195,6 +198,69 @@ class EvidenceSubmitServiceTest {
         evidenceSubmitService.submit(CASE_ID, "token", file, EvidenceType.DEATH_CERTIFICATE, null);
 
         verify(releaseCase, never()).startEvidenceReview();
+    }
+
+    // issue #41 재설계 - 상대 확인자의 증빙이 아직 없으면 매칭 판정을 하지 않고 그대로 대기해야 한다
+    @Test
+    void submit_whenNoSiblingEvidenceSubmittedYet_doesNotMarkMatchOrMismatch() {
+        byte[] pdfBytes = "%PDF-1.4\n%%EOF".getBytes(StandardCharsets.US_ASCII);
+        MockMultipartFile file = new MockMultipartFile("file", "proof.pdf", "application/pdf", pdfBytes);
+        when(malwareScanner.scan(any())).thenReturn(ScanResult.passed());
+        when(evidenceStorageClient.store(eq(CASE_ID), any())).thenReturn(new StoredEvidence("evidence/10/uuid.pdf", pdfBytes.length));
+        when(evidenceRepository.findFirstByReleaseCase_CaseIdAndConfirmer_ConfirmIdNot(CASE_ID, CONFIRM_ID))
+                .thenReturn(Optional.empty());
+
+        evidenceSubmitService.submit(CASE_ID, "token", file, EvidenceType.DEATH_CERTIFICATE, null);
+
+        verify(confirmer, never()).markMatched();
+        verify(confirmer, never()).markMismatched();
+    }
+
+    // issue #41 재설계 - 두 번째 증빙이 들어오는 시점에 상대 확인자의 신고 날짜와 비교해 매칭 판정을 내린다
+    @Test
+    void submit_whenSiblingEvidenceAlreadySubmittedAndDatesAgree_marksBothMatched() {
+        byte[] pdfBytes = "%PDF-1.4\n%%EOF".getBytes(StandardCharsets.US_ASCII);
+        MockMultipartFile file = new MockMultipartFile("file", "proof.pdf", "application/pdf", pdfBytes);
+        when(malwareScanner.scan(any())).thenReturn(ScanResult.passed());
+        when(evidenceStorageClient.store(eq(CASE_ID), any())).thenReturn(new StoredEvidence("evidence/10/uuid.pdf", pdfBytes.length));
+
+        when(confirmer.getReportedDeathDate()).thenReturn(LocalDate.of(2026, 8, 15));
+        Confirmer sibling = mock(Confirmer.class);
+        when(sibling.getReportedDeathDate()).thenReturn(LocalDate.of(2026, 8, 15));
+        Evidence siblingEvidence = mock(Evidence.class);
+        when(siblingEvidence.getConfirmer()).thenReturn(sibling);
+        when(evidenceRepository.findFirstByReleaseCase_CaseIdAndConfirmer_ConfirmIdNot(CASE_ID, CONFIRM_ID))
+                .thenReturn(Optional.of(siblingEvidence));
+
+        evidenceSubmitService.submit(CASE_ID, "token", file, EvidenceType.DEATH_CERTIFICATE, null);
+
+        verify(confirmer).markMatched();
+        verify(sibling).markMatched();
+        verify(confirmer, never()).markMismatched();
+        verify(sibling, never()).markMismatched();
+    }
+
+    // issue #41 재설계 - 불일치해도 이미 제출된 증빙은 폐기하지 않는다(외부 파트너가 검토할 수 있도록)
+    @Test
+    void submit_whenSiblingEvidenceAlreadySubmittedAndDatesDiffer_marksBothMismatchedButStillStoresEvidence() {
+        byte[] pdfBytes = "%PDF-1.4\n%%EOF".getBytes(StandardCharsets.US_ASCII);
+        MockMultipartFile file = new MockMultipartFile("file", "proof.pdf", "application/pdf", pdfBytes);
+        when(malwareScanner.scan(any())).thenReturn(ScanResult.passed());
+        when(evidenceStorageClient.store(eq(CASE_ID), any())).thenReturn(new StoredEvidence("evidence/10/uuid.pdf", pdfBytes.length));
+
+        when(confirmer.getReportedDeathDate()).thenReturn(LocalDate.of(2026, 8, 15));
+        Confirmer sibling = mock(Confirmer.class);
+        when(sibling.getReportedDeathDate()).thenReturn(LocalDate.of(2026, 8, 16));
+        Evidence siblingEvidence = mock(Evidence.class);
+        when(siblingEvidence.getConfirmer()).thenReturn(sibling);
+        when(evidenceRepository.findFirstByReleaseCase_CaseIdAndConfirmer_ConfirmIdNot(CASE_ID, CONFIRM_ID))
+                .thenReturn(Optional.of(siblingEvidence));
+
+        evidenceSubmitService.submit(CASE_ID, "token", file, EvidenceType.DEATH_CERTIFICATE, null);
+
+        verify(confirmer).markMismatched();
+        verify(sibling).markMismatched();
+        verify(evidenceStorageClient).store(eq(CASE_ID), any());
     }
 
     // issue #51 - DB 트랜잭션이 롤백된 뒤 보정 삭제(afterCompletion) 자체가 실패하면, 이전에는 로그만

@@ -262,18 +262,16 @@ class DeathReportReadinessIntegrationTest {
                 .isEqualTo(ErrorCode.ORDER_NOT_CONFIRMED);
     }
 
+    // issue #41 재설계 - 사건 생성(과 그에 딸린 준비도 검증)은 더 이상 "매칭 시점"이 아니라
+    // "첫 신고 시점"에 일어난다. 봉인되지 않은 계획은 첫 신고에서 곧바로 막혀야 한다.
     @Test
-    void report_whenPlanIsNotSealed_blocksReleaseCaseCreationEvenWhenReportsMatch() {
+    void report_whenPlanIsNotSealed_blocksReleaseCaseCreationOnFirstReport() {
         createFixture(false); // 준비도 조건 중 "봉인"만 깨뜨리고 나머지는 전부 충족시킨다
 
         String tokenA = securityTokenService.issueForConfirmer(
                 SecurityTokenPurpose.REPORT_DEATH, confirmerA, null, LocalDateTime.now().plusDays(1));
-        String tokenB = securityTokenService.issueForConfirmer(
-                SecurityTokenPurpose.REPORT_DEATH, confirmerB, null, LocalDateTime.now().plusDays(1));
 
-        deathReportService.report(tokenA, new DeathReportRequest(REPORTED_DEATH_DATE), null);
-
-        assertThatThrownBy(() -> deathReportService.report(tokenB, new DeathReportRequest(REPORTED_DEATH_DATE), null))
+        assertThatThrownBy(() -> deathReportService.report(tokenA, new DeathReportRequest(REPORTED_DEATH_DATE), null))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.PLAN_NOT_READY);

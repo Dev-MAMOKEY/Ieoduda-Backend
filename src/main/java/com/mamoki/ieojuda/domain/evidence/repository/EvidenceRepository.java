@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.List;
 
@@ -17,6 +18,10 @@ public interface EvidenceRepository extends JpaRepository<Evidence, UUID> {
 
     // issue #45 - "이 확인자가 이 사건에 이미 냈는지" 중복 제출 방지용
     boolean existsByReleaseCase_CaseIdAndConfirmer_ConfirmId(UUID caseId, UUID confirmId);
+
+    // issue #41 재설계 - 이 사건에 이미 제출된 "다른 확인자"의 증빙이 있는지 찾는다. 있으면 그 확인자가
+    // 이 사건의 신고 짝(sibling)이라는 뜻이라, 그 시점에 두 사람의 신고 날짜를 비교해 매칭 판정을 내린다.
+    Optional<Evidence> findFirstByReleaseCase_CaseIdAndConfirmer_ConfirmIdNot(UUID caseId, UUID confirmId);
 
     // issue #45 - "여러 증빙의 승인 정책" - 이 사건에서 승인된 증빙이 몇 건인지 세어, 매칭된 확인자 수와
     // 비교해 전부 승인됐는지 판단한다.

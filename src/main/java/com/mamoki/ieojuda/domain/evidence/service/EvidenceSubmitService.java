@@ -36,6 +36,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.LocalDate;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -119,7 +120,33 @@ public class EvidenceSubmitService {
             releaseCase.startEvidenceReview();
         }
 
+        matchAgainstSiblingIfPresent(confirmer, releaseCase);
+
         return EvidenceSubmitResponse.from(evidence);
+    }
+
+    // issue #41 재설계 - "독립된 2인 확인 원칙"의 매칭 판정을 신고 접수 시점이 아니라 두 확인자 모두 증빙까지
+    // 제출을 마친 시점으로 미룬다. 이 사건에 이미 다른 확인자의 증빙이 있으면 그 사람이 신고 짝(sibling)이므로,
+    // 이 자리에서 두 사람이 신고한 사망일을 비교해 MATCHED/MISMATCHED를 확정한다. 불일치해도 이미 제출된
+    // 증빙은 폐기하지 않는다 - 외부 파트너가 자료를 보고 직접 승인/반려를 판단한다.
+    private void matchAgainstSiblingIfPresent(Confirmer confirmer, ReleaseCase releaseCase) {
+        evidenceRepository.findFirstByReleaseCase_CaseIdAndConfirmer_ConfirmIdNot(releaseCase.getCaseId(), confirmer.getConfirmId())
+                .ifPresent(siblingEvidence -> {
+                    Confirmer sibling = siblingEvidence.getConfirmer();
+                    if (datesAgree(confirmer.getReportedDeathDate(), sibling.getReportedDeathDate())) {
+                        confirmer.markMatched();
+                        sibling.markMatched();
+                    } else {
+                        confirmer.markMismatched();
+                        sibling.markMismatched();
+                    }
+                });
+    }
+
+    // 둘 다 사망일을 명시했고 그 값이 같을 때만 일치로 본다.
+    // 하나라도 모르면(null)이거나 날짜가 다르면 불일치 처리 - 재확인/운영 검토로 전환한다.
+    private boolean datesAgree(LocalDate a, LocalDate b) {
+        return a != null && b != null && a.equals(b);
     }
 
     private void validateBasics(MultipartFile file) {

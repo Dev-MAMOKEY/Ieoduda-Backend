@@ -1,5 +1,6 @@
 package com.mamoki.ieojuda.domain.confirmer.service;
 
+import com.mamoki.ieojuda.domain.audit.entity.EmailType;
 import com.mamoki.ieojuda.domain.confirmer.dto.ConfirmerDecisionRequest;
 import com.mamoki.ieojuda.domain.confirmer.dto.ConfirmerDecisionResponse;
 import com.mamoki.ieojuda.domain.confirmer.dto.ConfirmerInviteResponse;
@@ -9,6 +10,9 @@ import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityToken;
 import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
 import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.config.AppProperties;
+import com.mamoki.ieojuda.global.email.contract.EmailContent;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
+import com.mamoki.ieojuda.global.email.template.EmailBuilder;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.ratelimit.PublicLinkAuditor;
@@ -17,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 // 명세서 "지정확인자 수락 이메일/화면" - 확인자가 초대 링크로 진입해 역할을 확인하고 수락/거절 (로그인 불필요, 토큰이 곧 인증)
 // issue #41 - 수락/거절은 ACCEPT_ROLE 목적 토큰으로만 처리한다. 수락이 완료되는 순간, 이후 사망 신고에
@@ -27,9 +32,13 @@ import java.time.LocalDateTime;
 @Transactional(readOnly = true)
 public class ConfirmerInviteService {
 
+    // 사망 신고는 수락 시점으로부터 수십 년 뒤에 이뤄질 수도 있어, 다른 토큰과 달리 사실상 무기한 수준으로 길게 둔다
+    private static final long REPORT_DEATH_TOKEN_TTL_YEARS = 100;
+
     private final AppProperties appProperties;
     private final PublicLinkAuditor publicLinkAuditor;
     private final SecurityTokenService securityTokenService;
+    private final EmailOutboxService emailOutboxService;
 
     // 초대 조회 - 만료·사용·폐기·목적 불일치 링크는 차단
     @Transactional
@@ -51,11 +60,25 @@ public class ConfirmerInviteService {
         confirmer.accept(inquiryOf(request));
         securityTokenService.consume(token);
 
-        LocalDateTime reportDeathExpiresAt = LocalDateTime.now().plusDays(appProperties.getActiveTokenTtlDays());
+        LocalDateTime reportDeathExpiresAt = LocalDateTime.now().plusYears(REPORT_DEATH_TOKEN_TTL_YEARS);
         String reportDeathToken = securityTokenService.issueForConfirmer(
                 SecurityTokenPurpose.REPORT_DEATH, confirmer, null, reportDeathExpiresAt);
+        sendDeathReportEmail(confirmer, reportDeathToken, reportDeathExpiresAt);
 
         return ConfirmerDecisionResponse.of(confirmer, reportDeathToken);
+    }
+
+    // 수락 완료 즉시 "사망 신고" 화면 링크를 이메일로 보내, 이후 응답을 잃어버려도 이 이메일로 돌아올 수 있게 한다
+    private void sendDeathReportEmail(Confirmer confirmer, String plainToken, LocalDateTime expiresAt) {
+        String secureLink = appProperties.getBaseUrl() + "/death-report?token=" + plainToken;
+        EmailContent content = EmailBuilder.build(
+                "지정 확인자",
+                "사망 사실을 신고해 주세요.",
+                expiresAt.atZone(ZoneId.systemDefault()),
+                secureLink,
+                appProperties.getContactEmail()
+        );
+        emailOutboxService.enqueue(confirmer.getPlan(), null, EmailType.DEATH_REPORT_REQUEST, confirmer.getEmail(), content);
     }
 
     // 역할 거절
