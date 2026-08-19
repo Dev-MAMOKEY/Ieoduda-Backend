@@ -14,7 +14,12 @@ import com.mamoki.ieojuda.global.security.PermissionGuard;
 import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -78,5 +83,22 @@ class EvidenceDeletionServiceTest {
 
         assertThat(response.deletedAt()).isNull();
         assertThat(response.overdue()).isFalse();
+    }
+
+    @Test
+    void getAllStatuses_returnsPagedResponsesMappedFromRepository() {
+        Evidence evidence = Evidence.builder()
+                .confirmer(mock(Confirmer.class)).plan(mock(Plan.class)).releaseCase(mock(ReleaseCase.class))
+                .storageKey("evidence/9/proof.pdf").fileName("proof.pdf").mimeType("application/pdf")
+                .integrityHash("hash-list").evidenceType(EvidenceType.DEATH_CERTIFICATE).build();
+        Pageable pageable = PageRequest.of(0, 50);
+        Page<Evidence> page = new PageImpl<>(List.of(evidence), pageable, 1);
+        when(evidenceRepository.findAll(pageable)).thenReturn(page);
+
+        Page<EvidenceDeletionStatusResponse> result = evidenceDeletionService.getAllStatuses(UUID.randomUUID(), pageable);
+
+        assertThat(result.getTotalElements()).isEqualTo(1);
+        assertThat(result.getContent().get(0).fileName()).isEqualTo("proof.pdf");
+        assertThat(result.getContent().get(0).integrityHash()).isEqualTo("hash-list");
     }
 }

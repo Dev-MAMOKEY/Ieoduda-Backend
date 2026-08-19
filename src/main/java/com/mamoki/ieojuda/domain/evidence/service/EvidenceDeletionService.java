@@ -14,6 +14,8 @@ import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.security.PermissionGuard;
 import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +34,12 @@ public class EvidenceDeletionService {
     public EvidenceDeletionStatusResponse getStatus(UUID userId, UUID evidenceId) {
         permissionGuard.require(userId, AdminPermission.EVIDENCE_DELETE_RETRY);
         return EvidenceDeletionStatusResponse.from(findEvidence(evidenceId));
+    }
+
+    // 관리자 "증빙 삭제 감사" 목록 화면 - evidenceId를 몰라도 전체 증빙을 페이지 단위로 조회
+    public Page<EvidenceDeletionStatusResponse> getAllStatuses(UUID userId, Pageable pageable) {
+        permissionGuard.require(userId, AdminPermission.EVIDENCE_DELETE_RETRY);
+        return evidenceRepository.findAll(pageable).map(EvidenceDeletionStatusResponse::from);
     }
 
     // "재처리 요청하기" - 자동 삭제가 실패한 증빙을 다시 삭제 시도. 사람 행위자가 있는 고위험
