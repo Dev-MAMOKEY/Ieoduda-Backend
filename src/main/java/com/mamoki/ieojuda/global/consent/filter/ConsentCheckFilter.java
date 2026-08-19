@@ -38,6 +38,12 @@ public class ConsentCheckFilter extends OncePerRequestFilter {
             "/api/consents"
     };
 
+    // GET /users/me(내 정보 조회)는 동의 안내 화면 헤더 등에서도 호출되므로 조회만 예외로 둔다.
+    // PUT/DELETE는 같은 경로를 쓰지만 계속 동의를 요구해야 하므로 메서드까지 함께 검사한다.
+    private static final String[] EXCLUDED_GET_PATHS = {
+            "/users/me"
+    };
+
     private final UserRepository userRepository;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
@@ -48,7 +54,7 @@ public class ConsentCheckFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        if (isExcluded(request.getServletPath())) {
+        if (isExcluded(request.getServletPath()) || isExcludedGet(request)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -78,6 +84,18 @@ public class ConsentCheckFilter extends OncePerRequestFilter {
     private boolean isExcluded(String path) {
         for (String pattern : EXCLUDED_PATHS) {
             if (pathMatcher.match(pattern, path)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isExcludedGet(HttpServletRequest request) {
+        if (!"GET".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+        for (String pattern : EXCLUDED_GET_PATHS) {
+            if (pathMatcher.match(pattern, request.getServletPath())) {
                 return true;
             }
         }
