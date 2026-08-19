@@ -5,6 +5,7 @@ import com.mamoki.ieojuda.domain.account.entity.User;
 import com.mamoki.ieojuda.domain.audit.entity.AdminActionType;
 import com.mamoki.ieojuda.domain.audit.service.AdminActionAuditService;
 import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
+import com.mamoki.ieojuda.domain.confirmer.entity.ReportStatus;
 import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
 import com.mamoki.ieojuda.domain.evidence.entity.EvidenceDownloadToken;
@@ -38,6 +39,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -109,6 +111,10 @@ class PartnerReviewServiceTest {
         when(releaseCase.getPlan()).thenReturn(plan);
         Confirmer confirmer = mock(Confirmer.class);
         when(confirmer.getName()).thenReturn("확인자");
+        // issue #41 재설계 - 매칭 판정이 끝난(MATCHED) 증빙만 승인할 수 있다. REPORTED(매칭 미확정)인
+        // 채로 두면 새로 추가한 가드에 막히므로, 기본값은 "이미 매칭 확정"으로 둔다
+        // (미확정 상태 자체를 검증하는 테스트는 개별적으로 REPORTED로 재정의한다).
+        when(confirmer.getReportStatus()).thenReturn(ReportStatus.MATCHED);
         evidence = mock(Evidence.class);
         when(evidence.getEvidenceId()).thenReturn(REVIEW_ID);
         when(evidence.getReleaseCase()).thenReturn(releaseCase);
@@ -119,8 +125,11 @@ class PartnerReviewServiceTest {
         when(evidenceRepository.findById(REVIEW_ID)).thenReturn(Optional.of(evidence));
         // 기본값: 매칭된 확인자가 1명뿐인 사건 - 승인 1건만으로 정족수를 채워 바로 WAITING까지 진행된다
         // (다중 확인자 정족수 시나리오는 별도 테스트에서 개별적으로 재정의한다)
-        when(confirmerRepository.findByPlan_PlanIdAndReportStatus(any(), any()))
+        when(confirmerRepository.findByPlan_PlanIdAndReportStatus(any(), eq(ReportStatus.MATCHED)))
                 .thenReturn(List.of(mock(Confirmer.class)));
+        // 불일치(MISMATCHED)로 확정된 확인자는 기본적으로 없다고 가정한다
+        when(confirmerRepository.findByPlan_PlanIdAndReportStatus(any(), eq(ReportStatus.MISMATCHED)))
+                .thenReturn(List.of());
         when(evidenceRepository.countByReleaseCase_CaseIdAndReviewStatus(any(), any())).thenReturn(0L);
     }
 
@@ -144,7 +153,7 @@ class PartnerReviewServiceTest {
     // WAITING으로 넘기지 않고 부분 승인(EVIDENCE_APPROVED) 상태로만 남겨야 한다.
     @Test
     void decide_whenOnlyOneOfTwoMatchedConfirmersApproved_leavesCasePartiallyApproved() {
-        when(confirmerRepository.findByPlan_PlanIdAndReportStatus(any(), any()))
+        when(confirmerRepository.findByPlan_PlanIdAndReportStatus(any(), eq(ReportStatus.MATCHED)))
                 .thenReturn(List.of(mock(Confirmer.class), mock(Confirmer.class)));
         when(evidenceRepository.countByReleaseCase_CaseIdAndReviewStatus(any(), any())).thenReturn(0L);
         PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
@@ -161,7 +170,7 @@ class PartnerReviewServiceTest {
     // 그때 비로소 WAITING으로 전환돼야 한다.
     @Test
     void decide_whenSecondOfTwoMatchedConfirmersApproved_startsWaiting() {
-        when(confirmerRepository.findByPlan_PlanIdAndReportStatus(any(), any()))
+        when(confirmerRepository.findByPlan_PlanIdAndReportStatus(any(), eq(ReportStatus.MATCHED)))
                 .thenReturn(List.of(mock(Confirmer.class), mock(Confirmer.class)));
         when(evidenceRepository.countByReleaseCase_CaseIdAndReviewStatus(any(), any())).thenReturn(1L);
         PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
@@ -172,6 +181,38 @@ class PartnerReviewServiceTest {
         verify(evidence).approve();
         verify(releaseCaseWarningService).sendDisputeWarningsAndStartWaiting(releaseCase, 7);
         verify(releaseCase, never()).markEvidencePartiallyApproved();
+    }
+
+    // issue #41 재설계 - 상대 확인자가 아직 증빙까지 제출하지 못해 매칭 판정이 안 난(REPORTED) 증빙은
+    // 승인할 수 없어야 한다. 이걸 막지 않으면 requiredCount가 부정확해져 조기에 WAITING으로 샐 수 있다.
+    @Test
+    void decide_whenMatchingNotYetDecided_isBlockedFromApproving() {
+        when(evidence.getConfirmer().getReportStatus()).thenReturn(ReportStatus.REPORTED);
+        PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
+                PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "correct-pw");
+
+        assertThatThrownBy(() -> partnerReviewService.decide(REVIEW_ID, USER_ID, request, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.RELEASE_CASE_INVALID_TRANSITION));
+        verify(evidence, never()).approve();
+    }
+
+    // issue #41 재설계 - 두 확인자의 신고 날짜가 불일치(MISMATCHED)해도, 이미 제출된 증빙은 파트너가
+    // 검토·승인할 수 있어야 한다 (검토 기회를 막지 않는다).
+    @Test
+    void decide_whenBothConfirmersMismatched_stillAllowsApprovalAndCountsTowardRequiredCount() {
+        when(evidence.getConfirmer().getReportStatus()).thenReturn(ReportStatus.MISMATCHED);
+        when(confirmerRepository.findByPlan_PlanIdAndReportStatus(any(), eq(ReportStatus.MATCHED)))
+                .thenReturn(List.of());
+        when(confirmerRepository.findByPlan_PlanIdAndReportStatus(any(), eq(ReportStatus.MISMATCHED)))
+                .thenReturn(List.of(mock(Confirmer.class)));
+        PartnerReviewDecisionRequest request = new PartnerReviewDecisionRequest(
+                PartnerReviewDecisionRequest.PartnerReviewDecision.APPROVE, null, "correct-pw");
+
+        partnerReviewService.decide(REVIEW_ID, USER_ID, request, null);
+
+        verify(evidence).approve();
+        verify(releaseCaseWarningService).sendDisputeWarningsAndStartWaiting(releaseCase, 7);
     }
 
     @Test

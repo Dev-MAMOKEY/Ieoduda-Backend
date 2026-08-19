@@ -155,13 +155,24 @@ public class PartnerReviewService {
         switch (request.decision()) {
             // issue #45 - "여러 증빙의 승인 정책" - 사건에 매칭된 확인자 각각이 낸 증빙이 전부 승인돼야
             // 대기(WAITING)로 넘어간다. 아직 다 안 됐으면 EVIDENCE_APPROVED(부분 승인) 상태로만 남겨둔다.
+            // issue #41 재설계 - 매칭 판정이 증빙 제출 이후로 미뤄지면서, 상대 확인자가 아직 증빙까지
+            // 제출하지 못해 이 확인자의 신고 상태가 여전히 REPORTED(매칭 미확정)인 경우가 생길 수 있다.
+            // 그 상태에서 증빙을 승인하면 아래 requiredCount가 부정확해져(상대방 몫이 아직 안 잡혀서) 조기에
+            // WAITING으로 새어나갈 수 있으므로, 매칭 판정이 끝난(MATCHED 또는 MISMATCHED) 증빙만 승인을 허용한다.
             case APPROVE -> {
                 ReleaseCase releaseCase = evidence.getReleaseCase();
+                if (evidence.getConfirmer().getReportStatus() == ReportStatus.REPORTED) {
+                    throw new CustomException(ErrorCode.RELEASE_CASE_INVALID_TRANSITION);
+                }
                 long alreadyApprovedCount = evidenceRepository.countByReleaseCase_CaseIdAndReviewStatus(
                         releaseCase.getCaseId(), EvidenceReviewStatus.APPROVED);
                 evidence.approve();
+                // 불일치(MISMATCHED)여도 이미 제출된 증빙은 파트너가 검토·승인할 수 있어야 하므로,
+                // MATCHED뿐 아니라 MISMATCHED로 확정된 확인자도 함께 센다.
                 long requiredCount = confirmerRepository.findByPlan_PlanIdAndReportStatus(
-                        releaseCase.getPlan().getPlanId(), ReportStatus.MATCHED).size();
+                        releaseCase.getPlan().getPlanId(), ReportStatus.MATCHED).size()
+                        + confirmerRepository.findByPlan_PlanIdAndReportStatus(
+                        releaseCase.getPlan().getPlanId(), ReportStatus.MISMATCHED).size();
 
                 if (alreadyApprovedCount + 1 >= requiredCount) {
                     // 이의 제기 연락처 전원에게 경고를 보내 발송이 확인된 뒤에만 WAITING으로 전이한다
