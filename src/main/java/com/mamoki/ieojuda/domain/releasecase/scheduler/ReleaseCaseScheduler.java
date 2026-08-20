@@ -32,10 +32,10 @@ public class ReleaseCaseScheduler {
     private final PlanSnapshotService planSnapshotService;
     private final HandoverStageService handoverStageService;
 
-    // 10분마다 - 대기기간이 긴(일 단위) 도메인 특성상 촘촘한 주기가 필요하지 않음
+    // 30초마다
     // FOR UPDATE SKIP LOCKED로 조회하므로, 다중 인스턴스가 동시에 돌아도 각 인스턴스는
     // 서로 다른 사건만 잠가서 처리한다 - 같은 사건이 중복으로 발송되지 않는다(issue #57).
-    @Scheduled(fixedRate = 600_000)
+    @Scheduled(fixedRate = 30_000)
     @Transactional
     public void progressExpiredWaitingCases() {
         List<ReleaseCase> dueCases = releaseCaseRepository
