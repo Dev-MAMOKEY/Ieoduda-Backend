@@ -13,7 +13,7 @@ public record DeathReportResponse(
         @Schema(description = "신고 상태", example = "REPORTED", allowableValues = {"NOT_REPORTED", "REPORTED", "MATCHED", "MISMATCHED"}) String reportStatus,
         @Schema(description = "신고 접수 시각") LocalDateTime reportedAt,
         @Schema(description = "이 신고가 속한 사건 ID") UUID caseId,
-        @Schema(description = "증빙 제출용 토큰 - /api/confirmer-acceptances/{token}/death-report(caseId 쿼리 포함)로 바로 제출 가능") String evidenceUploadToken
+        @Schema(description = "증빙 제출용 토큰 - /api/release-cases/{caseId}/evidence/submit로 바로 제출 가능") String evidenceUploadToken
 ) {
     public static DeathReportResponse of(Confirmer confirmer, UUID caseId, String evidenceUploadToken) {
         return new DeathReportResponse(
