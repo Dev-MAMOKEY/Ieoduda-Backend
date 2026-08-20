@@ -85,7 +85,7 @@ public class PlanService {
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
         plan.requestSelfWarningEmailVerification(request.email(), TokenProvider.hashToken(plainToken), expiresAt);
 
-        String secureLink = appProperties.getBaseUrl() + "/self-warning-email/verify/" + plainToken;
+        String secureLink = appProperties.getBaseUrl() + "/self-warning-email?token=" + plainToken;
         EmailContent content = EmailBuilder.build(
                 "본인 경고 메일",
                 "링크를 눌러 이 이메일 주소를 본인 경고 메일 수신처로 확인해 주세요.",
