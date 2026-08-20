@@ -1,0 +1,129 @@
+package com.mamoki.ieojuda.global.exception;
+import lombok.Getter;
+import org.springframework.http.HttpStatus;
+
+@Getter
+public enum ErrorCode {
+
+    // 요청 값 검증 예외 (400) -> @Valid 검증 실패, JSON 파싱 실패, 파라미터 타입 불일치 등
+    INVALID_INPUT(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "입력값이 올바르지 않습니다."),
+    PAYLOAD_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "PAYLOAD_TOO_LARGE", "업로드 파일 또는 요청 크기가 허용 범위를 초과했습니다."),
+
+    // 회원가입 / 로그인 관련 예외 (400)
+    PASSWORD_CONFIRMATION_MISMATCH(HttpStatus.BAD_REQUEST, "PASSWORD_CONFIRMATION_MISMATCH", "비밀번호와 비밀번호 확인이 일치하지 않습니다."),
+    BREACHED_PASSWORD(HttpStatus.BAD_REQUEST, "BREACHED_PASSWORD", "이미 유출된 적이 있는 비밀번호입니다. 다른 비밀번호를 사용해 주세요."),
+
+    // 계획 / 삶의 구역 / AI 구조화 관련 예외 (400)
+    INVALID_WAITING_PERIOD(HttpStatus.BAD_REQUEST, "INVALID_WAITING_PERIOD", "대기 기간은 7일 이상 30일 이하여야 합니다."),
+    CONSENT_REQUIRED(HttpStatus.BAD_REQUEST, "CONSENT_REQUIRED", "사후 인계 조건과 안전 범위를 확인해 주세요."),
+    SUSPECTED_CREDENTIAL_INPUT(HttpStatus.BAD_REQUEST, "SUSPECTED_CREDENTIAL_INPUT", "비밀번호·PIN·OTP·복구 코드로 보이는 내용은 저장할 수 없습니다. 위치 유형만 적어 주세요."),
+    CONVERSATION_HISTORY_TOO_LONG(HttpStatus.BAD_REQUEST, "CONVERSATION_HISTORY_TOO_LONG", "대화 이력이 너무 깁니다. 새 대화 세션을 시작해 주세요."),
+    UNGROUNDED_ITEM_NOT_APPROVABLE(HttpStatus.BAD_REQUEST, "UNGROUNDED_ITEM_NOT_APPROVABLE", "원문 근거가 없는 항목은 승인할 수 없습니다."),
+    ITEM_NOT_APPROVED(HttpStatus.BAD_REQUEST, "ITEM_NOT_APPROVED", "승인되지 않은 항목에는 담당자를 등록할 수 없습니다."),
+    PROHIBITED_ACTION_DETECTED(HttpStatus.BAD_REQUEST, "PROHIBITED_ACTION_DETECTED", "AI가 처리할 수 없는 금지 행동이 포함되어 있습니다."),
+    PACKAGE_SEAL_BLOCKED(HttpStatus.BAD_REQUEST, "PACKAGE_SEAL_BLOCKED", "금지 정보나 근거 없는 항목이 있어 패키지를 봉인할 수 없습니다."),
+    CIRCULAR_DEPENDENCY_DETECTED(HttpStatus.BAD_REQUEST, "CIRCULAR_DEPENDENCY_DETECTED", "발송 단계에 순환 의존 관계가 존재합니다."),
+    PLAN_NOT_SEALED(HttpStatus.BAD_REQUEST, "PLAN_NOT_SEALED", "봉인된 계획만 인계 점검을 보낼 수 있습니다."),
+    PLAN_NOT_READY(HttpStatus.BAD_REQUEST, "PLAN_NOT_READY", "준비(봉인)되지 않았거나 비활성화된 계획에서는 사후 사건을 생성할 수 없습니다."),
+    PLAN_DEACTIVATED(HttpStatus.CONFLICT, "PLAN_DEACTIVATED", "비활성화된 계획입니다."),
+    WAITING_PERIOD_NOT_SET(HttpStatus.BAD_REQUEST, "WAITING_PERIOD_NOT_SET", "대기 기간이 설정되지 않아 사후 사건을 생성할 수 없습니다."),
+    SELF_WARNING_EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "SELF_WARNING_EMAIL_NOT_VERIFIED", "본인 경고 이메일 인증이 완료되지 않아 사후 사건을 생성할 수 없습니다."),
+
+    // 담당자 / 확인자 / 이의 제기 연락처 관련 예외 (400)
+    INSUFFICIENT_CONFIRMERS(HttpStatus.BAD_REQUEST, "INSUFFICIENT_CONFIRMERS", "수락을 완료한 지정 확인자가 2명 미만이라 계획을 봉인할 수 없습니다."),
+    RECIPIENT_NOT_ACCEPTED(HttpStatus.BAD_REQUEST, "RECIPIENT_NOT_ACCEPTED", "역할을 수락하지 않은 담당자는 발송 단계에 포함할 수 없습니다."),
+    FALLBACK_RECIPIENT_MISSING(HttpStatus.BAD_REQUEST, "FALLBACK_RECIPIENT_MISSING", "대체 담당자가 없어 다음 단계를 진행할 수 없습니다."),
+    DISPUTE_CONTACT_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "DISPUTE_CONTACT_NOT_VERIFIED", "이메일 인증이 완료되지 않은 이의 제기 연락처는 활성화할 수 없습니다."),
+    ITEM_ASSIGNEE_MISSING(HttpStatus.BAD_REQUEST, "ITEM_ASSIGNEE_MISSING", "담당자가 지정되지 않은 항목이 있어 사후 사건을 생성할 수 없습니다."),
+
+    // 사망 신고 / 증빙 관련 예외 (400)
+    DEATH_REPORT_MISMATCH(HttpStatus.BAD_REQUEST, "DEATH_REPORT_MISMATCH", "두 확인자의 신고 내용이 일치하지 않아 절차를 중지합니다."),
+    EVIDENCE_SUBMISSION_INVALID(HttpStatus.BAD_REQUEST, "EVIDENCE_SUBMISSION_INVALID", "증빙 파일 형식이 올바르지 않거나 보안 검사에 실패했습니다."),
+
+    // 암호화 증빙 저장소 관련 예외 (500)
+    EVIDENCE_STORAGE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EVIDENCE_STORAGE_FAILED", "증빙 저장소 처리 중 오류가 발생했습니다."),
+
+    // OpenAI 연동 관련 예외 (502/503) - issue #52
+    AI_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY, "AI_RESPONSE_INVALID", "AI 응답을 처리할 수 없습니다. 다시 시도해 주세요."),
+    AI_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI_SERVICE_UNAVAILABLE", "AI 서비스 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요."),
+
+    // 공통 이메일 발송 모듈 관련 예외 (500)
+    EMAIL_CONTENT_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EMAIL_CONTENT_GENERATION_FAILED", "이메일 본문 생성에 실패했습니다."),
+    //이메일 토큰 관련 예외 (400/500)
+    INVALID_TOKEN_FORMAT(HttpStatus.BAD_REQUEST, "INVALID_TOKEN_FORMAT", "토큰 값이 비어있거나 형식이 올바르지 않습니다."),
+    TOKEN_HASHING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TOKEN_HASHING_FAILED", "토큰 처리 중 서버 오류가 발생했습니다."),
+
+    // 인증 관련 예외 처리 (401)
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다."),
+    TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "TOKEN_EXPIRED", "Access Token이 만료되었습니다."),
+    TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "TOKEN_INVALID", "토큰 형식이 잘못되었거나 서명이 유효하지 않습니다."),
+    REFRESH_TOKEN_REVOKED(HttpStatus.UNAUTHORIZED, "REFRESH_TOKEN_REVOKED", "이미 무효화된 Refresh Token입니다."),
+    REFRESH_TOKEN_REUSE_DETECTED(HttpStatus.UNAUTHORIZED, "REFRESH_TOKEN_REUSE_DETECTED", "이미 사용된 Refresh Token이 재사용되어 관련 세션을 모두 차단했습니다. 다시 로그인해 주세요."),
+    SESSION_REVOKED(HttpStatus.UNAUTHORIZED, "SESSION_REVOKED", "세션이 만료되었습니다. 다시 로그인해 주세요."),
+    ACCESS_LINK_EXPIRED(HttpStatus.UNAUTHORIZED, "ACCESS_LINK_EXPIRED", "링크가 만료되었습니다."),
+    ACCESS_LINK_ALREADY_USED(HttpStatus.UNAUTHORIZED, "ACCESS_LINK_ALREADY_USED", "이미 사용되었거나 재사용할 수 없는 링크입니다."),
+    TOKEN_REVOKED(HttpStatus.UNAUTHORIZED, "TOKEN_REVOKED", "폐기된 링크입니다. 최신 안내 메일의 링크를 사용해 주세요."),
+    TOKEN_PURPOSE_MISMATCH(HttpStatus.UNAUTHORIZED, "TOKEN_PURPOSE_MISMATCH", "이 작업에 사용할 수 없는 링크입니다."),
+    OTP_VERIFICATION_FAILED(HttpStatus.UNAUTHORIZED, "OTP_VERIFICATION_FAILED", "OTP 인증에 실패했습니다."),
+    ACCOUNT_TEMPORARILY_LOCKED(HttpStatus.TOO_MANY_REQUESTS, "ACCOUNT_TEMPORARILY_LOCKED", "로그인 실패 횟수가 많아 잠시 후 다시 시도해 주세요."),
+    TOKEN_TEMPORARILY_LOCKED(HttpStatus.TOO_MANY_REQUESTS, "TOKEN_TEMPORARILY_LOCKED", "이 링크로 실패 횟수가 많아 잠시 후 다시 시도해 주세요."),
+    TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS", "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."),
+    REAUTH_FAILED(HttpStatus.UNAUTHORIZED, "REAUTH_FAILED", "비밀번호가 일치하지 않아 이 작업을 진행할 수 없습니다."),
+
+    // 권한 에러 (403)
+    FORBIDDEN(HttpStatus.FORBIDDEN, "FORBIDDEN", "해당 리소스에 대한 권한이 없습니다."),
+    ROLE_PACKAGE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "ROLE_PACKAGE_ACCESS_DENIED", "본인의 역할 패키지가 아니거나 권한이 없는 요청입니다."),
+    REVIEWER_CONFLICT_OF_INTEREST(HttpStatus.FORBIDDEN, "REVIEWER_CONFLICT_OF_INTEREST", "이해충돌 또는 권한 만료로 다른 검토자에게 재배정이 필요합니다."),
+    INSUFFICIENT_PERMISSION(HttpStatus.FORBIDDEN, "INSUFFICIENT_PERMISSION", "이 작업을 수행할 세부 권한이 없습니다."),
+    ACCOUNT_SUSPENDED(HttpStatus.FORBIDDEN, "ACCOUNT_SUSPENDED", "정지된 계정입니다."),
+
+    // 리소스 없음 (404)
+    RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "요청한 리소스가 존재하지 않습니다."),
+    PLAN_NOT_FOUND(HttpStatus.NOT_FOUND, "PLAN_NOT_FOUND", "해당 계획이 존재하지 않습니다."),
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "해당 사용자가 존재하지 않습니다."),
+    LIFE_AREA_NOT_FOUND(HttpStatus.NOT_FOUND, "LIFE_AREA_NOT_FOUND", "해당 삶의 구역이 존재하지 않습니다."),
+    CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "CONVERSATION_NOT_FOUND", "해당 대화 세션이 존재하지 않습니다."),
+    ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "ITEM_NOT_FOUND", "해당 항목이 존재하지 않습니다."),
+    CONFIRMER_NOT_FOUND(HttpStatus.NOT_FOUND, "CONFIRMER_NOT_FOUND", "해당 지정 확인자가 존재하지 않습니다."),
+    RECIPIENT_NOT_FOUND(HttpStatus.NOT_FOUND, "RECIPIENT_NOT_FOUND", "해당 역할 담당자가 존재하지 않습니다."),
+    RELEASE_CASE_NOT_FOUND(HttpStatus.NOT_FOUND, "RELEASE_CASE_NOT_FOUND", "해당 사후 인계 사건이 존재하지 않습니다."),
+    EVIDENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "EVIDENCE_NOT_FOUND", "해당 증빙이 존재하지 않습니다."),
+    DISPUTE_CONTACT_NOT_FOUND(HttpStatus.NOT_FOUND, "DISPUTE_CONTACT_NOT_FOUND", "해당 이의 제기 연락처가 존재하지 않습니다."),
+    HANDOVER_STAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "HANDOVER_STAGE_NOT_FOUND", "해당 인계 단계가 존재하지 않습니다."),
+    PARTNER_REVIEWER_NOT_FOUND(HttpStatus.NOT_FOUND, "PARTNER_REVIEWER_NOT_FOUND", "해당 파트너 검토자가 존재하지 않습니다."),
+
+    // 상태 충돌 (409)
+    DUPLICATE_EMAIL(HttpStatus.CONFLICT, "DUPLICATE_EMAIL", "이미 사용 중인 이메일입니다."),
+    DISPUTE_RAISED(HttpStatus.CONFLICT, "DISPUTE_RAISED", "이의 제기가 접수되어 자동 발송이 중지되었습니다."),
+    RELEASE_CASE_FROZEN(HttpStatus.CONFLICT, "RELEASE_CASE_FROZEN", "사건이 동결되어 있어 처리할 수 없습니다."),
+    RELEASE_CASE_INVALID_TRANSITION(HttpStatus.CONFLICT, "RELEASE_CASE_INVALID_TRANSITION", "사건의 현재 상태에서는 이 작업을 수행할 수 없습니다."),
+    HANDOVER_STAGE_INVALID_TRANSITION(HttpStatus.CONFLICT, "HANDOVER_STAGE_INVALID_TRANSITION", "단계의 현재 상태에서는 이 작업을 수행할 수 없습니다."),
+    EVIDENCE_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "EVIDENCE_ALREADY_SUBMITTED", "이 확인자는 이미 이 사건에 증빙을 제출했습니다."),
+    ACTIVE_RELEASE_CASE_EXISTS(HttpStatus.CONFLICT, "ACTIVE_RELEASE_CASE_EXISTS", "진행 중인 사후 인계 사건이 있어 계정을 삭제할 수 없습니다."),
+    ITEM_DELETE_NOT_ALLOWED(HttpStatus.CONFLICT, "ITEM_DELETE_NOT_ALLOWED", "진행 중인 사후 인계 사건이 있어 항목을 삭제할 수 없습니다."),
+    RECIPIENT_ALREADY_ASSIGNED(HttpStatus.CONFLICT, "RECIPIENT_ALREADY_ASSIGNED", "해당 항목에는 이미 담당자가 등록되어 있습니다."),
+    CONFIRMER_ALREADY_REGISTERED(HttpStatus.CONFLICT, "CONFIRMER_ALREADY_REGISTERED", "이미 등록된 지정 확인자 이메일입니다."),
+    BACKUP_RECIPIENT_EMAIL_DUPLICATED(HttpStatus.CONFLICT, "BACKUP_RECIPIENT_EMAIL_DUPLICATED", "대체 담당자 이메일은 주 담당자와 같을 수 없습니다."),
+    RECIPIENT_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "RECIPIENT_RESEND_NOT_ALLOWED", "현재 수락 상태에서는 수락 요청을 다시 보낼 수 없습니다."),
+    CONFIRMER_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "CONFIRMER_RESEND_NOT_ALLOWED", "현재 수락 상태에서는 수락 요청을 다시 보낼 수 없습니다."),
+    DISPUTE_CONTACT_RESEND_NOT_ALLOWED(HttpStatus.CONFLICT, "DISPUTE_CONTACT_RESEND_NOT_ALLOWED", "이미 검증이 완료된 연락처에는 검증 메일을 다시 보낼 수 없습니다."),
+    ITEM_ORDER_CONFLICT(HttpStatus.CONFLICT, "ITEM_ORDER_CONFLICT", "순서 충돌이 있어 확정할 수 없습니다."),
+    ORDER_NOT_CONFIRMED(HttpStatus.CONFLICT, "ORDER_NOT_CONFIRMED", "실행 순서가 아직 확정되지 않아 패키지를 봉인할 수 없습니다."),
+    EVIDENCE_ALREADY_DELETED(HttpStatus.CONFLICT, "EVIDENCE_ALREADY_DELETED", "이미 삭제된 증빙입니다."),
+    EVIDENCE_ALREADY_DECIDED(HttpStatus.CONFLICT, "EVIDENCE_ALREADY_DECIDED", "이미 판정이 완료된 증빙은 다시 판정할 수 없습니다."),
+    DUPLICATE_REQUEST(HttpStatus.CONFLICT, "DUPLICATE_REQUEST", "이미 처리 중이거나 처리된 요청입니다."),
+    CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, "CONCURRENT_MODIFICATION", "다른 요청이 먼저 처리되어 현재 상태와 충돌합니다. 다시 시도해 주세요."),
+
+    // 서버 에러 (500)
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR","서버 오류가 발생했습니다.");
+
+    private final HttpStatus httpStatus;
+    private final String code;
+    private final String message;
+
+    ErrorCode(HttpStatus httpStatus, String code, String message) {
+        this.httpStatus = httpStatus;
+        this.code = code;
+        this.message = message;
+    }
+}

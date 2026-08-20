@@ -1,0 +1,256 @@
+package com.mamoki.ieojuda.domain.recipient.service;
+
+import com.mamoki.ieojuda.domain.plan.dto.ItemResponse;
+import com.mamoki.ieojuda.domain.plan.entity.DisclosureScope;
+import com.mamoki.ieojuda.domain.plan.entity.Item;
+import com.mamoki.ieojuda.domain.plan.entity.ItemStatus;
+import com.mamoki.ieojuda.domain.plan.entity.LifeArea;
+import com.mamoki.ieojuda.domain.audit.entity.EmailType;
+import com.mamoki.ieojuda.domain.plan.entity.Plan;
+import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
+import com.mamoki.ieojuda.domain.plan.service.PlanOwnershipReader;
+import com.mamoki.ieojuda.domain.recipient.dto.BackupRegisterRequest;
+import com.mamoki.ieojuda.domain.recipient.dto.BackupRegisterResponse;
+import com.mamoki.ieojuda.domain.recipient.dto.RecipientAcceptanceEmailResponse;
+import com.mamoki.ieojuda.domain.recipient.dto.RecipientBulkRegisterRequest;
+import com.mamoki.ieojuda.domain.recipient.dto.RecipientBulkRegisterResponse;
+import com.mamoki.ieojuda.domain.recipient.dto.RecipientDetailResponse;
+import com.mamoki.ieojuda.domain.recipient.dto.RecipientRegisterRequest;
+import com.mamoki.ieojuda.domain.recipient.dto.RecipientRegisterResponse;
+import com.mamoki.ieojuda.domain.recipient.dto.RecipientUpdateRequest;
+import com.mamoki.ieojuda.domain.recipient.dto.RecipientUpdateResponse;
+import com.mamoki.ieojuda.domain.recipient.entity.AcceptanceStatus;
+import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
+import com.mamoki.ieojuda.domain.recipient.entity.RoleType;
+import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
+import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
+import com.mamoki.ieojuda.global.config.AppProperties;
+import com.mamoki.ieojuda.global.email.contract.EmailContent;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxService;
+import com.mamoki.ieojuda.global.email.template.EmailBuilder;
+import com.mamoki.ieojuda.global.exception.CustomException;
+import com.mamoki.ieojuda.global.exception.ErrorCode;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.UUID;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+// "역할 담당자 등록" 화면 - 승인된 항목(박스) 하나당 담당자 한 명을 배정하고, 등록과 동시에 역할 수락 이메일을 발송
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class RecipientService {
+
+    private final ItemRepository itemRepository;
+    private final RecipientRepository recipientRepository;
+    private final PlanOwnershipReader planOwnershipReader;
+    private final EmailOutboxService emailOutboxService;
+    private final AppProperties appProperties;
+    private final SecurityTokenService securityTokenService;
+
+    @Transactional
+    public RecipientBulkRegisterResponse registerAll(UUID userId, UUID planId, RecipientBulkRegisterRequest request) {
+        planOwnershipReader.findOwnedPlan(userId, planId);
+        List<Item> items = validateAll(planId, request.recipients());
+
+        List<RecipientRegisterResponse> responses = new ArrayList<>();
+        for (int i = 0; i < request.recipients().size(); i++) {
+            responses.add(registerOne(items.get(i), request.recipients().get(i)));
+        }
+
+        return new RecipientBulkRegisterResponse(responses);
+    }
+
+    // 이메일은 발송 후 되돌릴 수 없으므로, 저장·발송을 시작하기 전에 요청 전체를 먼저 검증한다
+    private List<Item> validateAll(UUID planId, List<RecipientRegisterRequest> requests) {
+        Set<UUID> requestedItemIds = new HashSet<>();
+        List<Item> items = new ArrayList<>();
+
+        for (RecipientRegisterRequest request : requests) {
+            if (!requestedItemIds.add(request.itemId())) {
+                throw new CustomException(ErrorCode.RECIPIENT_ALREADY_ASSIGNED);
+            }
+
+            Item item = findItem(planId, request.itemId());
+
+            //  진입 조건: "구조화 항목이 승인된 후 진입"
+            if (item.getStatus() != ItemStatus.APPROVED) {
+                throw new CustomException(ErrorCode.ITEM_NOT_APPROVED);
+            }
+            // 항목(박스) 하나당 담당자 한 명 규칙
+            if (item.getRecipient() != null) {
+                throw new CustomException(ErrorCode.RECIPIENT_ALREADY_ASSIGNED);
+            }
+            // 대체 담당자가 주 담당자와 동일 이메일이면 실제 대체 전환 시 의미가 없으므로 차단
+            if (request.backup() != null && request.backup().email().equals(request.email())) {
+                throw new CustomException(ErrorCode.BACKUP_RECIPIENT_EMAIL_DUPLICATED);
+            }
+
+            items.add(item);
+        }
+
+        return items;
+    }
+
+    // 담당자 저장 + 항목 배정 + 초대 토큰 발급 + 수락 이메일 발송
+    // 이메일 발송 실패는 예외로 던지지 않는다 - 담당자 저장은 유지하고 건별 결과만 응답에 담는다
+    private RecipientRegisterResponse registerOne(Item item, RecipientRegisterRequest request) {
+        LifeArea lifeArea = item.getLifeArea();
+        Plan plan = lifeArea.getPlan();
+        DisclosureScope disclosureScope = item.getDisclosureScope();
+
+        Recipient recipient = recipientRepository.save(Recipient.builder()
+                .plan(plan)
+                .lifeArea(lifeArea)
+                .name(request.name())
+                .email(request.email())
+                .roleType(toRoleType(disclosureScope))
+                .isBackup(false)
+                .disclosureScope(disclosureScope)
+                .maxWaitHours(request.maxWaitHours())
+                .build());
+
+        item.assignRecipient(recipient);
+
+        issueInviteAndSend(recipient, toRoleName(disclosureScope));
+
+        BackupRegisterResponse backupResponse = request.backup() == null
+                ? null
+                : registerBackup(plan, lifeArea, disclosureScope, recipient, request.backup());
+
+        return RecipientRegisterResponse.of(recipient, item.getItemId(), true, null, backupResponse);
+    }
+
+    // 대체 담당자 저장 + 초대 토큰 발급 + 수락 이메일 발송
+    // 항목(Item)에는 배정하지 않는다 - 박스당 활성(주) 담당자 1명 규칙은 backupFor 관계로만 표현한다
+    private BackupRegisterResponse registerBackup(Plan plan, LifeArea lifeArea, DisclosureScope disclosureScope,
+                                                   Recipient primary, BackupRegisterRequest backupRequest) {
+        Recipient backup = recipientRepository.save(Recipient.builder()
+                .plan(plan)
+                .lifeArea(lifeArea)
+                .name(backupRequest.name())
+                .email(backupRequest.email())
+                .roleType(toRoleType(disclosureScope))
+                .isBackup(true)
+                .disclosureScope(disclosureScope)
+                .maxWaitHours(null)
+                .backupFor(primary)
+                .build());
+
+        issueInviteAndSend(backup, toRoleName(disclosureScope) + " (대체 담당자)");
+
+        return BackupRegisterResponse.of(backup, true, null);
+    }
+
+    // issue #41 - 재발급 시 이전에 발급됐던 미사용 ACCEPT_ROLE 토큰은 먼저 폐기한다(재발급·연락처변경 시 기존 토큰 폐기)
+    private void issueInviteAndSend(Recipient recipient, String roleName) {
+        securityTokenService.revokeAllForRecipient(recipient, SecurityTokenPurpose.ACCEPT_ROLE);
+        LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
+        String plainToken = securityTokenService.issueForRecipient(SecurityTokenPurpose.ACCEPT_ROLE, recipient, expiresAt);
+        recipient.markInviteSent();
+        sendAcceptanceEmail(recipient, roleName, plainToken, expiresAt);
+    }
+
+    private void sendAcceptanceEmail(Recipient recipient, String roleName,
+                                      String plainToken, LocalDateTime expiresAt) {
+        // 프론트 실제 경로 - 주 담당자와 대체 담당자는 서로 다른 화면으로 안내한다.
+        String path = Boolean.TRUE.equals(recipient.getIsBackup()) ? "/backup-accept" : "/role-acceptance";
+        String secureLink = appProperties.getBaseUrl() + path + "?token=" + plainToken;
+        EmailContent content = EmailBuilder.build(
+                roleName,
+                "역할 수락 여부를 확인해 주세요.",
+                expiresAt.atZone(ZoneId.systemDefault()),
+                secureLink,
+                appProperties.getContactEmail()
+        );
+        emailOutboxService.enqueue(recipient.getPlan(), null, EmailType.ROLE_ACCEPTANCE_INVITE, recipient.getEmail(), content);
+    }
+
+    private RoleType toRoleType(DisclosureScope disclosureScope) {
+        return switch (disclosureScope) {
+            case FAMILY -> RoleType.FAMILY_MANAGER;
+            case WORK -> RoleType.WORK_MANAGER;
+            case RELATIONSHIP -> RoleType.RELATIONSHIP_MANAGER;
+        };
+    }
+
+    private String toRoleName(DisclosureScope disclosureScope) {
+        return switch (disclosureScope) {
+            case FAMILY -> "가족 담당자";
+            case WORK -> "업무 처리 담당자";
+            case RELATIONSHIP -> "관계 정리 담당자";
+        };
+    }
+
+    private Item findItem(UUID planId, UUID itemId) {
+        Item item = itemRepository.findById(itemId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ITEM_NOT_FOUND));
+        if (!item.getLifeArea().getPlan().getPlanId().equals(planId)) {
+            throw new CustomException(ErrorCode.ITEM_NOT_FOUND);
+        }
+        return item;
+    }
+
+    // "역할 점검" 화면 상세 - 이름 클릭 시 해당 담당자에게 배정된 항목 전체
+    public RecipientDetailResponse getRecipient(UUID userId, UUID planId, UUID assigneeId) {
+        planOwnershipReader.findOwnedActivePlan(userId, planId);
+        Recipient recipient = findOwnedRecipient(planId, assigneeId);
+
+        List<ItemResponse> items = itemRepository.findByRecipient_AssigneeIdOrderByItemIdAsc(assigneeId).stream()
+                .map(ItemResponse::from)
+                .collect(Collectors.toList());
+
+        return RecipientDetailResponse.of(recipient, items);
+    }
+
+    // "수락 요청 다시 보내기" - 이미 수락/거절한 담당자에게는 재전송하지 않는다
+    @Transactional
+    public RecipientAcceptanceEmailResponse resendAcceptanceEmail(UUID userId, UUID recipientId) {
+        Recipient recipient = recipientRepository.findById(recipientId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RECIPIENT_NOT_FOUND));
+        if (!recipient.getPlan().getUser().getUserId().equals(userId)) {
+            throw new CustomException(ErrorCode.RECIPIENT_NOT_FOUND);
+        }
+        if (recipient.getAcceptanceStatus() != AcceptanceStatus.PENDING
+                && recipient.getAcceptanceStatus() != AcceptanceStatus.EXPIRED) {
+            throw new CustomException(ErrorCode.RECIPIENT_RESEND_NOT_ALLOWED);
+        }
+
+        recipient.resetAcceptance();
+        issueInviteAndSend(recipient, toRoleName(recipient.getDisclosureScope()));
+
+        return RecipientAcceptanceEmailResponse.of(recipient, true, null);
+    }
+
+    // "담당자 수정하기" - 이름/이메일 수정. 이메일이 바뀌면 재검증이 필요하므로 수락 이메일을 다시 보낸다
+    @Transactional
+    public RecipientUpdateResponse updateRecipient(UUID userId, UUID planId, UUID assigneeId, RecipientUpdateRequest request) {
+        planOwnershipReader.findOwnedPlan(userId, planId);
+        Recipient recipient = findOwnedRecipient(planId, assigneeId);
+
+        boolean emailChanged = recipient.updateContact(request.name(), request.email());
+        if (emailChanged) {
+            issueInviteAndSend(recipient, toRoleName(recipient.getDisclosureScope()));
+        }
+
+        return RecipientUpdateResponse.of(recipient, emailChanged, null);
+    }
+
+    private Recipient findOwnedRecipient(UUID planId, UUID assigneeId) {
+        Recipient recipient = recipientRepository.findById(assigneeId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RECIPIENT_NOT_FOUND));
+        if (!recipient.getPlan().getPlanId().equals(planId)) {
+            throw new CustomException(ErrorCode.RECIPIENT_NOT_FOUND);
+        }
+        return recipient;
+    }
+}
