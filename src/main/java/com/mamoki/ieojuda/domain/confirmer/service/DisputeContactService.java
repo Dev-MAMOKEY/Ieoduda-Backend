@@ -85,7 +85,7 @@ public class DisputeContactService {
         LocalDateTime expiresAt = LocalDateTime.now().plusHours(appProperties.getInviteTokenTtlHours());
         contact.issueInviteToken(TokenProvider.hashToken(plainToken), expiresAt);
 
-        String secureLink = appProperties.getBaseUrl() + "/dispute-contacts/verify/" + plainToken;
+        String secureLink = appProperties.getBaseUrl() + "/dispute-contact-email?token=" + plainToken;
         EmailContent content = EmailBuilder.build(
                 "이의 제기 연락처",
                 "링크를 눌러 이의 제기 연락처로 등록되었음을 확인해 주세요.",
