@@ -12,6 +12,7 @@ import com.mamoki.ieojuda.domain.confirmer.entity.Relationship;
 import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
 import com.mamoki.ieojuda.domain.confirmer.repository.DisputeContactRepository;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
+import com.mamoki.ieojuda.domain.evidence.repository.EvidenceDownloadTokenRepository;
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
 import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
 import com.mamoki.ieojuda.domain.handoffcheck.repository.HandoffCheckRepository;
@@ -23,6 +24,8 @@ import com.mamoki.ieojuda.domain.plan.repository.LifeAreaMessageRepository;
 import com.mamoki.ieojuda.domain.plan.repository.LifeAreaRepository;
 import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.domain.plan.repository.PlanVersionRepository;
+import com.mamoki.ieojuda.domain.postaccess.repository.AccessTokenRepository;
+import com.mamoki.ieojuda.domain.postaccess.repository.PackageActionCompletionRepository;
 import com.mamoki.ieojuda.domain.postaccess.repository.PackageIssueRepository;
 import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
@@ -30,8 +33,10 @@ import com.mamoki.ieojuda.domain.releasecase.repository.ObjectionRepository;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.domain.releasecase.service.ReleaseCaseGuardService;
 import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.repository.SecurityTokenRepository;
 import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.domain.stage.repository.HandoverStageRepository;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
@@ -80,6 +85,11 @@ class UserServiceTest {
     private RefreshSessionRepository refreshSessionRepository;
     private PartnerReviewerRepository partnerReviewerRepository;
     private SecurityTokenService securityTokenService;
+    private AccessTokenRepository accessTokenRepository;
+    private PackageActionCompletionRepository packageActionCompletionRepository;
+    private SecurityTokenRepository securityTokenRepository;
+    private EmailOutboxRepository emailOutboxRepository;
+    private EvidenceDownloadTokenRepository evidenceDownloadTokenRepository;
     private UserService userService;
 
     @BeforeEach
@@ -108,6 +118,11 @@ class UserServiceTest {
         refreshSessionRepository = mock(RefreshSessionRepository.class);
         partnerReviewerRepository = mock(PartnerReviewerRepository.class);
         securityTokenService = mock(SecurityTokenService.class);
+        accessTokenRepository = mock(AccessTokenRepository.class);
+        packageActionCompletionRepository = mock(PackageActionCompletionRepository.class);
+        securityTokenRepository = mock(SecurityTokenRepository.class);
+        emailOutboxRepository = mock(EmailOutboxRepository.class);
+        evidenceDownloadTokenRepository = mock(EvidenceDownloadTokenRepository.class);
 
         userService = new UserService(
                 userRepository, planRepository, conversationRepository, lifeAreaRepository, lifeAreaMessageRepository,
@@ -115,7 +130,9 @@ class UserServiceTest {
                 releaseCaseRepository, planVersionRepository, evidenceRepository, emailLogRepository,
                 handoverStageRepository, objectionRepository, handoffCheckRepository, handoffCheckResponseRepository,
                 packageIssueRepository, evidenceStorageClient, releaseCaseGuardService,
-                sessionRevocationService, refreshSessionRepository, partnerReviewerRepository, securityTokenService);
+                sessionRevocationService, refreshSessionRepository, partnerReviewerRepository, securityTokenService,
+                accessTokenRepository, packageActionCompletionRepository, securityTokenRepository,
+                emailOutboxRepository, evidenceDownloadTokenRepository);
     }
 
     @Test

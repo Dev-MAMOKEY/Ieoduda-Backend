@@ -10,9 +10,13 @@ import com.mamoki.ieojuda.domain.account.repository.RefreshSessionRepository;
 import com.mamoki.ieojuda.domain.account.repository.UserRepository;
 import com.mamoki.ieojuda.domain.confirmer.repository.ConfirmerRepository;
 import com.mamoki.ieojuda.domain.confirmer.repository.DisputeContactRepository;
+import com.mamoki.ieojuda.domain.confirmer.entity.Confirmer;
+import com.mamoki.ieojuda.domain.confirmer.entity.DisputeContact;
 import com.mamoki.ieojuda.domain.evidence.entity.Evidence;
+import com.mamoki.ieojuda.domain.evidence.repository.EvidenceDownloadTokenRepository;
 import com.mamoki.ieojuda.domain.evidence.repository.EvidenceRepository;
 import com.mamoki.ieojuda.domain.partner.repository.PartnerReviewerRepository;
+import com.mamoki.ieojuda.domain.audit.entity.EmailLog;
 import com.mamoki.ieojuda.domain.audit.repository.EmailLogRepository;
 import com.mamoki.ieojuda.domain.handoffcheck.repository.HandoffCheckRepository;
 import com.mamoki.ieojuda.domain.handoffcheck.repository.HandoffCheckResponseRepository;
@@ -23,14 +27,21 @@ import com.mamoki.ieojuda.domain.plan.repository.LifeAreaMessageRepository;
 import com.mamoki.ieojuda.domain.plan.repository.LifeAreaRepository;
 import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
 import com.mamoki.ieojuda.domain.plan.repository.PlanVersionRepository;
+import com.mamoki.ieojuda.domain.postaccess.repository.AccessTokenRepository;
+import com.mamoki.ieojuda.domain.postaccess.repository.PackageActionCompletionRepository;
 import com.mamoki.ieojuda.domain.postaccess.repository.PackageIssueRepository;
+import com.mamoki.ieojuda.domain.recipient.entity.Recipient;
 import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
+import com.mamoki.ieojuda.domain.releasecase.entity.ReleaseCase;
 import com.mamoki.ieojuda.domain.releasecase.repository.ObjectionRepository;
 import com.mamoki.ieojuda.domain.releasecase.repository.ReleaseCaseRepository;
 import com.mamoki.ieojuda.domain.releasecase.service.ReleaseCaseGuardService;
 import com.mamoki.ieojuda.domain.securitytoken.entity.SecurityTokenPurpose;
+import com.mamoki.ieojuda.domain.securitytoken.repository.SecurityTokenRepository;
 import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
+import com.mamoki.ieojuda.domain.stage.entity.HandoverStage;
 import com.mamoki.ieojuda.domain.stage.repository.HandoverStageRepository;
+import com.mamoki.ieojuda.global.email.outbox.EmailOutboxRepository;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import com.mamoki.ieojuda.global.storage.EvidenceStorageClient;
@@ -38,6 +49,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Comparator;
+import java.util.List;
 
 // 명세서 "마이페이지" 화면 - 계정 정보 변경 / 계정 삭제
 @Service
@@ -69,6 +83,11 @@ public class UserService {
     private final RefreshSessionRepository refreshSessionRepository;
     private final PartnerReviewerRepository partnerReviewerRepository;
     private final SecurityTokenService securityTokenService;
+    private final AccessTokenRepository accessTokenRepository;
+    private final PackageActionCompletionRepository packageActionCompletionRepository;
+    private final SecurityTokenRepository securityTokenRepository;
+    private final EmailOutboxRepository emailOutboxRepository;
+    private final EvidenceDownloadTokenRepository evidenceDownloadTokenRepository;
 
     @Transactional
     public UserResponse updateProfile(UUID userId, UserUpdateRequest request) {
@@ -167,11 +186,18 @@ public class UserService {
         userRepository.delete(user);
     }
 
-    // 자식 -> 부모 순서로 삭제 (FK 제약 위반 방지)
+    // 자식 -> 부모 순서로 삭제 (FK 제약 위반 방지). 아래 각 지점은 실제 운영 FK 제약(ON DELETE 지정
+    // 없음 = NO ACTION)을 전부 조회해서 맞춘 것으로, 이전에는 email_outbox/posthumouse_access_tokens/
+    // package_action_completions/security_tokens/evidence_download_tokens 정리가 빠져 있어 실제
+    // 사용 이력이 있는 계정은 탈퇴 시 전부 DataIntegrityViolationException으로 실패했다(버그 회귀 방지).
     private void deletePlanData(Plan plan) {
         UUID planId = plan.getPlanId();
 
-        emailLogRepository.deleteAll(emailLogRepository.findByPlan_PlanIdOrderByRequestedAtDesc(planId));
+        // email_outbox.log_id -> email_logs 이므로 로그를 지우기 전에 그 로그를 참조하는 아웃박스부터 지운다
+        List<EmailLog> emailLogs = emailLogRepository.findByPlan_PlanIdOrderByRequestedAtDesc(planId);
+        emailLogs.forEach(log -> emailOutboxRepository.deleteByEmailLog_LogId(log.getLogId()));
+        emailLogRepository.deleteAll(emailLogs);
+
         deleteEvidenceWithStorage(planId);
         objectionRepository.deleteAll(objectionRepository.findByPlan_PlanId(planId));
         handoffCheckResponseRepository.deleteAll(handoffCheckResponseRepository.findByHandoffCheck_Plan_PlanId(planId));
@@ -179,12 +205,40 @@ public class UserService {
         packageIssueRepository.deleteAll(packageIssueRepository.findByRecipient_Plan_PlanId(planId));
         lifeAreaMessageRepository.deleteAll(lifeAreaMessageRepository.findByConversation_Plan_PlanId(planId));
         itemRepository.deleteAll(itemRepository.findByLifeArea_Plan_PlanIdOrderByItemIdAsc(planId));
-        handoverStageRepository.deleteAll(handoverStageRepository.findByPlan_PlanId(planId));
-        recipientRepository.deleteAll(recipientRepository.findByPlan_PlanId(planId));
-        disputeContactRepository.deleteAll(disputeContactRepository.findByPlan_PlanId(planId));
-        releaseCaseRepository.deleteAll(releaseCaseRepository.findByPlan_PlanId(planId));
+
+        // posthumouse_access_tokens.stage_id / package_action_completions.stage_id -> handover_stages
+        List<HandoverStage> stages = handoverStageRepository.findByPlan_PlanId(planId);
+        stages.forEach(stage -> {
+            accessTokenRepository.deleteByHandoverStage_StageId(stage.getStageId());
+            packageActionCompletionRepository.deleteByHandoverStage_StageId(stage.getStageId());
+        });
+        handoverStageRepository.deleteAll(stages);
+
+        // security_tokens.recipient_id -> role_assignees. 대체 담당자(backup_for_id)는 role_assignees
+        // 자기 자신을 가리키는 FK라, 대체 담당자를 주 담당자보다 먼저 지워야 순서 위반이 안 난다.
+        List<Recipient> recipients = recipientRepository.findByPlan_PlanId(planId);
+        recipients.forEach(recipient -> securityTokenRepository.deleteByRecipient_AssigneeId(recipient.getAssigneeId()));
+        recipients.stream()
+                .sorted(Comparator.comparing(r -> r.getBackupFor() == null ? 1 : 0))
+                .forEach(recipientRepository::delete);
+
+        // security_tokens.dispute_contact_id -> dispute_contacts
+        List<DisputeContact> disputeContacts = disputeContactRepository.findByPlan_PlanId(planId);
+        disputeContacts.forEach(contact -> securityTokenRepository.deleteByDisputeContact_ContactId(contact.getContactId()));
+        disputeContactRepository.deleteAll(disputeContacts);
+
+        // security_tokens.case_id -> release_cases
+        List<ReleaseCase> releaseCases = releaseCaseRepository.findByPlan_PlanId(planId);
+        releaseCases.forEach(releaseCase -> securityTokenRepository.deleteByReleaseCase_CaseId(releaseCase.getCaseId()));
+        releaseCaseRepository.deleteAll(releaseCases);
+
         planVersionRepository.deleteAll(planVersionRepository.findByPlan_PlanId(planId));
-        confirmerRepository.deleteAll(confirmerRepository.findByPlan_PlanIdOrderByConfirmIdAsc(planId));
+
+        // security_tokens.confirmer_id -> death_confirmers
+        List<Confirmer> confirmers = confirmerRepository.findByPlan_PlanIdOrderByConfirmIdAsc(planId);
+        confirmers.forEach(confirmer -> securityTokenRepository.deleteByConfirmer_ConfirmId(confirmer.getConfirmId()));
+        confirmerRepository.deleteAll(confirmers);
+
         lifeAreaRepository.deleteAll(lifeAreaRepository.findByPlan_PlanId(planId));
         conversationRepository.deleteAll(conversationRepository.findByPlan_PlanId(planId));
         planRepository.delete(plan);
@@ -192,9 +246,13 @@ public class UserService {
 
     // S3 원본까지 함께 정리한다. 이미 자동/수동 삭제 절차로 원본이 지워진 증빙(deletedAt != null)은
     // 다시 지우려고 시도하지 않는다 - 존재하지 않는 스토리지 키를 지우는 시도를 막기 위함.
+    // evidence_download_tokens.evidence_id -> evidences이므로 증빙을 지우기 전에 그 증빙에 발급된
+    // 다운로드 토큰부터 지운다.
     private void deleteEvidenceWithStorage(UUID planId) {
         var evidences = evidenceRepository.findByPlan_PlanId(planId);
         for (Evidence evidence : evidences) {
+            evidenceDownloadTokenRepository.deleteAll(
+                    evidenceDownloadTokenRepository.findByEvidence_EvidenceId(evidence.getEvidenceId()));
             if (evidence.getDeletedAt() == null) {
                 evidenceStorageClient.delete(evidence.getStorageKey());
             }

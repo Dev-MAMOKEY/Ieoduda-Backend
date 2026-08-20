@@ -23,4 +23,7 @@ public interface AccessTokenRepository extends JpaRepository<AccessToken, UUID> 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from AccessToken a where a.tokenHash = :tokenHash")
     Optional<AccessToken> findByTokenHashForUpdate(@Param("tokenHash") String tokenHash);
+
+    // 계정 삭제 - handover_stages를 지우기 전에 이 단계를 참조하는 토큰을 먼저 지워야 FK 위반이 안 난다
+    void deleteByHandoverStage_StageId(UUID stageId);
 }
