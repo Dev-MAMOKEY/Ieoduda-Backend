@@ -10,6 +10,9 @@ import com.mamoki.ieojuda.domain.plan.entity.ItemStatus;
 import com.mamoki.ieojuda.domain.plan.entity.Plan;
 import com.mamoki.ieojuda.domain.plan.repository.ItemRepository;
 import com.mamoki.ieojuda.domain.plan.repository.PlanRepository;
+import com.mamoki.ieojuda.domain.recipient.repository.RecipientRepository;
+import com.mamoki.ieojuda.domain.releasecase.service.ReleaseCaseGuardService;
+import com.mamoki.ieojuda.domain.securitytoken.service.SecurityTokenService;
 import com.mamoki.ieojuda.global.exception.CustomException;
 import com.mamoki.ieojuda.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +45,8 @@ class ItemReviewServiceBolaTest {
     void setUp() {
         planRepository = mock(PlanRepository.class);
         itemRepository = mock(ItemRepository.class);
-        itemReviewService = new ItemReviewService(itemRepository, new PlanOwnershipReader(planRepository));
+        itemReviewService = new ItemReviewService(itemRepository, new PlanOwnershipReader(planRepository),
+                mock(RecipientRepository.class), mock(SecurityTokenService.class), mock(ReleaseCaseGuardService.class));
         when(planRepository.findByPlanIdAndUser_UserId(PLAN_ID, ATTACKER_ID)).thenReturn(Optional.empty());
     }
 
