@@ -26,15 +26,23 @@ public interface SecurityTokenRepository extends JpaRepository<SecurityToken, UU
     // 사건 종료(취소/완료) 시 그 사건에 묶인 목적별 토큰을 일괄 폐기하기 위한 조회
     List<SecurityToken> findByReleaseCase_CaseIdAndPurposeAndUsedAtIsNullAndRevokedAtIsNull(UUID caseId, SecurityTokenPurpose purpose);
 
-    // 테스트 정리용 - 사건에 묶인 토큰(사건 FK 참조)을 전부 지워 사건/확인자 삭제 시 FK 위반을 막는다
+    // 사건/확인자/담당자/이의연락처에 묶인 토큰(FK 참조, 사용·폐기 여부 무관)을 전부 지워 그 대상
+    // 삭제 시 FK 위반을 막는다 - 계정 삭제(UserService.deletePlanData)와 테스트 정리 둘 다에서 쓴다.
     @Modifying
     @Query("DELETE FROM SecurityToken t WHERE t.releaseCase.caseId = :caseId")
     void deleteByReleaseCase_CaseId(@Param("caseId") UUID caseId);
 
-    // 테스트 정리용 - 확인자에 묶인 토큰(확인자 FK 참조, 사용·폐기 여부 무관)을 전부 지워 확인자 삭제 시 FK 위반을 막는다
     @Modifying
     @Query("DELETE FROM SecurityToken t WHERE t.confirmer.confirmId = :confirmId")
     void deleteByConfirmer_ConfirmId(@Param("confirmId") UUID confirmId);
+
+    @Modifying
+    @Query("DELETE FROM SecurityToken t WHERE t.recipient.assigneeId = :assigneeId")
+    void deleteByRecipient_AssigneeId(@Param("assigneeId") UUID assigneeId);
+
+    @Modifying
+    @Query("DELETE FROM SecurityToken t WHERE t.disputeContact.contactId = :contactId")
+    void deleteByDisputeContact_ContactId(@Param("contactId") UUID contactId);
 
     // issue #41 - "토큰 소비를 원자적 단일 사용으로 처리" - 조회 후 갱신이 아니라 조건부 UPDATE 한 번으로
     // 처리해, 동시에 같은 토큰이 들어와도 정확히 하나만 영향받은 행(1)을 얻는다. 나머지는 0을 받아 거절된다.

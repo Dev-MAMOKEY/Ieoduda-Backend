@@ -17,4 +17,7 @@ public interface PackageActionCompletionRepository extends JpaRepository<Package
 
     // issue #78 - 단계 완료 판정(전체 항목 수 대비 완료된 항목 수)에 사용
     long countByHandoverStage_StageId(UUID stageId);
+
+    // 계정 삭제 - handover_stages를 지우기 전에 이 단계를 참조하는 행동 완료 기록을 먼저 지워야 FK 위반이 안 난다
+    void deleteByHandoverStage_StageId(UUID stageId);
 }
