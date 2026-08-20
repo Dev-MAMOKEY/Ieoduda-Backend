@@ -108,6 +108,10 @@ class PosthumousAccessServiceTest {
                 .build();
         when(accessTokenRepository.findByTokenHash(TokenProvider.hashToken(PLAIN_TOKEN)))
                 .thenReturn(Optional.of(accessToken));
+        // sendOtp()는 쿨다운 경쟁 조건을 막기 위해 잠금 조회를 쓴다 - 단위 테스트에선 실제 잠금 대신
+        // 동일한 값을 반환하는 목으로 대체(잠금 자체의 동시성 효과는 HTTP 통합 테스트가 검증)
+        when(accessTokenRepository.findByTokenHashForUpdate(TokenProvider.hashToken(PLAIN_TOKEN)))
+                .thenReturn(Optional.of(accessToken));
         // OtpAttemptRecorder(REQUIRES_NEW)가 tokenId로 다시 조회하는 부분을 재현
         when(accessTokenRepository.findById(any())).thenReturn(Optional.of(accessToken));
         return accessToken;
