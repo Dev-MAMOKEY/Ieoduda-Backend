@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 
 // issue #41 - 목적별 보안 토큰의 발급·검증·소비·폐기를 한 곳에 모은다. 만료·사용·폐기·목적 불일치
 // 검증을 여기서 공통화해서, 각 도메인 서비스(사망신고/증빙제출/이의제기/역할수락)가 직접
@@ -81,10 +82,20 @@ public class SecurityTokenService {
 
     // 조회 + 만료·사용·폐기·목적 불일치 검증 (아직 소비하지 않음 - 실제 처리가 성공한 뒤 consume()을 별도 호출)
     public SecurityToken resolve(String plainToken, SecurityTokenPurpose expectedPurpose) {
+        return resolve(plainToken, EnumSet.of(expectedPurpose));
+    }
+
+    // waiting 페이지처럼 하나의 링크를 CANCEL_CASE(작성자)·RAISE_OBJECTION(이의 제기 연락처) 중
+    // 어느 쪽이 눌러도 조회는 되어야 하는 경우 - 여러 목적을 한 번에 허용한다. 검증 로직은 resolve()와 동일.
+    public SecurityToken resolveAny(String plainToken, java.util.Set<SecurityTokenPurpose> expectedPurposes) {
+        return resolve(plainToken, expectedPurposes);
+    }
+
+    private SecurityToken resolve(String plainToken, java.util.Set<SecurityTokenPurpose> expectedPurposes) {
         SecurityToken token = tokenLookupGuard.resolve(plainToken,
                 () -> securityTokenRepository.findByTokenHash(TokenProvider.hashToken(plainToken)));
 
-        if (token.getPurpose() != expectedPurpose) {
+        if (!expectedPurposes.contains(token.getPurpose())) {
             throw new CustomException(ErrorCode.TOKEN_PURPOSE_MISMATCH);
         }
         if (token.isRevoked()) {

@@ -42,6 +42,7 @@ public class SecurityConfig {
             "/api/dispute-contacts/*/verify",
             "/api/release-cases/*/disputes", // 이의 제기 접수 (초대 토큰이 곧 인증)
             "/api/release-cases/*/cancellations", // 경고 메일 취소 링크 접수 (CANCEL_CASE 토큰이 곧 인증)
+            "/api/release-cases/*/waiting/status", // 경고 메일 waiting 링크 공개 조회 (CANCEL_CASE/RAISE_OBJECTION 토큰이 곧 인증)
             "/api/release-cases/*/evidence/**", // 증빙 제출 (초대 토큰이 곧 인증)
             "/api/recipient-acceptances/**",// 역할 담당자 수락
             "/api/confirmer-acceptances/**", // 지정확인자 수락 / 사망 신고
@@ -90,6 +91,7 @@ public class SecurityConfig {
                 new RateLimitRule("evidence-submit", "/api/release-cases/*/evidence/submit", "POST", 50, Duration.ofHours(1)),
                 new RateLimitRule("objection", "/api/release-cases/*/disputes", "POST", 50, Duration.ofHours(1)),
                 new RateLimitRule("case-cancellation", "/api/release-cases/*/cancellations", "POST", 50, Duration.ofHours(1)),
+                new RateLimitRule("waiting-status", "/api/release-cases/*/waiting/status", "GET", 100, Duration.ofHours(1)),
                 new RateLimitRule("dispute-verify", "/api/dispute-contacts/*/verify", null, 100, Duration.ofHours(1)),
                 new RateLimitRule("dispute-contact-resend", "/api/dispute-contacts/*/verification-email", "POST", 25, Duration.ofHours(1)),
                 new RateLimitRule("self-warning-email", "/api/self-warning-email/**", null, 100, Duration.ofHours(1)),
