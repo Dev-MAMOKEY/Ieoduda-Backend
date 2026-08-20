@@ -61,7 +61,7 @@ public class PosthumousAccessService {
     // ② OTP 발송 - 별도 이메일로 4자리 코드 발송, 해시만 저장
     @Transactional
     public OtpSendResponse sendOtp(String plainToken) {
-        AccessToken accessToken = findByToken(plainToken);
+        AccessToken accessToken = findByTokenForUpdate(plainToken);
         checkUsable(accessToken);
         checkAttemptsRemaining(accessToken);
         checkResendCooldown(accessToken);
@@ -115,6 +115,12 @@ public class PosthumousAccessService {
     private AccessToken findByToken(String plainToken) {
         return tokenLookupGuard.resolve(plainToken,
                 () -> accessTokenRepository.findByTokenHash(TokenProvider.hashToken(plainToken)));
+    }
+
+    // OTP 발송 - 쿨다운 체크·발송 시각 갱신을 같은 잠긴 행 위에서 원자적으로 수행하기 위해 잠금 조회를 쓴다.
+    private AccessToken findByTokenForUpdate(String plainToken) {
+        return tokenLookupGuard.resolve(plainToken,
+                () -> accessTokenRepository.findByTokenHashForUpdate(TokenProvider.hashToken(plainToken)));
     }
 
     // 만료·재사용(1회성 소진)·역할 불일치 링크를 차단 (이슈 #76 완료 조건 3가지)
