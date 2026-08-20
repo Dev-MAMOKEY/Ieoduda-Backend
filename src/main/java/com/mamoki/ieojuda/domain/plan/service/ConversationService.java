@@ -76,7 +76,7 @@ public class ConversationService {
         Conversation conversation = findConversation(userId, planId, conversationId);
 
         Slice<LifeAreaMessage> slice = lifeAreaMessageRepository
-                .findByConversation_ConversationIdOrderByMessageIdDesc(conversation.getConversationId(), pageable);
+                .findByConversation_ConversationIdOrderByCreatedAtDescMessageIdDesc(conversation.getConversationId(), pageable);
 
         List<LifeAreaMessageResponse> messages = new ArrayList<>(
                 slice.getContent().stream().map(LifeAreaMessageResponse::from).toList()
@@ -99,7 +99,7 @@ public class ConversationService {
 
         // step 1. 이 세션 안에서 지금까지의 대화 이력 로드
         List<LifeAreaMessage> history = lifeAreaMessageRepository
-                .findByConversation_ConversationIdOrderByMessageIdAsc(conversation.getConversationId());
+                .findByConversation_ConversationIdOrderByCreatedAtAscMessageIdAsc(conversation.getConversationId());
 
         // issue #52 - 전체 이력 길이 상한. 이번 메세지를 저장하기 전에 확인해야
         // "거절된 입력은 저장하지 않는다"는 원칙을 지킬 수 있다.

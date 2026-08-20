@@ -202,7 +202,7 @@ public class RecipientService {
 
     // "역할 점검" 화면 상세 - 이름 클릭 시 해당 담당자에게 배정된 항목 전체
     public RecipientDetailResponse getRecipient(UUID userId, UUID planId, UUID assigneeId) {
-        planOwnershipReader.findOwnedPlan(userId, planId);
+        planOwnershipReader.findOwnedActivePlan(userId, planId);
         Recipient recipient = findOwnedRecipient(planId, assigneeId);
 
         List<ItemResponse> items = itemRepository.findByRecipient_AssigneeIdOrderByItemIdAsc(assigneeId).stream()

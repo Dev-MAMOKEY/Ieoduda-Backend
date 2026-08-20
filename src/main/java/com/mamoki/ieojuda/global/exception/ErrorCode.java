@@ -25,6 +25,7 @@ public enum ErrorCode {
     CIRCULAR_DEPENDENCY_DETECTED(HttpStatus.BAD_REQUEST, "CIRCULAR_DEPENDENCY_DETECTED", "발송 단계에 순환 의존 관계가 존재합니다."),
     PLAN_NOT_SEALED(HttpStatus.BAD_REQUEST, "PLAN_NOT_SEALED", "봉인된 계획만 인계 점검을 보낼 수 있습니다."),
     PLAN_NOT_READY(HttpStatus.BAD_REQUEST, "PLAN_NOT_READY", "준비(봉인)되지 않았거나 비활성화된 계획에서는 사후 사건을 생성할 수 없습니다."),
+    PLAN_DEACTIVATED(HttpStatus.CONFLICT, "PLAN_DEACTIVATED", "비활성화된 계획입니다."),
     WAITING_PERIOD_NOT_SET(HttpStatus.BAD_REQUEST, "WAITING_PERIOD_NOT_SET", "대기 기간이 설정되지 않아 사후 사건을 생성할 수 없습니다."),
     SELF_WARNING_EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "SELF_WARNING_EMAIL_NOT_VERIFIED", "본인 경고 이메일 인증이 완료되지 않아 사후 사건을 생성할 수 없습니다."),
 
