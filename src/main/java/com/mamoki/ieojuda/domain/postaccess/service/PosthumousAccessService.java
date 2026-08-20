@@ -77,8 +77,13 @@ public class PosthumousAccessService {
                 otpExpiresAt.atZone(ZoneId.systemDefault()),
                 appProperties.getContactEmail()
         );
-        // 실제 SMTP 발송은 EmailOutboxScheduler가 담당한다 (issue #51 - 발송 실패가 성공으로 기록되지 않도록)
-        emailOutboxService.enqueue(accessToken.getHandoverStage().getPlan(), accessToken.getHandoverStage(),
+        // 실제 SMTP 발송은 EmailOutboxScheduler가 담당한다 (issue #51 - 발송 실패가 성공으로 기록되지 않도록).
+        // handoverStage는 여기서 null로 넘긴다 - sendOtp()에 도달하려면 checkRoleConsistent()가 이미 이
+        // 단계를 SENT로 확인했으므로, 발송 성공 시 스케줄러가 stage.send()를 다시 호출하면
+        // (PENDING|READY|FALLBACK -> SENT만 허용) HANDOVER_STAGE_INVALID_TRANSITION이 터진다.
+        // 그 예외가 dispatchPending()의 트랜잭션 전체를 롤백시켜 outbox.markSent()까지 취소되고,
+        // 같은 행이 PENDING으로 남아 다음 주기마다 같은 코드로 무한 재전송되던 버그였다.
+        emailOutboxService.enqueue(accessToken.getHandoverStage().getPlan(), null,
                 EmailType.OTP, recipient.getEmail(), content);
 
         return new OtpSendResponse(
