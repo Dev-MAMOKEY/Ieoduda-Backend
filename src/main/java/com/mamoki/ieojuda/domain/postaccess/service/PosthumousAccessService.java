@@ -58,7 +58,7 @@ public class PosthumousAccessService {
         return PosthumousAccessResponse.of(accessToken, appProperties.getContactEmail());
     }
 
-    // ② OTP 발송 - 별도 이메일로 6자리 코드 발송, 해시만 저장
+    // ② OTP 발송 - 별도 이메일로 4자리 코드 발송, 해시만 저장
     @Transactional
     public OtpSendResponse sendOtp(String plainToken) {
         AccessToken accessToken = findByToken(plainToken);
@@ -171,7 +171,7 @@ public class PosthumousAccessService {
     }
 
     private String generateOtpCode() {
-        int code = SECURE_RANDOM.nextInt(1_000_000);
-        return String.format("%06d", code);
+        int code = SECURE_RANDOM.nextInt(10_000);
+        return String.format("%04d", code);
     }
 }

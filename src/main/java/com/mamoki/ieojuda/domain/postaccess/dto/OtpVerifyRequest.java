@@ -5,8 +5,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
 public record OtpVerifyRequest(
-        @Schema(description = "6자리 OTP 코드", example = "123456")
+        @Schema(description = "4자리 OTP 코드", example = "1234")
         @NotBlank(message = "OTP 코드를 입력해 주세요.")
-        @Pattern(regexp = "\\d{6}", message = "OTP 코드는 6자리 숫자여야 합니다.") String otpCode
+        @Pattern(regexp = "\\d{4}", message = "OTP 코드는 4자리 숫자여야 합니다.") String otpCode
 ) {
 }

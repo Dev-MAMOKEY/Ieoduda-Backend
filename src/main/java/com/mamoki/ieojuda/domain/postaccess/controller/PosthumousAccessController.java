@@ -36,7 +36,7 @@ public class PosthumousAccessController {
         return ResponseEntity.ok(RsData.success(posthumousAccessService.getAccess(token)));
     }
 
-    @Operation(summary = "OTP 발송", description = "담당자의 등록된 이메일로 별도의 6자리 OTP 코드를 발송합니다. 재발송 간격과 최대 시도 횟수 제한이 적용됩니다.")
+    @Operation(summary = "OTP 발송", description = "담당자의 등록된 이메일로 별도의 4자리 OTP 코드를 발송합니다. 재발송 간격과 최대 시도 횟수 제한이 적용됩니다.")
     @PostMapping("/{token}/otp")
     public ResponseEntity<RsData<OtpSendResponse>> sendOtp(
             @Parameter(description = "사후 인계 링크 토큰") @PathVariable String token

@@ -198,7 +198,7 @@ class PosthumousAccessHttpIntegrationTest {
         ArgumentCaptor<EmailContent> captor = ArgumentCaptor.forClass(EmailContent.class);
         verify(emailOutboxService).enqueue(any(), any(), any(), anyString(), captor.capture());
         String realCode = extractOtpCode(captor.getValue().body());
-        String wrongCode = realCode.equals("000000") ? "111111" : "000000";
+        String wrongCode = realCode.equals("0000") ? "1111" : "0000";
 
         for (int i = 0; i < 5; i++) {
             HttpResponse<String> failResp = post("/api/posthumous-access/" + plainToken + "/verify",
@@ -214,8 +214,8 @@ class PosthumousAccessHttpIntegrationTest {
     }
 
     private String extractOtpCode(String emailBody) {
-        Matcher matcher = Pattern.compile("인증 코드: (\\d{6})").matcher(emailBody);
-        assertThat(matcher.find()).as("OTP 이메일 본문에서 6자리 코드를 찾을 수 있어야 한다").isTrue();
+        Matcher matcher = Pattern.compile("인증 코드: (\\d{4})").matcher(emailBody);
+        assertThat(matcher.find()).as("OTP 이메일 본문에서 4자리 코드를 찾을 수 있어야 한다").isTrue();
         return matcher.group(1);
     }
 
