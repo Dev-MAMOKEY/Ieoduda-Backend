@@ -25,7 +25,7 @@ public class RoleCheckService {
     private final ConfirmerRepository confirmerRepository;
 
     public List<RoleCheckSummaryResponse> getRoleChecks(UUID userId, UUID planId) {
-        planOwnershipReader.findOwnedPlan(userId, planId);
+        planOwnershipReader.findOwnedActivePlan(userId, planId);
 
         List<RoleCheckSummaryResponse> results = new ArrayList<>();
         for (Recipient recipient : recipientRepository.findByPlan_PlanIdAndIsBackupFalseOrderByAssigneeIdAsc(planId)) {

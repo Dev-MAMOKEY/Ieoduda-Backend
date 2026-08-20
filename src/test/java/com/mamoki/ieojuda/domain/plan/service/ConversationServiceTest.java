@@ -67,7 +67,7 @@ class ConversationServiceTest {
         when(conversation.getPlan()).thenReturn(plan);
         when(planOwnershipReader.findOwnedPlan(USER_ID, PLAN_ID)).thenReturn(plan);
         when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation));
-        when(lifeAreaMessageRepository.findByConversation_ConversationIdOrderByMessageIdAsc(CONVERSATION_ID))
+        when(lifeAreaMessageRepository.findByConversation_ConversationIdOrderByCreatedAtAscMessageIdAsc(CONVERSATION_ID))
                 .thenReturn(List.of());
         when(lifeAreaMessageRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
@@ -89,7 +89,7 @@ class ConversationServiceTest {
         LifeAreaMessage taintedPastMessage = LifeAreaMessage.builder()
                 .conversation(conversation).role(MessageRole.USER)
                 .content("복구코드: XY12-9988").build();
-        when(lifeAreaMessageRepository.findByConversation_ConversationIdOrderByMessageIdAsc(CONVERSATION_ID))
+        when(lifeAreaMessageRepository.findByConversation_ConversationIdOrderByCreatedAtAscMessageIdAsc(CONVERSATION_ID))
                 .thenReturn(List.of(taintedPastMessage));
 
         assertThatThrownBy(() -> conversationService.sendMessage(
@@ -136,7 +136,7 @@ class ConversationServiceTest {
     void sendMessage_whenHistoryPlusNewMessageExceedsTwelveThousandChars_throwsWithoutSavingOrCallingOpenAI() {
         LifeAreaMessage longPastMessage = LifeAreaMessage.builder()
                 .conversation(conversation).role(MessageRole.USER).content("x".repeat(11_990)).build();
-        when(lifeAreaMessageRepository.findByConversation_ConversationIdOrderByMessageIdAsc(CONVERSATION_ID))
+        when(lifeAreaMessageRepository.findByConversation_ConversationIdOrderByCreatedAtAscMessageIdAsc(CONVERSATION_ID))
                 .thenReturn(List.of(longPastMessage));
 
         assertThatThrownBy(() -> conversationService.sendMessage(
@@ -152,7 +152,7 @@ class ConversationServiceTest {
     void sendMessage_whenHistoryPlusNewMessageIsExactlyTwelveThousandChars_proceeds() {
         LifeAreaMessage longPastMessage = LifeAreaMessage.builder()
                 .conversation(conversation).role(MessageRole.USER).content("x".repeat(11_990)).build();
-        when(lifeAreaMessageRepository.findByConversation_ConversationIdOrderByMessageIdAsc(CONVERSATION_ID))
+        when(lifeAreaMessageRepository.findByConversation_ConversationIdOrderByCreatedAtAscMessageIdAsc(CONVERSATION_ID))
                 .thenReturn(List.of(longPastMessage));
         OpenAIResponse response = new OpenAIResponse(List.of(
                 new OpenAIResponse.Choice(new OpenAIMessageDto("assistant",
