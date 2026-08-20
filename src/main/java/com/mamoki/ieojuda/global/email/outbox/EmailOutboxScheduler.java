@@ -42,7 +42,23 @@ public class EmailOutboxScheduler {
         }
     }
 
+    // 이 메서드 밖으로 예외가 새어나가면 dispatchPending()의 트랜잭션 전체가 롤백돼, 같은 배치에서
+    // 이미 성공 처리된 다른 행의 markSent()까지 전부 취소된다(버그 회귀 방지 - 발송 후 부수 효과인
+    // stage.send()가 실패하는 경우 이 문제로 이미 발송된 메일이 무한 재전송됐었다). EvidenceDeletionScheduler와
+    // 동일하게, 발송 자체는 성공했는데 그 이후 처리에서 예외가 나는 경우까지 넓게 잡아 이 건만 격리한다.
     private void dispatchOne(EmailOutbox outbox) {
+        try {
+            dispatchOneUnsafe(outbox);
+        } catch (Exception e) {
+            String reason = truncate(e.getMessage());
+            log.error("[Email Outbox Dispatch] 예상치 못한 예외 - 이 건만 건너뛴다. outboxId={}, cause={}",
+                    outbox.getOutboxId(), e.getMessage(), e);
+            adminActionAuditService.recordSystem(
+                    AdminActionType.EMAIL_OUTBOX_DISPATCH_FAILED, outbox.getOutboxId(), false, reason);
+        }
+    }
+
+    private void dispatchOneUnsafe(EmailOutbox outbox) {
         EmailContent content = new EmailContent(outbox.getSubject(), outbox.getBody());
         EmailSendResult result = emailSender.send(outbox.getRecipientEmail(), content);
         EmailLog emailLog = outbox.getEmailLog();
@@ -68,6 +84,13 @@ public class EmailOutboxScheduler {
             adminActionAuditService.recordSystem(
                     AdminActionType.EMAIL_OUTBOX_DISPATCH_FAILED, outbox.getOutboxId(), false, reason);
         }
+    }
+
+    private String truncate(String message) {
+        if (message == null) {
+            return null;
+        }
+        return message.length() > 1000 ? message.substring(0, 1000) : message;
     }
 
     private String describeFailure(EmailSendResult result) {
